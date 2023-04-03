@@ -55,6 +55,8 @@ const scraperObject = {
 			new_context.setDefaultTimeout(60000*3)
 			new_context.addCookies(cookies)
 			const newPage = await new_context.newPage();
+			await newPage.setViewportSize({ width: 1600, height: 30000 });
+
 
 			await newPage.goto(link);
 			await newPage.waitForLoadState()
