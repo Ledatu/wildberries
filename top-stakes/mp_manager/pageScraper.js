@@ -1,7 +1,7 @@
 const xlsx = require("node-xlsx").default
 const fs = require("fs");
-const cookies = require('./cookies.json');
 const path = require("path");
+const cookies = require(path.join(__dirname, '../../secrets/mp_manager/cookies'))
 const { parseStakeSheet } = require("./xlsxParser");
 const { updateRow } = require("../google_sheets/index");
 const scraperObject = {

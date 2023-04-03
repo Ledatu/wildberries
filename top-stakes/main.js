@@ -1,11 +1,9 @@
-const fs = require('fs');
-const path = require('path');
 const scrape = require('./mp_manager/index');
-const getGoogleData = require('./google_sheets/index');
+const { getStakes } = require('./google_sheets/index');
 const clearDownloadsDirectory = require('./mp_manager/clearDownloadsFolder');
-const { createFlagFile, deleteFlagFile } = require('./flagWork');
+const { createFlagFile, deleteFlagFile, checkFlagFilesExist } = require('../flags/flagWork');
 
-const flagsDir = path.join(__dirname, '..', 'flags');
+
 const flagFile = 'top-stakes-flag.txt';
 
 /**
@@ -14,22 +12,24 @@ const flagFile = 'top-stakes-flag.txt';
  */
 module.exports = () => {
     return new Promise((resolve, reject) => {
-        fs.access(path.join(flagsDir, flagFile), async (err) => {
-            if (err) {
-                console.log('Running operation...');
-                await createFlagFile()
+        checkFlagFilesExist([flagFile, 'analytics-flag.txt'])
+            .then(async (flagExists) => {
+                if (!flagExists) {
+                    console.log('Running operation...');
 
-                await clearDownloadsDirectory()
-                await getGoogleData()
-                await scrape()
-                
-                await deleteFlagFile()
-                resolve();
-            } else {
-                // Flag file present, so skip the operation
-                console.log(`Flag file '${flagFile}' present. Skipping operation.`);
-                resolve();
-            }
-        });
+                    await createFlagFile(flagFile);
+
+                    await clearDownloadsDirectory();
+                    await getStakes();
+                    await scrape();
+                    
+                    await deleteFlagFile(flagFile);
+
+                } else {
+                    console.log(`Flag file present. Skipping operation.`);
+                    resolve();
+                }
+            })
+            .catch(reject);
     });
-}
+};

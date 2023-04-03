@@ -12,7 +12,7 @@ const main = require('./main');
 
 const app = express();
 const port = 24456;
-const secretKey = require(path.join(__dirname, '../secrets/top-stakes/secret'));
+const secretKey = require(path.join(__dirname, '../secrets/top-stakes/secret')).secretKey;
 
 /**
  * Middleware function to check for the token in the request header.

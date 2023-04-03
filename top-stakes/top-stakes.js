@@ -1,11 +1,12 @@
 const startServer = require("./server");
-const { deleteFlagFile } = require("./flagWork")
+const { deleteFlagFile } = require('../flags/flagWork');
 
 startServer()
+const flagFile = 'top-stakes-flag.txt';
 
 function cleanup() {
     console.log('Script exiting...');
-    deleteFlagFile().catch((err) => {
+    deleteFlagFile(flagFile).catch((err) => {
         console.error(`Error deleting flag file: ${err}`);
     });
     process.exit();
