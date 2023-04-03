@@ -106,8 +106,9 @@ const scraperObject = {
 			await download.saveAs(path_to_file)
 
 			// change sheet name to match current name in mp_manager
-			const sheet = xlsx.parse(path_to_file)[0]
-            fs.writeFileSync(path_to_file, xlsx.build([{ name: dataObj['name'], data: sheet['data'] }]))
+			const data = xlsx.parse(path_to_file)[0].data
+			data[0][0] = dataObj.name
+            fs.writeFileSync(path_to_file, xlsx.build([{ name: 'Sheet', data: data }]))
 
 			// await newPage.$eval('.MuiBox-root.css-1age63q > button', button => button.click());
 
@@ -129,7 +130,9 @@ const scraperObject = {
 		// }
 		let all_page_promises = []
 		for(link in urls){
-			//all_page_promises.push(pagePromise(urls[link]))
+			// all_page_promises.push(pagePromise(urls[link]))
+			// await new Promise(resolve => setTimeout(resolve, 1000));
+			
 			try {
 				await pagePromise(urls[link]).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); throw error})
 			} catch (error) {
@@ -137,11 +140,7 @@ const scraperObject = {
 				console.log('Retrying...')
 				await pagePromise(urls[link]).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); })
 			}
-			//await page.waitForTimeout(20000)
-			//pagePromise(link).then(pr => all_page_promises.push(pr)).catch(error => {
-			//	console.log(error)
-			//	pagePromise(link).then(pr => all_page_promises.push(pr))
-			//})
+
 		}
 		await Promise.all(all_page_promises)
 		for (pr in all_page_promises) {

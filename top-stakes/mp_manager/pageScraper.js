@@ -57,16 +57,16 @@ const scraperObject = {
 			}
 
 			const download = await downloadPromise
-			const path_to_file = path.join(__dirname, 'files', 'downloads', `${index}.xlsx`)
+			const path_to_file = path.join(__dirname, 'files', 'downloads', `${index} ${stake}.xlsx`)
 			await download.saveAs(path_to_file)
 
-			const data = xlsx.parse(path_to_file)[0].data
-			fs.writeFileSync(path_to_file, xlsx.build([{name: stake, data: data}]))
+			// const data = xlsx.parse(path_to_file)[0].data
+			// fs.writeFileSync(path_to_file, xlsx.build([{name: 'Sheet', data: data}]))
 
 			const row = parseStakeSheet(path_to_file)
 			console.log(row)
 			await updateRow(row)
-			resolve(data)
+			resolve()
 
 		}).catch(error => { console.log('Passing error'); throw error })
 

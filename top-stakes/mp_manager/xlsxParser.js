@@ -21,7 +21,7 @@ const parseStakeSheet = function (filepath) {
         const cell = data_row[columnNumber];
         data.push(cell ? cell : null);
     }
-    return [sheet.name].concat(data);
+    return [filepath.slice(0, filepath.lastIndexOf('.')).split(' ').slice(1).join(' ')].concat(data);
 };
 
 /**

@@ -37,7 +37,7 @@ module.exports = (campaign_id) => {
         const sheet = xlsx.parse(`${downloadsForlder}${file}`)[0]
 		const data = sheet['data']
 		const id = file.split('.')[0]
-		const name = id + ' ' + sheet['name']
+		const name = id + ' ' + data[0][0]
 		
 //		console.log(id)
 		if (!presented_ids.includes(id)) {
