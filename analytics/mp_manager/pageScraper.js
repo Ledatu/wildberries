@@ -77,7 +77,7 @@ const scraperObject = {
 
 
 			dataObj['id'] = `[${link.split('/')[7]}]`
-			dataObj['name'] = (await newPage.$eval('.MuiBox-root.css-6n7j50 > a > .MuiTypography-root.MuiTypography-h3.css-11j0d37', text => text.textContent));
+			dataObj['name'] = (await newPage.$eval('.MuiBox-root.css-6n7j50 > a > h3', text => text.textContent));
 //			console.log(dataObj.name)
 //			dataObj['name'] = dataObj.name.split(' ').slice(1, dataObj.name.length).join(' ')
 
