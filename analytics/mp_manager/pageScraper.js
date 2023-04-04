@@ -92,7 +92,7 @@ const scraperObject = {
 			//await newPage.locator('.sd').first().evaluate(el => el.click())
 			//await newPage.waitForTimeout(1000)
 
-			await newPage.getByText('Экспорт').first().waitFor()
+			// await newPage.getByText('Экспорт').first().waitFor()
 			await newPage.waitForTimeout(5000)
 
 			const downloadPromise = newPage.waitForEvent('download');
@@ -130,16 +130,16 @@ const scraperObject = {
 		// }
 		let all_page_promises = []
 		for(link in urls){
-			// all_page_promises.push(pagePromise(urls[link]))
+			all_page_promises.push(pagePromise(urls[link]))
 			// await new Promise(resolve => setTimeout(resolve, 1000));
 			
-			try {
-				await pagePromise(urls[link]).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); throw error})
-			} catch (error) {
-				//console.log(error)
-				console.log('Retrying...')
-				await pagePromise(urls[link]).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); })
-			}
+			// try {
+			// 	await pagePromise(urls[link]).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); throw error})
+			// } catch (error) {
+			// 	//console.log(error)
+			// 	console.log('Retrying...')
+			// 	await pagePromise(urls[link]).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); })
+			// }
 
 		}
 		await Promise.all(all_page_promises)
