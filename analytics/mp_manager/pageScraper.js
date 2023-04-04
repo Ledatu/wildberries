@@ -60,7 +60,7 @@ const scraperObject = {
 
 			await newPage.goto(link);
 			await newPage.waitForLoadState()
-			// await newPage.waitForTimeout(10000)
+			await newPage.waitForTimeout(10000)
 
 			await newPage.waitForSelector('.MuiTypography-root.MuiTypography-h3.css-11j0d37').catch(error => {console.log('Invisible'); reject(dataObj)});
 
@@ -83,17 +83,16 @@ const scraperObject = {
 
 			await newPage.waitForSelector('.MuiButtonBase-root.MuiAccordionSummary-root.css-1dkwt8e');
 			await newPage.$eval('.MuiButtonBase-root.MuiAccordionSummary-root.css-1dkwt8e', el => el.click());
-			// await newPage.waitForTimeout(10000)
+			await newPage.waitForTimeout(20000)
 			
 			//await newPage.getByText('Интервал').first().evaluate(el => el.click());
 			
 			//await newPage.locator('.rmdp-left')
 			//await newPage.waitForTimeout(1000)
 			//await newPage.locator('.sd').first().evaluate(el => el.click())
-			//await newPage.waitForTimeout(1000)
+			// await newPage.waitForTimeout(1000)
 
 			// await newPage.getByText('Экспорт').first().waitFor()
-			// await newPage.waitForTimeout(5000)
 
 			const downloadPromise = newPage.waitForEvent('download');
 			await newPage.getByText('Экспорт').first().evaluate(el => el.click())
@@ -114,7 +113,7 @@ const scraperObject = {
 
 			await newPage.close()
 			await new_context.close()
-			process.stdout.write(`${index}/${totalLength} `)
+			console.log(`${index}/${totalLength} `)
 			console.log(dataObj)
 			resolve(dataObj)
 
@@ -133,16 +132,16 @@ const scraperObject = {
 		let index = 0
 		for(link in urls){
 			index++
-			// all_page_promises.push(pagePromise(urls[link], index, urls.length))
+			all_page_promises.push(pagePromise(urls[link], index, urls.length))
 			// await new Promise(resolve => setTimeout(resolve, 1000));
 			
-			try {
-				await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); throw error})
-			} catch (error) {
-				//console.log(error)
-				console.log('Retrying...')
-				await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); })
-			}
+			// try {
+			// 	await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); throw error})
+			// } catch (error) {
+			// 	//console.log(error)
+			// 	console.log('Retrying...')
+			// 	await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); })
+			// }
 
 		}
 		await Promise.all(all_page_promises)

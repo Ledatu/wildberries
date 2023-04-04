@@ -47,7 +47,7 @@ module.exports = (campaign_id) => {
 		if (data[0].length < 1){
 		    return
 		}
-//        console.log(file, data)
+    //    console.log(file, data)
         const rashod = data[7]
         const clicks = data[3]
 		const srs = data[6]
