@@ -132,16 +132,16 @@ const scraperObject = {
 		let index = 0
 		for(link in urls){
 			index++
-			all_page_promises.push(pagePromise(urls[link], index, urls.length))
+			// all_page_promises.push(pagePromise(urls[link], index, urls.length))
 			// await new Promise(resolve => setTimeout(resolve, 1000));
 			
-			// try {
-			// 	await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); throw error})
-			// } catch (error) {
-			// 	//console.log(error)
-			// 	console.log('Retrying...')
-			// 	await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); })
-			// }
+			try {
+				await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); throw error})
+			} catch (error) {
+				//console.log(error)
+				console.log('Retrying...')
+				await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); })
+			}
 
 		}
 		await Promise.all(all_page_promises)
