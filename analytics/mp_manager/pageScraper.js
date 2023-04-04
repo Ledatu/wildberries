@@ -48,7 +48,7 @@ const scraperObject = {
 			return 
 		}
 	
-		let pagePromise = (link) => new Promise(async(resolve, reject) => {
+		let pagePromise = (link, index, totalLength) => new Promise(async(resolve, reject) => {
 			let dataObj = {};
 			
 			const new_context = await browser.newContext();
@@ -114,6 +114,7 @@ const scraperObject = {
 
 			await newPage.close()
 			await new_context.close()
+			process.stdout.write(`${index}/${totalLength} `)
 			console.log(dataObj)
 			resolve(dataObj)
 
@@ -129,16 +130,18 @@ const scraperObject = {
 		// 	console.log(currentPageData);
 		// }
 		let all_page_promises = []
+		let index = 0
 		for(link in urls){
-			// all_page_promises.push(pagePromise(urls[link]))
+			index++
+			// all_page_promises.push(pagePromise(urls[link], index, urls.length))
 			// await new Promise(resolve => setTimeout(resolve, 1000));
 			
 			try {
-				await pagePromise(urls[link]).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); throw error})
+				await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); throw error})
 			} catch (error) {
 				//console.log(error)
 				console.log('Retrying...')
-				await pagePromise(urls[link]).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); })
+				await pagePromise(urls[link], index, urls.length).then(pr => all_page_promises.push(pr)).catch(error => {console.log('Caught'); })
 			}
 
 		}
