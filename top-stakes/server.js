@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const bodyParser = require('body-parser');
 const main = require('./main');
+const { getTemplate } = require('./google_sheets/templateXlsxDownload/templateXlsxDownload');
 
 const app = express();
 const port = 24456;
@@ -24,6 +25,7 @@ const secretKey = require(path.join(__dirname, '../secrets/top-stakes/secret')).
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
+  // console.log(req.headers)
   if (token == null) return res.sendStatus(401);
 
   jwt.verify(token, secretKey, (err, user) => {
@@ -63,6 +65,27 @@ app.get('/', (req, res) => {
 app.get('/api/startXlsxParsing', authenticateToken, (req, res) => {
   startXlsxParsing();
   res.send('XLSX parsing started!');
+});
+
+app.get('/api/downloadTemplate', async (req, res) => {
+  try {
+    await getTemplate()
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1000);
+    });
+    const file = path.join(__dirname, 'google_sheets/templateXlsxDownload/Template.xlsx');
+    // Wait for the file to be created before attempting to download it
+    fs.access(file, fs.constants.F_OK, (err) => {
+      if (err) {
+        res.status(500).end(err);
+      } else {
+        res.download(file); // Set disposition and send it.
+      }
+    });
+  }
+  catch (error) {
+    res.status(500).end(error);
+  }
 });
 
 // Use the body-parser middleware to parse request bodies
