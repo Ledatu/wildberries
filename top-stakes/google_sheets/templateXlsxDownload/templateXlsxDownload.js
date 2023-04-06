@@ -78,13 +78,11 @@ async function getTemplate(auth) {
     })).data.values;
     const filteredBars = bars.filter(stake => stake.length === 2);
     await fs.writeFile(path.join(__dirname, 'Template.xlsx'), xlsx.build([{ name: 'Sheet1', data: filteredBars }]));
-    console.log('wrote')
 }
 
 module.exports = {
     getTemplate: async () => {
         const auth = await authorize()
         await getTemplate(auth).catch(console.error)
-        console.log('exited')
     },
 };
