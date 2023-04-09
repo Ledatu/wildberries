@@ -7,12 +7,12 @@ cron.schedule('0 */2 * * *', () => {
 	main()
 })
 
-const flagFile = 'analytics-flag.txt';
+// const flagFile = 'analytics-flag.txt';
 function cleanup() {
     console.log('Script exiting...');
-    deleteFlagFile(flagFile).catch((err) => {
-        console.error(`Error deleting flag file: ${err}`);
-    });
+    // deleteFlagFile(flagFile).catch((err) => {
+    //     console.error(`Error deleting flag file: ${err}`);
+    // });
     process.exit();
 }
 

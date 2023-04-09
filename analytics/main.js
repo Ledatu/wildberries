@@ -15,7 +15,7 @@ module.exports = () => {
                 if (!flagExists) {
                     console.log('Running operation...');
                     
-                    await createFlagFile(flagFile)
+                    // await createFlagFile(flagFile)
                     
                     let campaign_ids = ['Q8OWW7YMRgq5h4wk7UHHvA', 'TsGOXnYrT22nfoDwEsftHw']
                     let campaign_names = ['MAYUSHA', 'DELICATUS']
@@ -25,7 +25,7 @@ module.exports = () => {
                         await writeToGoole(campaign_ids[i], campaign_names[i])
                     }
 
-                    await deleteFlagFile(flagFile)
+                    // await deleteFlagFile(flagFile)
 
                 } else {
                     console.log(`Flag file present. Skipping operation.`);
