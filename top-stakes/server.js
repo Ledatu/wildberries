@@ -68,11 +68,13 @@ app.get('/api/startXlsxParsing', authenticateToken, (req, res) => {
 });
 
 app.get('/api/downloadTemplate', async (req, res) => {
+  console.log(req)
   try {
     await getTemplate()
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
-    });
+    // await new Promise((resolve) => {
+    //   setTimeout(resolve, 1000);
+    // });
+    console.log('File created.')
     const file = path.join(__dirname, 'google_sheets/templateXlsxDownload/Template.xlsx');
     // Wait for the file to be created before attempting to download it
     fs.access(file, fs.constants.F_OK, (err) => {
