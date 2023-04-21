@@ -81,15 +81,17 @@ async function writePrices(auth) {
         });
     }
 
-    const data = xlsx.parse(path.join(__dirname, '../data.xlsx'))[0]['data'];
-    //console.log(data)
-    const sheets = google.sheets({ version: 'v4', auth });
+
     
+    const data = xlsx.parse(path.join(__dirname, '../data.xlsx'))[0]['data'];
+    console.log(data)
+    const sheets = google.sheets({ version: 'v4', auth });
+
     await sheets.spreadsheets.values.clear({
         spreadsheetId: '1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8',
         range: `Main report!1:1000`,
     });
-    
+
     await update_data(data)
     console.log(`Prices data written to the google sheets.`)
 }

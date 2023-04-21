@@ -8,3 +8,5 @@ top-stakes/google_sheets/templateXlsxDownload/Template.xlsx
 
 prices/data.xlsx
 prices/vendorCodes.json
+prices/stocks.json
+prices/orders.json
