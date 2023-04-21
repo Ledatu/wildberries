@@ -10,6 +10,7 @@ const fs = require('fs');
 const bodyParser = require('body-parser');
 const main = require('./main');
 const { getTemplate } = require('./google_sheets/templateXlsxDownload/templateXlsxDownload');
+const { getPrices } = require(path.join(__dirname, '../prices/prices.js'));
 
 const app = express();
 const port = 24456;
@@ -65,6 +66,11 @@ app.get('/', (req, res) => {
 app.get('/api/startXlsxParsing', authenticateToken, (req, res) => {
   startXlsxParsing();
   res.send('XLSX parsing started!');
+});
+
+app.get('/api/getPrices', authenticateToken, (req, res) => {
+  getPrices();
+  res.send('Prices getting started!');
 });
 
 app.get('/api/downloadTemplate', async (req, res) => {
