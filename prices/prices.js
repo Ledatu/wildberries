@@ -4,9 +4,9 @@ const writePrices = require('./google_sheets/index')
 const getPrices = async () => {
   Promise.all([
     await fetchCardsAndWriteToJSON(),
-    await fetchDataAndWriteToXlsx(),
     await fetchOrdersAndWriteToJSON(),
     await fetchStocksAndWriteToJSON(),
+    await fetchDataAndWriteToXlsx(),
   ]).then(async () => {
     console.log('All tasks completed successfully');
     await writePrices();
