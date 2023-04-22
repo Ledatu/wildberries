@@ -70,7 +70,7 @@ const buildXlsx = (data) => {
     const vendorCode = vendorCodes[el.nmId];
     if (!vendorCode) return;
     const obor = stocks[el.nmId]/(orders[el.nmId]/7)
-    new_data.push([String(vendorCode), el.price, el.discount, el.price * (1 - el.discount / 100), obor]);
+    new_data.push([String(vendorCode), el.price, el.discount, Math.floor(el.price * (1 - el.discount / 100)), obor]);
   });
   new_data = sortData(new_data); // Sort the data
   return xlsx.build([{ name: 'Общий отчёт', data: new_data }]);

@@ -1,4 +1,2 @@
-const { fetchStocksAndWriteToJSON, fetchOrdersAndWriteToJSON } = require("./main");
-
-// fetchStocksAndWriteToJSON()
-fetchOrdersAndWriteToJSON()
+const { getPrices } = require('./prices')
+getPrices()
