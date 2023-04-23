@@ -72,15 +72,17 @@ const buildXlsx = (data, campaign) => {
     if (!vendorCode) return;
     vendorCode = String(vendorCode)
     const per_day = orders[el.nmId]/7
-    const obor = stocks[el.nmId]/per_day
+    const stock = stocks[el.nmId]
+    const obor = stock/per_day
     const mult = multiplicity[vendorCode]
+    const zakaz = Math.floor((per_day*30-stock)/mult)*mult
     new_data.push([
       vendorCode, 
       el.price, 
       el.discount, 
       Math.floor(el.price * (1 - el.discount / 100)), 
       obor,
-      Math.floor((per_day*30)/mult)*mult
+      zakaz > 0 ? zakaz : 0
     ]);
   });
   new_data = sortData(new_data); // Sort the data
