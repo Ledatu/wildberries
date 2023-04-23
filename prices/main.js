@@ -14,9 +14,9 @@ const sortData = (data) => {
   return data;
 };
 
-const getAuthToken = (type) => {
+const getAuthToken = (type, campaign) => {
   try {
-    const secret = require('../secrets/wildberries/secret.json');
+    const secret = require(`../secrets/wildberries/${campaign}.json`);
     return secret[type];
   } catch (error) {
     console.error(error);
@@ -61,39 +61,50 @@ const getOrders = (authToken, params) => {
     .catch(error => console.error(error));
 };
 
-const buildXlsx = (data) => {
-  const vendorCodes = require(path.join(__dirname, 'vendorCodes'))
-  const orders = require(path.join(__dirname, 'orders'))
-  const stocks = require(path.join(__dirname, 'stocks'))
-  let new_data = [['Артикул продавца', 'Текущая розн. цена (до скидки)', 'Текущая скидка на сайте, %', 'Цена со скидкой', 'Оборачиваемость']]
+const buildXlsx = (data, campaign) => {
+  const vendorCodes = require(path.join(__dirname, 'files', campaign, 'vendorCodes'))
+  const orders = require(path.join(__dirname, 'files', campaign, 'orders'))
+  const stocks = require(path.join(__dirname, 'files', campaign, 'stocks'))
+  const multiplicity = require(path.join(__dirname, 'files/multiplicity'))
+  let new_data = [['Артикул продавца', 'Текущая розн. цена (до скидки)', 'Текущая скидка на сайте, %', 'Цена со скидкой', 'Оборачиваемость', 'ЗАКАЗАТЬ']]
   data.forEach(el => {
-    const vendorCode = vendorCodes[el.nmId];
+    let vendorCode = vendorCodes[el.nmId];
     if (!vendorCode) return;
-    const obor = stocks[el.nmId]/(orders[el.nmId]/7)
-    new_data.push([String(vendorCode), el.price, el.discount, Math.floor(el.price * (1 - el.discount / 100)), obor]);
+    vendorCode = String(vendorCode)
+    const per_day = orders[el.nmId]/7
+    const obor = stocks[el.nmId]/per_day
+    const mult = multiplicity[vendorCode]
+    new_data.push([
+      vendorCode, 
+      el.price, 
+      el.discount, 
+      Math.floor(el.price * (1 - el.discount / 100)), 
+      obor,
+      Math.floor((per_day*30)/mult)*mult
+    ]);
   });
   new_data = sortData(new_data); // Sort the data
   return xlsx.build([{ name: 'Общий отчёт', data: new_data }]);
 };
 
-const writeDataToXlsx = (data) => {
-  const buffer = buildXlsx(data);
-  return fs.writeFile(path.join(__dirname, 'data.xlsx'), buffer)
+const writeDataToXlsx = (data, campaign) => {
+  const buffer = buildXlsx(data, campaign);
+  return fs.writeFile(path.join(__dirname, 'files', campaign, 'data.xlsx'), buffer)
     .then(() => console.log('data.xlsx created.'))
     .catch(error => console.error(error));
 };
 
-const writeVendorCodeToJson = (data) => {
+const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
   data.forEach((item) => {
     jsonData[item.nmID] = item.vendorCode;
   });
-  return fs.writeFile(path.join(__dirname, 'vendorCodes.json'), JSON.stringify(jsonData))
+  return fs.writeFile(path.join(__dirname, 'files', campaign, 'vendorCodes.json'), JSON.stringify(jsonData))
     .then(() => console.log('vendorCodes.json created.'))
     .catch(error => console.error(error));
 };
 
-const writeStocksToJson = (data) => {
+const writeStocksToJson = (data, campaign) => {
   const jsonData = {};
   data.forEach((item) => {
     if (item.nmId in jsonData) 
@@ -101,12 +112,12 @@ const writeStocksToJson = (data) => {
     else
       jsonData[item.nmId] = item.quantity;
   });
-  return fs.writeFile(path.join(__dirname, 'stocks.json'), JSON.stringify(jsonData))
+  return fs.writeFile(path.join(__dirname, 'files', campaign, 'stocks.json'), JSON.stringify(jsonData))
     .then(() => console.log('stocks.json created.'))
     .catch(error => console.error(error));
 };
 
-const writeOrdersToJson = (data) => {
+const writeOrdersToJson = (data, campaign) => {
   const today = new Date().getDate()
   const jsonData = {};
   data.forEach((item) => {
@@ -116,22 +127,22 @@ const writeOrdersToJson = (data) => {
     else
       jsonData[item.nmId] = 1;
   });
-  return fs.writeFile(path.join(__dirname, 'orders.json'), JSON.stringify(jsonData))
+  return fs.writeFile(path.join(__dirname, 'files', campaign, 'orders.json'), JSON.stringify(jsonData))
     .then(() => console.log('orders.json created.'))
     .catch(error => console.error(error));
 };
 
-const fetchDataAndWriteToXlsx = () => {
-  const authToken = getAuthToken('api-token');
+const fetchDataAndWriteToXlsx = (campaign) => {
+  const authToken = getAuthToken('api-token', campaign);
   return getInfo(authToken)
     .then(data => {
-      return writeDataToXlsx(data);
+      return writeDataToXlsx(data, campaign);
     })
     .catch(error => console.error(error));
 };
 
-const fetchCardsAndWriteToJSON = () => {
-  const authToken = getAuthToken('api-token');
+const fetchCardsAndWriteToJSON = (campaign) => {
+  const authToken = getAuthToken('api-token', campaign);
   const params = {
     sort: {
       cursor: {
@@ -143,31 +154,31 @@ const fetchCardsAndWriteToJSON = () => {
     },
   };
   return getCards(authToken, params)
-    .then(cards => writeVendorCodeToJson(cards.data.cards))
+    .then(cards => writeVendorCodeToJson(cards.data.cards, campaign))
     .catch(error => console.error(error));
 };
 
-const fetchStocksAndWriteToJSON = () => {
-  const authToken = getAuthToken('api-statistic-token');
+const fetchStocksAndWriteToJSON = (campaign) => {
+  const authToken = getAuthToken('api-statistic-token', campaign);
   const dateFrom = new Date()
   dateFrom.setDate(dateFrom.getDate() - 1)
   const params = {
     dateFrom: dateFrom
   };
   return getStocks(authToken, params)
-    .then(data => writeStocksToJson(data))
+    .then(data => writeStocksToJson(data, campaign))
     .catch(error => console.error(error));
 };
 
-const fetchOrdersAndWriteToJSON = () => {
-  const authToken = getAuthToken('api-statistic-token');
+const fetchOrdersAndWriteToJSON = (campaign) => {
+  const authToken = getAuthToken('api-statistic-token', campaign);
   const dateFrom = new Date()
   dateFrom.setDate(dateFrom.getDate() - 8)
   const params = {
     dateFrom: dateFrom
   };
   return getOrders(authToken, params)
-    .then(data => writeOrdersToJson(data))
+    .then(data => writeOrdersToJson(data, campaign))
     .catch(error => console.error(error));
 };
 
