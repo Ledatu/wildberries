@@ -10,6 +10,7 @@ const fs = require('fs');
 const bodyParser = require('body-parser');
 const main = require('./main');
 const { getTemplate } = require('./google_sheets/templateXlsxDownload/templateXlsxDownload');
+const { copyZakazToOtherSpreadsheet } = require('../prices/google_sheets');
 const { getPrices } = require(path.join(__dirname, '../prices/prices.js'));
 
 const app = express();
@@ -71,6 +72,11 @@ app.get('/api/startXlsxParsing', authenticateToken, (req, res) => {
 app.get('/api/getPrices', authenticateToken, (req, res) => {
   getPrices();
   res.send('Prices getting started!');
+});
+
+app.get('/api/copyZakaz', authenticateToken, (req, res) => {
+  copyZakazToOtherSpreadsheet();
+  res.send('Zakaz copying started!');
 });
 
 app.get('/api/downloadTemplate', async (req, res) => {

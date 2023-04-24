@@ -131,6 +131,78 @@ const writeDataToFile = (data, filename) => {
   });
 };
 
+async function copyZakazToOtherSpreadsheet(auth) {
+  const sourceSpreadsheetId = "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8";
+  const destinationSpreadsheetId =
+    "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ";
+
+  const sheets = google.sheets({ version: "v4", auth });
+  const update_data = async (sheet, data) => {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: destinationSpreadsheetId,
+      range: `${sheet}!A2:C`,
+      valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+      resource: {
+        values: data,
+      },
+    });
+  };
+  const get_data = async (sheet) => {
+    const rows = (
+      await sheets.spreadsheets.values.get({
+        spreadsheetId: sourceSpreadsheetId,
+        range: `${sheet}!A2:F`,
+      })
+    ).data.values;
+
+    const data = [];
+    rows.forEach((row) => {
+      if (row[5] > 0) {
+        data.push([row[0], "", row[5]]);
+      }
+    });
+    return data;
+  };
+
+  const sourceSheets = await sheets.spreadsheets.get({
+    auth,
+    spreadsheetId: sourceSpreadsheetId,
+    fields: "sheets(properties(title,sheetId))",
+  });
+  const destinationSheets = await sheets.spreadsheets.get({
+    auth,
+    spreadsheetId: destinationSpreadsheetId,
+    fields: "sheets(properties(title,sheetId))",
+  });
+
+  const templateSheetId = destinationSheets.data.sheets.find(
+    (sheet) => sheet.properties.title === "template"
+  ).properties.sheetId;
+  
+  for (const sourceSheet of sourceSheets.data.sheets) {
+    try {
+      const title = sourceSheet.properties.title;
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: destinationSpreadsheetId,
+        resource: {
+          requests: [
+            {
+              duplicateSheet: {
+                sourceSheetId: templateSheetId,
+                insertSheetIndex: 1,
+                newSheetName: title,
+              },
+            },
+          ],
+        },
+      });
+      await update_data(title, await get_data(title));
+    } catch (err) {
+      console.error(err);
+    }
+  }
+}
+
 module.exports = {
   writePrices: async (campaign) => {
     const auth = await authorize();
@@ -139,5 +211,9 @@ module.exports = {
   fetchMultiplicityAndWriteToJSON: async () => {
     const auth = await authorize();
     await fetchMultiplicityAndWriteToJSON(auth).catch(console.error);
+  },
+  copyZakazToOtherSpreadsheet: async () => {
+    const auth = await authorize();
+    await copyZakazToOtherSpreadsheet(auth).catch(console.error);
   },
 };
