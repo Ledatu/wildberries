@@ -87,7 +87,7 @@ async function writePrices(auth, campaign) {
   const data = xlsx.parse(
     path.join(__dirname, `../files/${campaign}/data.xlsx`)
   )[0]["data"];
-  console.log(data);
+  // console.log(data);
   const sheets = google.sheets({ version: "v4", auth });
 
   await sheets.spreadsheets.values.clear({

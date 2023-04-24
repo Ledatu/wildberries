@@ -7,7 +7,7 @@ const getPrices = async () => {
   await fetchMultiplicityAndWriteToJSON()
   campaigns.forEach(async campaign => {
     Promise.all([
-      await fetchCardsAndWriteToJSON(campaign),
+      // await fetchCardsAndWriteToJSON(campaign),
       await fetchOrdersAndWriteToJSON(campaign),
       await fetchStocksAndWriteToJSON(campaign),
       await fetchDataAndWriteToXlsx(campaign),
