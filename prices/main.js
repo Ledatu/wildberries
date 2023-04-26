@@ -114,7 +114,7 @@ const buildXlsx = (data, campaign) => {
       el.discount,
       Math.floor(el.price * (1 - el.discount / 100)),
       obor,
-      zakaz > 0 ? zakaz : 0,
+      zakaz > 0 ? zakaz : (!orders[el.nmId] ? mult*5 : 0),
       stock,
       orders[el.nmId],
       per_day,
