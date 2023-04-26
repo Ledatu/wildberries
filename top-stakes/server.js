@@ -10,7 +10,8 @@ const fs = require('fs');
 const bodyParser = require('body-parser');
 const main = require('./main');
 const { getTemplate } = require('./google_sheets/templateXlsxDownload/templateXlsxDownload');
-const { copyZakazToOtherSpreadsheet } = require('../prices/google_sheets');
+const { copyZakazToOtherSpreadsheet } = require('../prices/google_sheets/index');
+const { qrGeneration } = require('../qrGeneration/qrGeneration');
 const { getPrices } = require(path.join(__dirname, '../prices/prices.js'));
 
 const app = express();
@@ -77,6 +78,29 @@ app.get('/api/getPrices', authenticateToken, (req, res) => {
 app.get('/api/copyZakaz', authenticateToken, (req, res) => {
   copyZakazToOtherSpreadsheet();
   res.send('Zakaz copying started!');
+});
+
+app.get('/api/generateQRs', authenticateToken, (req, res) => {
+  qrGeneration();
+  res.send('QR Generation started!');
+});
+
+app.get('/api/downloadQRs', async (req, res) => {
+  console.log(req)
+  try {
+    const file = path.join(__dirname, '../qrGeneration/files/qrcodes.zip');
+    // Wait for the file to be created before attempting to download it
+    fs.access(file, fs.constants.F_OK, (err) => {
+      if (err) {
+        res.status(500).end(err);
+      } else {
+        res.download(file); // Set disposition and send it.
+      }
+    });
+  }
+  catch (error) {
+    res.status(500).end(error);
+  }
 });
 
 app.get('/api/downloadTemplate', async (req, res) => {
