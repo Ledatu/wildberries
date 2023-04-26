@@ -182,21 +182,25 @@ async function copyZakazToOtherSpreadsheet(auth) {
   for (const sourceSheet of sourceSheets.data.sheets) {
     try {
       const title = sourceSheet.properties.title;
-      const oldSheetId = destinationSheets.data.sheets.find(
+      const oldSheet = destinationSheets.data.sheets.find(
         (sheet) => sheet.properties.title === title
-      ).properties.sheetId;
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: destinationSpreadsheetId,
-        resource: {
-          requests: [
-            {
-              deleteSheet: {
-                sheetId: oldSheetId
+      )
+      if (oldSheet) {
+        const oldSheetId = oldSheet.properties.sheetId;
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: destinationSpreadsheetId,
+          resource: {
+            requests: [
+              {
+                deleteSheet: {
+                  sheetId: oldSheetId
+                },
               },
-            },
-          ],
-        },
-      });
+            ],
+          },
+        });
+      }
+      
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId: destinationSpreadsheetId,
         resource: {
