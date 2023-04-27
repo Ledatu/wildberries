@@ -10,8 +10,9 @@ const getPrices = async () => {
       await fetchCardsAndWriteToJSON(campaign),
       await fetchOrdersAndWriteToJSON(campaign),
       await fetchStocksAndWriteToJSON(campaign),
-      await fetchDataAndWriteToXlsx(campaign),
+      await fetchDataAndWriteToXlsx(campaign)	,
     ]).then(async () => {
+      //await fetchDataAndWriteToXlsx(campaign)
       console.log('All tasks completed successfully');
       await writePrices(campaign);
     }).catch((error) => {

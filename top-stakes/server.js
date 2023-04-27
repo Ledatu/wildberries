@@ -92,7 +92,7 @@ app.get('/api/downloadQRs', async (req, res) => {
     const sleep = (ms) => new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
-    await sleep(2000)
+    await sleep(6000)
     const file = path.join(__dirname, '../qrGeneration/files/qrcodes.zip');
     // Wait for the file to be created before attempting to download it
     fs.access(file, fs.constants.F_OK, (err) => {

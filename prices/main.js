@@ -77,15 +77,16 @@ const getOrders = (authToken, params) => {
 };
 
 const buildXlsx = (data, campaign) => {
-  const vendorCodes = require(path.join(
+const afs = require('fs')
+  const vendorCodes = JSON.parse(afs.readFileSync(path.join(
     __dirname,
     "files",
     campaign,
-    "vendorCodes"
-  ));
-  const orders = require(path.join(__dirname, "files", campaign, "orders"));
-  const stocks = require(path.join(__dirname, "files", campaign, "stocks"));
-  const multiplicity = require(path.join(__dirname, "files/multiplicity"));
+    "vendorCodes.json"
+  )));
+  const orders = JSON.parse(afs.readFileSync(path.join(__dirname, "files", campaign, "orders.json")));
+  const stocks = JSON.parse(afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json")));
+  const multiplicity = JSON.parse(afs.readFileSync(path.join(__dirname, "files/multiplicity.json")));
   let new_data = [
     [
       "Артикул продавца",
