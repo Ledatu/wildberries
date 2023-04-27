@@ -31,14 +31,69 @@ async function saveQRPDF(qrDataArray, filePath) {
   for (const qrData of qrDataArray) {
     const buffer = await QRCode.toBuffer(qrData, { errorCorrectionLevel: "H" });
     const qrImage = await pdfDoc.embedPng(buffer);
-    const page = pdfDoc.addPage([58, 40]);
-    page.drawImage(qrImage, { x: 0, y: 0, width: 40, height: 40 });
+    const page = pdfDoc.addPage([165, 113]);
+    page.drawImage(qrImage, { x: 0, y: 0, width: 113, height: 113 });
   }
 
   const pdfBytes = await pdfDoc.save();
   writeStream.write(pdfBytes);
   writeStream.end();
 }
+
+// async function saveQRPDF(qrDataArray, filePath) {
+//   const pdfDoc = await PDFDocument.create();
+//   const writeStream = fs.createWriteStream(filePath);
+
+//   const qrSize = 40;
+//   const margin = 20;
+//   const spacing = 10;
+//   const qrCols = 58;
+//   const qrRows = 40;
+//   const qrPerPage = qrRows * qrCols;
+
+//   const page = pdfDoc.addPage();
+//   const pageWidth = page.getWidth();
+//   const pageHeight = page.getHeight();
+//   const usableWidth = pageWidth - margin * 2;
+//   const usableHeight = pageHeight - margin * 2;
+//   const qrGridWidth = qrCols * qrSize + (qrCols - 1) * spacing;
+//   const qrGridHeight = qrRows * qrSize + (qrRows - 1) * spacing;
+//   const qrScale = Math.min(usableWidth / qrGridWidth, usableHeight / qrGridHeight);
+
+//   let qrIndex = 0;
+//   let qrX = margin;
+//   let qrY = pageHeight - margin - qrSize * qrScale;
+
+//   while (qrIndex < qrDataArray.length) {
+//     const qrData = qrDataArray[qrIndex];
+//     const buffer = await QRCode.toBuffer(qrData, { errorCorrectionLevel: 'H' });
+//     const qrImage = await pdfDoc.embedPng(buffer);
+//     const qrSizeScaled = qrSize * qrScale;
+//     const qrXOffset = (qrSizeScaled + spacing) * (qrIndex % qrCols);
+//     const qrYOffset = (qrSizeScaled + spacing) * (qrIndex % qrPerPage >= qrCols ? 1 : 0);
+//     const qrXPos = qrX + qrXOffset;
+//     const qrYPos = qrY - qrYOffset;
+
+//     const page = pdfDoc.addPage();
+//     page.drawImage(qrImage, { x: qrXPos, y: qrYPos, width: qrSizeScaled, height: qrSizeScaled });
+
+//     qrIndex++;
+
+//     if (qrIndex % qrPerPage === 0 || qrIndex === qrDataArray.length) {
+//       qrX = margin;
+//       qrY -= qrSizeScaled + spacing;
+//     } else if (qrIndex % qrCols === 0) {
+//       qrX = margin;
+//       qrY -= qrSizeScaled + spacing;
+//     } else {
+//       qrX += qrSizeScaled + spacing;
+//     }
+//   }
+
+//   const pdfBytes = await pdfDoc.save();
+//   writeStream.write(pdfBytes);
+//   writeStream.end();
+// }
 
 function main() {
   return new Promise((resolve, reject) => {
