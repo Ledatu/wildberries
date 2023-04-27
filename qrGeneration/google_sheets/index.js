@@ -100,7 +100,7 @@ async function writePrices(auth, campaign) {
 }
 
 async function fetchQrCodesAndWriteToJSON(auth) {
-  try {
+  return new Promise(async (resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
 
     // Retrieve the values from the specified range
@@ -111,34 +111,33 @@ async function fetchQrCodesAndWriteToJSON(auth) {
 
     // Parse the values into a JSON object
     const rows = res.data.values;
-    const data = {qrcodes: [],};
+    const data = { qrcodes: [] };
     rows.forEach((row) => {
-      data['qrcodes'].push(row[0]);
+      data["qrcodes"].push(row[0]);
     });
 
-    writeDataToFile(data, path.join(__dirname, "../files/qrcodes.json"));
-  } catch (err) {
-    console.log(`The API returned an error: ${err}`);
-    return null;
-  }
+    writeDataToFile(data, path.join(__dirname, "../files/qrcodes.json")).then(pr => resolve());
+  })
 }
 
 // Define the function to write data to a JSON file
 const writeDataToFile = (data, filename) => {
-  fs.writeFile(filename, JSON.stringify(data), (err) => {
+  return fs.writeFile(filename, JSON.stringify(data), (err) => {
     if (err) return console.log(`Error writing file: ${err}`);
     console.log(`Data written to ${filename}`);
   });
 };
-
 
 module.exports = {
   writePrices: async (campaign) => {
     const auth = await authorize();
     await writePrices(auth, campaign).catch(console.error);
   },
-  fetchQrCodesAndWriteToJSON: async () => {
-    const auth = await authorize();
-    await fetchQrCodesAndWriteToJSON(auth).catch(console.error);
+  fetchQrCodesAndWriteToJSON: () => {
+    return new Promise(async (resolve, reject) => {
+      const auth = await authorize();
+      await fetchQrCodesAndWriteToJSON(auth).catch(console.error);
+      resolve();
+    });
   },
 };

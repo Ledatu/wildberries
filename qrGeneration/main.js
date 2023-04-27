@@ -40,40 +40,61 @@ async function saveQRPDF(qrDataArray, filePath) {
   writeStream.end();
 }
 
-async function main() {
-  const arch = path.join(__dirname, "files/qrcodes.zip");
-  if (fs.existsSync(arch)) {
-    fs.rmSync(arch);
-  }
+function main() {
+  return new Promise((resolve, reject) => {
+    const arch = path.join(__dirname, "files/qrcodes.zip");
+    const qrcodes = JSON.parse(fs.readFileSync(path.join(__dirname, "files/qrcodes.json"))).qrcodes;
+    console.log(qrcodes);
 
-  const qrcodes = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "files/qrcodes.json"))
-  ).qrcodes;
-  console.log(qrcodes);
-  const mainQrDir = path.join(__dirname, "files/qrcodes");
-  fs.rmSync(mainQrDir, { recursive: true, force: true });
-  fs.mkdirSync(mainQrDir, (err) => {});
-
-  qrs = {};
-  for (qr of qrcodes) {
-    const params = qr.split(";");
-    const multiplicity = String(params[3]);
-
-    if (multiplicity in qrs) {
-      qrs[multiplicity].push(qr);
-    } else {
-      qrs[multiplicity] = [qr];
+    // Remove existing files
+    if (fs.existsSync(arch)) {
+      fs.rm(arch, (err) => {
+        if (err) reject(err);
+      });
     }
-  }
+    const mainQrDir = path.join(__dirname, "files/qrcodes");
+    if (fs.existsSync(mainQrDir)) {
+      fs.rmSync(mainQrDir, { recursive: true, force: true }, (err) => {
+        if (err) reject(err);
+      });
+    }
 
-  for (let [key, value] of Object.entries(qrs)) {
-    const multPdf = path.join(mainQrDir, `QR Кратность ${key}.pdf`);
-    await saveQRPDF(value, multPdf);
-  }
+    // Create directory
+    fs.mkdir(mainQrDir, (err) => {
+      if (err) reject(err);
 
-  await zipDirectory(mainQrDir, arch);
-  console.log("Zipping complete.");
+      // Group qrcodes by multiplicity
+      const qrs = {};
+      for (const qr of qrcodes) {
+        const params = qr.split(";");
+        const multiplicity = String(params[3]);
+        if (multiplicity in qrs) {
+          qrs[multiplicity].push(qr);
+        } else {
+          qrs[multiplicity] = [qr];
+        }
+      }
 
+      // Generate PDFs for each multiplicity
+      const promises = [];
+      for (const [key, value] of Object.entries(qrs)) {
+        const multPdf = path.join(mainQrDir, `QR Кратность ${key}.pdf`);
+        promises.push(saveQRPDF(value, multPdf));
+      }
+
+      Promise.all(promises)
+        .then(() => {
+          // Zip directory
+          zipDirectory(mainQrDir, arch)
+            .then(() => {
+              console.log("Zipping complete.");
+              resolve();
+            })
+            .catch((err) => reject(err));
+        })
+        .catch((err) => reject(err));
+    });
+  });
 }
 
 module.exports = {
