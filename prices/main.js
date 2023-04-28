@@ -113,7 +113,7 @@ const afs = require('fs')
       vendorCode,
       el.price,
       el.discount,
-      Math.floor(el.price * (1 - el.discount / 100)),
+      el.price * (1 - el.discount / 100), // розничная стоимость
       obor,
       zakaz > 0 ? zakaz : (!orders[el.nmId] ? mult*5 : 0),
       stock,
