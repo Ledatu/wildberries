@@ -74,7 +74,7 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
     const update_data = async (data) => {
         await sheets.spreadsheets.values.update({
             spreadsheetId: '1c1TXMXLWiyxDEFd-kaP6UxE2zlVC3FVXIsBpfp31S4g',
-            range: `${sheet_name}!A3:EU`,
+            range: `${sheet_name}!A3:FY`,
             valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
             resource: {
                 values: data,
@@ -90,7 +90,7 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
 	data.sort((a, b) => b.slice(0, 6).filter(String).length - a.slice(0, 6).filter(String).length)
 	await sheets.spreadsheets.values.clear({
 	        spreadsheetId: '1c1TXMXLWiyxDEFd-kaP6UxE2zlVC3FVXIsBpfp31S4g',
-        	range: `${sheet_name}!A3:EU`,
+        	range: `${sheet_name}!A3:FY`,
 	});
 
 	await update_data(data)
