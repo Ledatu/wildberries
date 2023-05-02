@@ -26,6 +26,21 @@ const getAuthToken = (type, campaign) => {
   }
 };
 
+const getDetailedByPeriod = (authToken, params) => {
+  return axios
+    .get(
+      "https://statistics-api.wildberries.ru/api/v1/supplier/reportDetailByPeriod",
+      {
+        headers: {
+          Authorization: authToken,
+        },
+        params: params,
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const getInfo = (authToken) => {
   return axios
     .get("https://suppliers-api.wildberries.ru/public/api/v1/info", {
@@ -174,11 +189,11 @@ const writeOrdersToJson = (data, campaign) => {
   dateFrom.setHours(0);
   dateFrom.setMinutes(0);
   const jsonData = {};
-  const excluded = {'excluded': []};
+  const excluded = { excluded: [] };
   data.forEach((item) => {
     const order_date = new Date(item.date);
     if (order_date < dateFrom) {
-      excluded.excluded.push({order_date: order_date, nmId: item.nmId})
+      excluded.excluded.push({ order_date: order_date, nmId: item.nmId });
       return;
     }
     if (item.isCancel || order_date.getDate() == today) return;
@@ -186,7 +201,8 @@ const writeOrdersToJson = (data, campaign) => {
     else jsonData[item.nmId] = 1;
   });
   fs.writeFile(
-    path.join(__dirname, "files", campaign, "excluded.json"), JSON.stringify(excluded)
+    path.join(__dirname, "files", campaign, "excluded.json"),
+    JSON.stringify(excluded)
   ).then(() => console.log("excluded.xlsx created."));
   return fs
     .writeFile(
@@ -194,6 +210,55 @@ const writeOrdersToJson = (data, campaign) => {
       JSON.stringify(jsonData)
     )
     .then(() => console.log("orders.json created."))
+    .catch((error) => console.error(error));
+};
+
+const writeDetailedByPeriodToJson = (data, campaign) => {
+  const jsonData = {};
+  data.forEach((item) => {
+    const type = item.sa_name.split("_")[0];
+    if (type in jsonData) {
+      jsonData[type].buyout += item.quantity;
+      jsonData[type].delivery += item.delivery_rub;
+    } else jsonData[type] = { buyout: 0, delivery: item.delivery_rub };
+  });
+  for (const key in jsonData) {
+    jsonData[key]["average_delivery"] =
+      jsonData[key].delivery / jsonData[key].buyout;
+  }
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "detailedByPeriod.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("detailedByPeriod.json created."))
+    .catch((error) => console.error(error));
+};
+
+const fetchDetailedByPeriodAndWriteToJSON = (campaign) => {
+  const authToken = getAuthToken("api-statistic-token", campaign);
+  const prevMonday = new Date();
+  prevMonday.setDate(
+    prevMonday.getDate() - 7 - ((prevMonday.getDay() + 6) % 7)
+  );
+  const prevSunday = new Date();
+  prevSunday.setDate(
+    prevSunday.getDate() - 7 - ((prevSunday.getDay() - 7) % 7)
+  );
+  const params = {
+    dateFrom: prevMonday.toISOString().split("T")[0],
+    dateTo: prevSunday.toISOString().split("T")[0],
+  };
+  console.log(params);
+  // return 0;
+  return getDetailedByPeriod(authToken, params)
+    .then((data) => {
+      fs.writeFile(
+        path.join(__dirname, "files", campaign, "detailedByPeriod_full.json"),
+        JSON.stringify(data)
+      );
+      return writeDetailedByPeriodToJson(data, campaign);
+    })
     .catch((error) => console.error(error));
 };
 
@@ -262,4 +327,5 @@ module.exports = {
   fetchCardsAndWriteToJSON,
   fetchStocksAndWriteToJSON,
   fetchOrdersAndWriteToJSON,
+  fetchDetailedByPeriodAndWriteToJSON,
 };

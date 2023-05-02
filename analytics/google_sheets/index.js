@@ -90,10 +90,11 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
   //console.log(analytics)
   const sheets = google.sheets({ version: "v4", auth });
 
-  analytics.sort(
-    (a, b) =>
-      b.slice(0, 6).filter(String).length - a.slice(0, 6).filter(String).length
-  );
+  analytics.sort((a, b) => {
+    const a1 = a[0].split(" ").slice(1).join(" ");
+    const b1 = b[0].split(" ").slice(1).join(" ");
+    return ("" + b1).localeCompare(a1) || b.slice(0, 6).filter(String).length - a.slice(0, 6).filter(String).length;
+  });
   await sheets.spreadsheets.values.clear({
     spreadsheetId: "1c1TXMXLWiyxDEFd-kaP6UxE2zlVC3FVXIsBpfp31S4g",
     range: `${sheet_name}!A3:FY`,

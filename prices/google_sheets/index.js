@@ -99,6 +99,64 @@ async function writePrices(auth, campaign) {
   console.log(`Prices data written to the google sheets.`);
 }
 
+async function writeDetailedByPeriod(auth, campaign) {
+  return new Promise(async (resolve, reject) => {
+    // console.log(campaign);
+
+    const seller_ids = (
+      await JSON.parse(
+        await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
+      )
+    ).seller_ids;
+
+    const update_data = async (data) => {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+        range: `Данные!G2:G`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: data,
+        },
+      });
+    };
+
+    const delivery = JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, `../files/${campaign}/detailedByPeriod.json`)
+      )
+    );
+    // console.log(data);
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Данные!A2:K",
+    });
+
+    // Parse the values into a JSON object
+    const rows = res.data.values;
+    // console.log(rows);
+    const data = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      data.push([row[6]]);
+
+      if (row[4] != seller_ids[campaign]) continue;
+
+      const type = row[0].split("_")[0];
+      // console.log(type);
+      data[i][0] = `${
+        delivery[type] ? -delivery[type].average_delivery : data[i][0]
+      }`.replace(".", ",");
+      // console.log(campaign, type, data[i]);
+    }
+
+    await update_data(data).then(pr => resolve());
+    console.log(`Delivery data written to the google sheets.`);
+
+  });
+}
+
 async function fetchMultiplicityAndWriteToJSON(auth) {
   try {
     const sheets = google.sheets({ version: "v4", auth });
@@ -178,13 +236,13 @@ async function copyZakazToOtherSpreadsheet(auth) {
   const templateSheetId = destinationSheets.data.sheets.find(
     (sheet) => sheet.properties.title === "template"
   ).properties.sheetId;
-  
+
   for (const sourceSheet of sourceSheets.data.sheets) {
     try {
       const title = sourceSheet.properties.title;
       const oldSheet = destinationSheets.data.sheets.find(
         (sheet) => sheet.properties.title === title
-      )
+      );
       if (oldSheet) {
         const oldSheetId = oldSheet.properties.sheetId;
         await sheets.spreadsheets.batchUpdate({
@@ -193,14 +251,14 @@ async function copyZakazToOtherSpreadsheet(auth) {
             requests: [
               {
                 deleteSheet: {
-                  sheetId: oldSheetId
+                  sheetId: oldSheetId,
                 },
               },
             ],
           },
         });
       }
-      
+
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId: destinationSpreadsheetId,
         resource: {
@@ -226,6 +284,10 @@ module.exports = {
   writePrices: async (campaign) => {
     const auth = await authorize();
     await writePrices(auth, campaign).catch(console.error);
+  },
+  writeDetailedByPeriod: async (campaign) => {
+    const auth = await authorize();
+    await writeDetailedByPeriod(auth, campaign).catch(console.error);
   },
   fetchMultiplicityAndWriteToJSON: async () => {
     const auth = await authorize();

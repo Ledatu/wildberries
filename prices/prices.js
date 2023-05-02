@@ -1,6 +1,6 @@
 const path = require('path')
-const { fetchDataAndWriteToXlsx, fetchCardsAndWriteToJSON, fetchOrdersAndWriteToJSON, fetchStocksAndWriteToJSON } = require('./main');
-const { writePrices, fetchMultiplicityAndWriteToJSON } = require('./google_sheets/index')
+const { fetchDataAndWriteToXlsx, fetchCardsAndWriteToJSON, fetchOrdersAndWriteToJSON, fetchStocksAndWriteToJSON, fetchDetailedByPeriodAndWriteToJSON } = require('./main');
+const { writePrices, writeDetailedByPeriod, fetchMultiplicityAndWriteToJSON } = require('./google_sheets/index')
 
 const getPrices = async () => {
   const campaigns = require(path.join(__dirname, 'files/campaigns')).campaigns
@@ -12,7 +12,6 @@ const getPrices = async () => {
       await fetchStocksAndWriteToJSON(campaign),
       await fetchDataAndWriteToXlsx(campaign)	,
     ]).then(async () => {
-      //await fetchDataAndWriteToXlsx(campaign)
       console.log('All tasks completed successfully');
       await writePrices(campaign);
     }).catch((error) => {
@@ -21,6 +20,21 @@ const getPrices = async () => {
   });
 }
 
+const getDelivery = async () => {
+  const campaigns = require(path.join(__dirname, 'files/campaigns')).campaigns
+  campaigns.forEach(async campaign => {
+    Promise.all([
+      await fetchDetailedByPeriodAndWriteToJSON(campaign),
+    ]).then(async () => {
+      console.log('All tasks completed successfully');
+      await writeDetailedByPeriod(campaign);
+    }).catch((error) => {
+      console.error('An error occurred:', error);
+    });
+  });
+}
+
 module.exports = {
   getPrices,
+  getDelivery,
 };

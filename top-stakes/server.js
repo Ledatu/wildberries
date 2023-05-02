@@ -12,7 +12,7 @@ const main = require('./main');
 const { getTemplate } = require('./google_sheets/templateXlsxDownload/templateXlsxDownload');
 const { copyZakazToOtherSpreadsheet } = require('../prices/google_sheets/index');
 const { qrGeneration } = require('../qrGeneration/qrGeneration');
-const { getPrices } = require(path.join(__dirname, '../prices/prices.js'));
+const { getPrices, getDelivery } = require('../prices/prices');
 
 const app = express();
 const port = 24456;
@@ -73,6 +73,11 @@ app.get('/api/startXlsxParsing', authenticateToken, (req, res) => {
 app.get('/api/getPrices', authenticateToken, (req, res) => {
   getPrices();
   res.send('Prices getting started!');
+});
+
+app.get('/api/getDelivery', authenticateToken, (req, res) => {
+  getDelivery();
+  res.send('Delivery getting started!');
 });
 
 app.get('/api/copyZakaz', authenticateToken, (req, res) => {
