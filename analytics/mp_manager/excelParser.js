@@ -63,7 +63,6 @@ module.exports = (campaign_id) => {
     //		console.log('Tomorrow: ', date.getDate())
     let days = -1;
     for (let i = 0; i < 30; i++) {
-
       days++;
       date.setDate(date.getDate() - 1);
       const today = date.getDate();
@@ -92,10 +91,29 @@ module.exports = (campaign_id) => {
     resultSheet.push(to_push);
   });
 
-  //    console.log(resultSheet)
+  // make pivot table
+  const pivotSheet = [];
+  for (row of resultSheet) {
+    const days = (row.length - 1) / 6;
+    const stats = [0, 0, 0, 0, 0, 0];
+    for (let day = 0; day < days; day++) {
+      for (let i = 0; i < 6; i++) {
+        let val = row[1 + (day * 6) + i];
+        val = Number(val ? val.replace(",", ".") : 0);
+        if (i == 1 || i == 3 || i == 5) val /= days;
+        stats[i] += val;
+      }
+    }
+    pivotSheet.push([row[0]].concat(stats));
+  }
+
+  // console.log(pivotSheet);
   fs.writeFileSync(
     `./files/${campaign_id}.xlsx`,
-    xlsx.build([{ name: "Аналитика", data: resultSheet }])
+    xlsx.build([
+      { name: "Аналитика", data: resultSheet },
+      { name: "Сводка", data: pivotSheet },
+    ])
   );
   //    clearDownloadsFolder()
 };
