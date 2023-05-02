@@ -77,16 +77,21 @@ const getOrders = (authToken, params) => {
 };
 
 const buildXlsx = (data, campaign) => {
-const afs = require('fs')
-  const vendorCodes = JSON.parse(afs.readFileSync(path.join(
-    __dirname,
-    "files",
-    campaign,
-    "vendorCodes.json"
-  )));
-  const orders = JSON.parse(afs.readFileSync(path.join(__dirname, "files", campaign, "orders.json")));
-  const stocks = JSON.parse(afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json")));
-  const multiplicity = JSON.parse(afs.readFileSync(path.join(__dirname, "files/multiplicity.json")));
+  const afs = require("fs");
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const orders = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "orders.json"))
+  );
+  const stocks = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
+  );
+  const multiplicity = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files/multiplicity.json"))
+  );
   let new_data = [
     [
       "Артикул продавца",
@@ -96,8 +101,8 @@ const afs = require('fs')
       "Оборачиваемость",
       "ЗАКАЗАТЬ",
       "остаток",
-      "заказов/неделя",
-      "заказов/день",
+      "заказов/7",
+      "заказов/1",
     ],
   ];
   data.forEach((el) => {
@@ -115,7 +120,7 @@ const afs = require('fs')
       el.discount,
       el.price * (1 - el.discount / 100), // розничная стоимость
       obor,
-      zakaz > 0 ? zakaz : (!orders[el.nmId] ? mult*5 : 0),
+      zakaz > 0 ? zakaz : !orders[el.nmId] ? mult * 5 : 0,
       stock,
       orders[el.nmId],
       per_day,
@@ -166,17 +171,23 @@ const writeOrdersToJson = (data, campaign) => {
   const today = new Date().getDate();
   const dateFrom = new Date();
   dateFrom.setDate(dateFrom.getDate() - 8);
+  dateFrom.setHours(0);
+  dateFrom.setMinutes(0);
   const jsonData = {};
+  const excluded = {'excluded': []};
   data.forEach((item) => {
     const order_date = new Date(item.date);
     if (order_date < dateFrom) {
-      // console.log(order_date);
+      excluded.excluded.push({order_date: order_date, nmId: item.nmId})
       return;
     }
-    if (item.isCancel || item.date.includes(`-${today}`)) return;
+    if (item.isCancel || order_date.getDate() == today) return;
     if (item.nmId in jsonData) jsonData[item.nmId] += 1;
     else jsonData[item.nmId] = 1;
   });
+  fs.writeFile(
+    path.join(__dirname, "files", campaign, "excluded.json"), JSON.stringify(excluded)
+  ).then(() => console.log("excluded.xlsx created."));
   return fs
     .writeFile(
       path.join(__dirname, "files", campaign, "orders.json"),
