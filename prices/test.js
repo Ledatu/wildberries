@@ -3,9 +3,10 @@ const {
   fetchDataAndWriteToJSON,
 } = require("./google_sheets");
 const { fetchDetailedByPeriodAndWriteToJSON } = require("./main");
-const { getPrices, getDelivery } = require("./prices");
-getPrices();
+const { getPrices, getDelivery, calcNewValues } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
 // getDelivery()
 // fetchDataAndWriteToJSON()
+getPrices();
+// calcNewValues()

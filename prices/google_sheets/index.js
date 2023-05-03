@@ -171,14 +171,14 @@ async function fetchDataAndWriteToJSON(auth) {
     const data = {};
     rows.forEach((row) => {
       data[row[0]] = {
-        multiplicity: Number(row[2]),
+        multiplicity: Math.abs(Number(row[2])),
         seller_id: row[4],
-        commission: Number(row[5].replace("%", "")),
-        delivery: Number(row[6].replace(",", ".")),
-        tax: Number(row[7].replace("%", "")),
-        expences: Number(row[8]),
-        prime_cost: Number(row[9]),
-        spp: Number(row[10].replace("%", "")),
+        commission: Math.abs(Number(row[5].replace("%", ""))),
+        delivery: Math.abs(Number(row[6].replace(",", "."))),
+        tax: Math.abs(Number(row[7].replace("%", ""))),
+        expences: Math.abs(Number(row[8])),
+        prime_cost: Math.abs(Number(row[9])),
+        spp: Math.abs(Number(row[10].replace("%", ""))),
       };
     });
 
@@ -189,9 +189,39 @@ async function fetchDataAndWriteToJSON(auth) {
   }
 }
 
+function fetchEnteredROIAndWriteToJSON(auth, campaign) {
+  return new Promise((resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+
+    sheets.spreadsheets.values
+      .get({
+        spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
+        range: `${campaign}!A2:L`,
+      })
+      .then((res) => {
+        const rows = res.data.values;
+        // console.log(rows);
+        const data = {};
+        rows.forEach((row) => {
+          if (!row[11]) return;
+          data[row[0]] = Number(row[11].replace("%", "").replace(",", "."));
+        });
+
+        writeDataToFile(
+          data,
+          path.join(__dirname, `../files/${campaign}/enteredROI.json`)
+        ).then((pr) => resolve());
+      })
+      .catch((err) => {
+        console.log(`The API returned an error: ${err}`);
+        reject(err);
+      });
+  });
+}
+
 // Define the function to write data to a JSON file
 const writeDataToFile = (data, filename) => {
-  fs.writeFile(filename, JSON.stringify(data), (err) => {
+  return fs.writeFile(filename, JSON.stringify(data), (err) => {
     if (err) return console.log(`Error writing file: ${err}`);
     console.log(`Data written to ${filename}`);
   });
@@ -300,6 +330,10 @@ module.exports = {
   fetchDataAndWriteToJSON: async () => {
     const auth = await authorize();
     await fetchDataAndWriteToJSON(auth).catch(console.error);
+  },
+  fetchEnteredROIAndWriteToJSON: async (campaign) => {
+    const auth = await authorize();
+    await fetchEnteredROIAndWriteToJSON(auth, campaign).catch(console.error);
   },
   copyZakazToOtherSpreadsheet: async () => {
     const auth = await authorize();

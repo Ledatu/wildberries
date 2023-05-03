@@ -113,21 +113,24 @@ const buildXlsx = (data, campaign) => {
       "Текущая розн. цена (до скидки)",
       "Текущая скидка на сайте, %",
       "Цена со скидкой",
-      "Цена СПП",
       "Оборачиваемость",
       "ЗАКАЗАТЬ",
       "остаток",
       "заказов/7",
       "заказов/1",
+      "Профит",
+      "ROI",
+      "Новый ROI",
+      "Новая РЦ",
+      "Новая РЦ с СПП",
+      "Новая WB цена",
+      "",
+      "Цена СПП",
       "Коммисия",
       "Логистика",
       "Налоги",
       "Расходы",
       "Себестоимость",
-      "Профит",
-      "ROI",
-      "Новая цена",
-      "Новый ROI",
     ],
   ];
   data.forEach((el) => {
@@ -138,35 +141,43 @@ const buildXlsx = (data, campaign) => {
     const stock = stocks[el.nmId];
     const obor = stock / per_day;
     const mult = arts_data[vendorCode].multiplicity;
-    const zakaz = Math.floor((per_day * 30 - stock) / mult) * mult;
-    const roz_price = el.price * (1 - el.discount / 100);
+    const zakaz = Math.round((per_day * 30 - stock) / mult) * mult;
+    const roz_price = Math.round(el.price * (1 - el.discount / 100));
 
-    const spp_price = roz_price * (1 - arts_data[vendorCode].spp / 100);
+    const spp_price = Math.floor(
+      roz_price * (1 - arts_data[vendorCode].spp / 100)
+    );
     const commission = roz_price * (arts_data[vendorCode].commission / 100);
-    const delivery = -arts_data[vendorCode].delivery;
+    const delivery = arts_data[vendorCode].delivery;
     const tax = spp_price * (arts_data[vendorCode].tax / 100);
-    const expences = -arts_data[vendorCode].expences;
+    const expences = arts_data[vendorCode].expences;
     const prime_cost = arts_data[vendorCode].prime_cost;
-    const profit = (-commission-delivery-tax-expences-prime_cost)+roz_price;
-    const roi = profit/(prime_cost+expences)
+    const profit =
+      -commission - delivery - tax - expences - prime_cost + roz_price;
+    const roi = profit / (prime_cost - expences);
     new_data.push([
       vendorCode,
       el.price,
       el.discount,
       roz_price, // розничная стоимость
-      spp_price,
       obor,
       zakaz > 0 ? zakaz : !orders[el.nmId] ? mult * 5 : 0,
       stock,
       orders[el.nmId],
       per_day,
+      profit,
+      roi,
+      "",
+      "",
+      "",
+      "",
+      "",
+      spp_price,
       commission,
       delivery,
       tax,
       expences,
       prime_cost,
-      profit,
-      roi,
     ]);
   });
   console.log(new_data);
@@ -351,10 +362,68 @@ const fetchOrdersAndWriteToJSON = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
+  const afs = require("fs");
+  const enteredROI = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "enteredROI.json"))
+  );
+  const arts_data = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files/data.json"))
+  );
+  const data = xlsx.parse(
+    path.join(__dirname, `files/${campaign}/data.xlsx`)
+  )[0]["data"];
+
+  for (let i = 0; i < data.length; i++) {
+    let row = data[i];
+    // console.log(row);
+    const vendorCode = row[0];
+    if (!vendorCode || !arts_data[vendorCode] || !enteredROI[vendorCode])
+      continue;
+
+    const roz_price = row[3];
+    const spp_price = Math.floor(
+      roz_price * (1 - arts_data[vendorCode].spp / 100)
+    );
+    const commission = roz_price * (arts_data[vendorCode].commission / 100);
+    const delivery = arts_data[vendorCode].delivery;
+    const tax = spp_price * (arts_data[vendorCode].tax / 100);
+    const expences = arts_data[vendorCode].expences;
+    const prime_cost = arts_data[vendorCode].prime_cost;
+    const profit =
+      -commission - delivery - tax - expences - prime_cost + roz_price;
+    const roi = enteredROI[vendorCode] / 100
+
+    const new_roz_price = Math.round(
+      roi * prime_cost + roz_price - profit
+    );
+    const new_spp_price = Math.round(
+      new_roz_price * (1 - arts_data[vendorCode].spp / 100)
+    );
+    const new_wb_price = new_roz_price / (1 - row[2] / 100);
+
+    // console.log(new_roz_price, new_spp_price, new_wb_price);
+
+    row[11] = roi;
+    row[12] = new_roz_price;
+    row[13] = new_spp_price;
+    row[14] = new_wb_price;
+
+    data[i] = row;
+  }
+
+  const buffer = xlsx.build([{ name: "Общий отчёт", data: data }]);
+  return fs
+    .writeFile(path.join(__dirname, "files", campaign, "data.xlsx"), buffer)
+    .then(() => console.log("data.xlsx created."))
+    .catch((error) => console.error(error));
+};
+
 module.exports = {
   fetchDataAndWriteToXlsx,
   fetchCardsAndWriteToJSON,
   fetchStocksAndWriteToJSON,
   fetchOrdersAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
+  calculateNewValuesBasedOnEnteredROIAndWriteToXlsx,
 };
