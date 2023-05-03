@@ -151,30 +151,38 @@ async function writeDetailedByPeriod(auth, campaign) {
       // console.log(campaign, type, data[i]);
     }
 
-    await update_data(data).then(pr => resolve());
+    await update_data(data).then((pr) => resolve());
     console.log(`Delivery data written to the google sheets.`);
-
   });
 }
 
-async function fetchMultiplicityAndWriteToJSON(auth) {
+async function fetchDataAndWriteToJSON(auth) {
   try {
     const sheets = google.sheets({ version: "v4", auth });
 
     // Retrieve the values from the specified range
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-      range: "Данные!A2:C",
+      range: "Данные!A2:K",
     });
 
     // Parse the values into a JSON object
     const rows = res.data.values;
     const data = {};
     rows.forEach((row) => {
-      data[row[0]] = row[2];
+      data[row[0]] = {
+        multiplicity: Number(row[2]),
+        seller_id: row[4],
+        commission: Number(row[5].replace("%", "")),
+        delivery: Number(row[6].replace(",", ".")),
+        tax: Number(row[7].replace("%", "")),
+        expences: Number(row[8]),
+        prime_cost: Number(row[9]),
+        spp: Number(row[10].replace("%", "")),
+      };
     });
 
-    writeDataToFile(data, path.join(__dirname, "../files/multiplicity.json"));
+    writeDataToFile(data, path.join(__dirname, "../files/data.json"));
   } catch (err) {
     console.log(`The API returned an error: ${err}`);
     return null;
@@ -209,14 +217,14 @@ async function copyZakazToOtherSpreadsheet(auth) {
     const rows = (
       await sheets.spreadsheets.values.get({
         spreadsheetId: sourceSpreadsheetId,
-        range: `${sheet}!A2:F`,
+        range: `${sheet}!A2:G`,
       })
     ).data.values;
 
     const data = [];
     rows.forEach((row) => {
       if (row[5] > 0) {
-        data.push([row[0], "", row[5]]);
+        data.push([row[0], "", row[6]]);
       }
     });
     return data;
@@ -289,9 +297,9 @@ module.exports = {
     const auth = await authorize();
     await writeDetailedByPeriod(auth, campaign).catch(console.error);
   },
-  fetchMultiplicityAndWriteToJSON: async () => {
+  fetchDataAndWriteToJSON: async () => {
     const auth = await authorize();
-    await fetchMultiplicityAndWriteToJSON(auth).catch(console.error);
+    await fetchDataAndWriteToJSON(auth).catch(console.error);
   },
   copyZakazToOtherSpreadsheet: async () => {
     const auth = await authorize();

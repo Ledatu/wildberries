@@ -104,8 +104,8 @@ const buildXlsx = (data, campaign) => {
   const stocks = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
   );
-  const multiplicity = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files/multiplicity.json"))
+  const arts_data = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files/data.json"))
   );
   let new_data = [
     [
@@ -113,34 +113,63 @@ const buildXlsx = (data, campaign) => {
       "Текущая розн. цена (до скидки)",
       "Текущая скидка на сайте, %",
       "Цена со скидкой",
+      "Цена СПП",
       "Оборачиваемость",
       "ЗАКАЗАТЬ",
       "остаток",
       "заказов/7",
       "заказов/1",
+      "Коммисия",
+      "Логистика",
+      "Налоги",
+      "Расходы",
+      "Себестоимость",
+      "Профит",
+      "ROI",
+      "Новая цена",
+      "Новый ROI",
     ],
   ];
   data.forEach((el) => {
     let vendorCode = vendorCodes[el.nmId];
-    if (!vendorCode) return;
+    if (!vendorCode || !arts_data[vendorCode]) return;
     vendorCode = String(vendorCode);
     const per_day = orders[el.nmId] / 7;
     const stock = stocks[el.nmId];
     const obor = stock / per_day;
-    const mult = multiplicity[vendorCode];
+    const mult = arts_data[vendorCode].multiplicity;
     const zakaz = Math.floor((per_day * 30 - stock) / mult) * mult;
+    const roz_price = el.price * (1 - el.discount / 100);
+
+    const spp_price = roz_price * (1 - arts_data[vendorCode].spp / 100);
+    const commission = roz_price * (arts_data[vendorCode].commission / 100);
+    const delivery = -arts_data[vendorCode].delivery;
+    const tax = spp_price * (arts_data[vendorCode].tax / 100);
+    const expences = -arts_data[vendorCode].expences;
+    const prime_cost = arts_data[vendorCode].prime_cost;
+    const profit = (-commission-delivery-tax-expences-prime_cost)+roz_price;
+    const roi = profit/(prime_cost+expences)
     new_data.push([
       vendorCode,
       el.price,
       el.discount,
-      el.price * (1 - el.discount / 100), // розничная стоимость
+      roz_price, // розничная стоимость
+      spp_price,
       obor,
       zakaz > 0 ? zakaz : !orders[el.nmId] ? mult * 5 : 0,
       stock,
       orders[el.nmId],
       per_day,
+      commission,
+      delivery,
+      tax,
+      expences,
+      prime_cost,
+      profit,
+      roi,
     ]);
   });
+  console.log(new_data);
   new_data = sortData(new_data); // Sort the data
   return xlsx.build([{ name: "Общий отчёт", data: new_data }]);
 };

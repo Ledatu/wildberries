@@ -1,7 +1,11 @@
-const { copyZakazToOtherSpreadsheet } = require('./google_sheets')
-const { fetchDetailedByPeriodAndWriteToJSON } = require('./main')
-const { getPrices, getDelivery } = require('./prices')
-// getPrices()
+const {
+  copyZakazToOtherSpreadsheet,
+  fetchDataAndWriteToJSON,
+} = require("./google_sheets");
+const { fetchDetailedByPeriodAndWriteToJSON } = require("./main");
+const { getPrices, getDelivery } = require("./prices");
+getPrices();
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
-getDelivery()
+// getDelivery()
+// fetchDataAndWriteToJSON()
