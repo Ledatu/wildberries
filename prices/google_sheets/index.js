@@ -223,7 +223,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
 
     const data = [];
     rows.forEach((row) => {
-      if (row[5] > 0) {
+      if (row[6] > 0) {
         data.push([row[0], "", row[6]]);
       }
     });
