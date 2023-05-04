@@ -156,6 +156,46 @@ async function writeDetailedByPeriod(auth, campaign) {
   });
 }
 
+async function fetchNewPricesAndWriteToJSON(auth, campaign) {
+  return new Promise(async (resolve, reject) => {
+    const objectFlip = (obj) => {
+      const ret = {};
+      Object.keys(obj).forEach((key) => {
+        ret[obj[key]] = Number(key);
+      });
+      return ret;
+    };
+
+    const sheets = google.sheets({ version: "v4", auth });
+    const nmIds = objectFlip(
+      JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, `../files/${campaign}/vendorCodes.json`)
+        )
+      )
+    );
+
+    // console.log(data);
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
+      range: `${campaign}!A2:O`,
+    });
+
+    const rows = res.data.values;
+    const data = [];
+    rows.forEach((row) => {
+      const new_price = Number(row[14]);
+      if (!new_price ||  new_price > 20000|| new_price < 4500) return;
+      data.push({ nmId: nmIds[row[0]], price: new_price });
+    });
+
+    writeDataToFile(
+      data,
+      path.join(__dirname, `../files/${campaign}/newPrices.json`)
+    ).then((pr) => resolve());
+  });
+}
+
 async function fetchDataAndWriteToJSON(auth) {
   try {
     const sheets = google.sheets({ version: "v4", auth });
@@ -390,6 +430,10 @@ module.exports = {
   fetchDataAndWriteToJSON: async () => {
     const auth = await authorize();
     await fetchDataAndWriteToJSON(auth).catch(console.error);
+  },
+  fetchNewPricesAndWriteToJSON: async (campaign) => {
+    const auth = await authorize();
+    await fetchNewPricesAndWriteToJSON(auth, campaign).catch(console.error);
   },
   fetchEnteredROIAndWriteToJSON: async (campaign) => {
     const auth = await authorize();

@@ -302,6 +302,30 @@ const fetchDetailedByPeriodAndWriteToJSON = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const updatePrices = async (campaign) => {
+  const authToken = getAuthToken("api-token", campaign);
+  const newPricesPath = path.join(
+    __dirname,
+    `files/${campaign}/newPrices.json`
+  );
+  const newPrices = JSON.parse(await fs.readFile(newPricesPath));
+  console.log(newPrices);
+  fs.rm(newPricesPath);
+  return 0;
+  axios
+    .post(
+      "https://suppliers-api.wildberries.ru/public/api/v1/prices",
+      newPrices,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const fetchDataAndWriteToXlsx = (campaign) => {
   const authToken = getAuthToken("api-token", campaign);
   return getInfo(authToken)
@@ -374,12 +398,19 @@ const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
     path.join(__dirname, `files/${campaign}/data.xlsx`)
   )[0]["data"];
 
-  for (let i = 0; i < data.length; i++) {
+  for (let i = 1; i < data.length; i++) {
     let row = data[i];
     // console.log(row);
     const vendorCode = row[0];
-    if (!vendorCode || !arts_data[vendorCode] || !enteredROI[vendorCode])
+    if (!vendorCode || !arts_data[vendorCode] || !enteredROI[vendorCode]) {
+      row[11] = "";
+      row[12] = "";
+      row[13] = "";
+      row[14] = "";
+
+      data[i] = row;
       continue;
+    }
 
     const calcROI = (roz_price) => {
       const spp_price = Math.floor(
@@ -439,4 +470,5 @@ module.exports = {
   fetchOrdersAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
   calculateNewValuesBasedOnEnteredROIAndWriteToXlsx,
+  updatePrices,
 };
