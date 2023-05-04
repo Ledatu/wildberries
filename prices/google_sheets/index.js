@@ -253,8 +253,8 @@ async function copyZakazToOtherSpreadsheet(auth) {
 
     const data = [];
     rows.forEach((row) => {
-      if (row[6] > 0) {
-        data.push([row[0], "", row[6]]);
+      if (row[5] > 0) {
+        data.push([row[0], "", row[5]]);
       }
     });
     return data;

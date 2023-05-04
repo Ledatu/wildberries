@@ -8,5 +8,5 @@ const { getPrices, getDelivery, calcNewValues } = require("./prices");
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
 // getDelivery()
 // fetchDataAndWriteToJSON()
-getPrices();
-// calcNewValues()
+// getPrices();
+calcNewValues()

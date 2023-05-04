@@ -180,7 +180,7 @@ const buildXlsx = (data, campaign) => {
       prime_cost,
     ]);
   });
-  console.log(new_data);
+  // console.log(new_data);
   new_data = sortData(new_data); // Sort the data
   return xlsx.build([{ name: "Общий отчёт", data: new_data }]);
 };
@@ -381,33 +381,46 @@ const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
     if (!vendorCode || !arts_data[vendorCode] || !enteredROI[vendorCode])
       continue;
 
-    const roz_price = row[3];
-    const spp_price = Math.floor(
-      roz_price * (1 - arts_data[vendorCode].spp / 100)
-    );
-    const commission = roz_price * (arts_data[vendorCode].commission / 100);
-    const delivery = arts_data[vendorCode].delivery;
-    const tax = spp_price * (arts_data[vendorCode].tax / 100);
-    const expences = arts_data[vendorCode].expences;
-    const prime_cost = arts_data[vendorCode].prime_cost;
-    const profit =
-      -commission - delivery - tax - expences - prime_cost + roz_price;
-    const roi = enteredROI[vendorCode] / 100
+    const calcROI = (roz_price) => {
+      const spp_price = Math.floor(
+        roz_price * (1 - arts_data[vendorCode].spp / 100)
+      );
+      const commission = roz_price * (arts_data[vendorCode].commission / 100);
+      const delivery = arts_data[vendorCode].delivery;
+      const tax = spp_price * (arts_data[vendorCode].tax / 100);
+      const expences = arts_data[vendorCode].expences;
+      const prime_cost = arts_data[vendorCode].prime_cost;
+      const profit =
+        -commission - delivery - tax - expences - prime_cost + roz_price;
+      const wb_price = roz_price / (1 - row[2] / 100);
 
-    const new_roz_price = Math.round(
-      roi * prime_cost + roz_price - profit
-    );
-    const new_spp_price = Math.round(
-      new_roz_price * (1 - arts_data[vendorCode].spp / 100)
-    );
-    const new_wb_price = new_roz_price / (1 - row[2] / 100);
+      const roi = profit / (prime_cost - expences);
+      return {
+        new_roi: roi,
+        new_price: roz_price,
+        new_spp_price: spp_price,
+        new_wb_price: wb_price,
+      };
+    };
+    const entered_roi = enteredROI[vendorCode] / 100;
 
-    // console.log(new_roz_price, new_spp_price, new_wb_price);
-
-    row[11] = roi;
-    row[12] = new_roz_price;
-    row[13] = new_spp_price;
-    row[14] = new_wb_price;
+    const diffs = []
+    const calculateds = {}
+    for (let i = 400; i < 5000; i++) {
+      const calculated = calcROI(i);
+      const diff = Math.abs(calculated.new_roi - entered_roi);
+      diffs.push(diff)
+      calculateds[String(diff)] = calculated
+      // break;
+    }
+    
+    diffs.sort()
+    const min_diff = String(diffs[0])
+    // console.log(min_diff, diffs, calculateds[min_diff])
+    row[11] = calculateds[min_diff].new_roi;
+    row[12] = calculateds[min_diff].new_price;
+    row[13] = calculateds[min_diff].new_spp_price;
+    row[14] = calculateds[min_diff].new_wb_price;
 
     data[i] = row;
   }
