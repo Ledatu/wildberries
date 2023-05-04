@@ -168,17 +168,18 @@ async function fetchDataAndWriteToJSON(auth) {
 
     // Parse the values into a JSON object
     const rows = res.data.values;
+
     const data = {};
     rows.forEach((row) => {
       data[row[0]] = {
-        multiplicity: Math.abs(Number(row[2])),
+        multiplicity: Math.abs(Number(row[2] ?? 0)),
         seller_id: row[4],
-        commission: Math.abs(Number(row[5].replace("%", ""))),
-        delivery: Math.abs(Number(row[6].replace(",", "."))),
-        tax: Math.abs(Number(row[7].replace("%", ""))),
-        expences: Math.abs(Number(row[8])),
-        prime_cost: Math.abs(Number(row[9])),
-        spp: Math.abs(Number(row[10].replace("%", ""))),
+        commission: Math.abs(Number(row[5] ? row[5].replace("%", "") : 0)),
+        delivery: Math.abs(Number(row[6] ? row[6].replace(",", ".") : 0)),
+        tax: Math.abs(Number(row[7] ? row[7].replace("%", "") : 0)),
+        expences: Math.abs(Number(row[8] ?? 0)),
+        prime_cost: Math.abs(Number(row[9] ?? 0)),
+        spp: Math.abs(Number(row[10] ? row[10].replace("%", "") : 0)),
       };
     });
 
@@ -226,6 +227,65 @@ const writeDataToFile = (data, filename) => {
     console.log(`Data written to ${filename}`);
   });
 };
+
+async function copyPricesToDataSpreadsheet(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sourceSpreadsheetId = "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ";
+    const destinationSpreadsheetId =
+      "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs";
+
+    const sheets = google.sheets({ version: "v4", auth });
+    const update_data = async (data) => {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: destinationSpreadsheetId,
+        range: `Данные!J2:J`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: data,
+        },
+      });
+    };
+    const prices_rows = (
+      await sheets.spreadsheets.values.get({
+        spreadsheetId: sourceSpreadsheetId,
+        range: `ЦЕНЫ+ШК!D2:F`,
+      })
+    ).data.values;
+
+    const prices = {};
+    prices_rows.forEach((row) => {
+      if (!row[0]) return;
+      prices[row[0]] = Number(row[2]);
+    });
+
+    // console.log(prices);
+
+    const data_rows = (
+      await sheets.spreadsheets.values.get({
+        spreadsheetId: destinationSpreadsheetId,
+        range: `Данные!A2:A`,
+      })
+    ).data.values;
+
+    const data = [];
+    data_rows.forEach((row) => {
+      let regex = row[0].split("_").slice(0, 2).join("_");
+      if (row[0].includes("КПБ")) {
+        regex += "_СТРАЙП";
+      }
+      if (row[0].includes("НАМАТРАСНИК")) {
+        regex += "_ОТК";
+      }
+      if (row[0].includes("ТКС")) {
+        regex += "_ТКС";
+      }
+      // console.log(regex, prices[regex]);
+      data.push([prices[regex]]);
+    });
+
+    await update_data(data).then((pr) => resolve());
+  });
+}
 
 async function copyZakazToOtherSpreadsheet(auth) {
   const sourceSpreadsheetId = "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8";
@@ -334,6 +394,10 @@ module.exports = {
   fetchEnteredROIAndWriteToJSON: async (campaign) => {
     const auth = await authorize();
     await fetchEnteredROIAndWriteToJSON(auth, campaign).catch(console.error);
+  },
+  copyPricesToDataSpreadsheet: async () => {
+    const auth = await authorize();
+    await copyPricesToDataSpreadsheet(auth).catch(console.error);
   },
   copyZakazToOtherSpreadsheet: async () => {
     const auth = await authorize();

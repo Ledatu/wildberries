@@ -1,10 +1,11 @@
 const path = require('path')
 const { fetchDataAndWriteToXlsx, fetchCardsAndWriteToJSON, fetchOrdersAndWriteToJSON, fetchStocksAndWriteToJSON, fetchDetailedByPeriodAndWriteToJSON, calculateNewValuesBasedOnEnteredROIAndWriteToXlsx } = require('./main');
-const { writePrices, writeDetailedByPeriod, fetchDataAndWriteToJSON, fetchEnteredROIAndWriteToJSON } = require('./google_sheets/index')
+const { writePrices, writeDetailedByPeriod, fetchDataAndWriteToJSON, fetchEnteredROIAndWriteToJSON, copyPricesToDataSpreadsheet } = require('./google_sheets/index')
 
 const getPrices = async () => {
   const campaigns = require(path.join(__dirname, 'files/campaigns')).campaigns
-  await fetchDataAndWriteToJSON()
+  await copyPricesToDataSpreadsheet().then(async pr => await fetchDataAndWriteToJSON())
+  
   campaigns.forEach(async campaign => {
     Promise.all([
       await fetchCardsAndWriteToJSON(campaign),

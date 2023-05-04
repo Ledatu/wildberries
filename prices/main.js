@@ -154,7 +154,7 @@ const buildXlsx = (data, campaign) => {
     const prime_cost = arts_data[vendorCode].prime_cost;
     const profit =
       -commission - delivery - tax - expences - prime_cost + roz_price;
-    const roi = profit / (prime_cost - expences);
+    const roi = profit / (prime_cost + expences);
     new_data.push([
       vendorCode,
       el.price,
@@ -394,7 +394,7 @@ const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
         -commission - delivery - tax - expences - prime_cost + roz_price;
       const wb_price = roz_price / (1 - row[2] / 100);
 
-      const roi = profit / (prime_cost - expences);
+      const roi = profit / (prime_cost + expences);
       return {
         new_roi: roi,
         new_price: roz_price,
@@ -404,18 +404,18 @@ const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
     };
     const entered_roi = enteredROI[vendorCode] / 100;
 
-    const diffs = []
-    const calculateds = {}
+    const diffs = [];
+    const calculateds = {};
     for (let i = 400; i < 5000; i++) {
       const calculated = calcROI(i);
       const diff = Math.abs(calculated.new_roi - entered_roi);
-      diffs.push(diff)
-      calculateds[String(diff)] = calculated
+      diffs.push(diff);
+      calculateds[String(diff)] = calculated;
       // break;
     }
-    
-    diffs.sort()
-    const min_diff = String(diffs[0])
+
+    diffs.sort();
+    const min_diff = String(diffs[0]);
     // console.log(min_diff, diffs, calculateds[min_diff])
     row[11] = calculateds[min_diff].new_roi;
     row[12] = calculateds[min_diff].new_price;
