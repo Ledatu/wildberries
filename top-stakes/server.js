@@ -106,6 +106,9 @@ app.post("/api/updatePrices", authenticateToken, (req, res) => {
   fetchNewPricesAndWriteToJSON(campaign).then((pr) => {
     console.log("Prices fetched.");
     updatePrices(campaign);
+    new Promise((resolve) => setTimeout(resolve, 5000)).then((pr) =>
+      getPrices()
+    );
   });
 
   res.send("Updating prices.");
