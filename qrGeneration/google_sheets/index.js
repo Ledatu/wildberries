@@ -116,8 +116,10 @@ async function fetchQrCodesAndWriteToJSON(auth) {
       data["qrcodes"].push(row[0]);
     });
 
-    writeDataToFile(data, path.join(__dirname, "../files/qrcodes.json")).then(pr => resolve());
-  })
+    writeDataToFile(data, path.join(__dirname, "../files/qrcodes.json")).then(
+      (pr) => resolve()
+    );
+  });
 }
 
 // Define the function to write data to a JSON file

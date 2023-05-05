@@ -1,4 +1,4 @@
-const { fetchQrCodesAndWriteToJSON } = require('./google_sheets/index')
-const { qrGeneration } = require('./qrGeneration')
+const { fetchQrCodesAndWriteToJSON } = require("./google_sheets/index");
+const { qrGeneration } = require("./qrGeneration");
 // fetchQrCodesAndWriteToJSON()
-qrGeneration()
+qrGeneration();

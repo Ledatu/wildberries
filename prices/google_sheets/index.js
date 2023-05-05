@@ -185,7 +185,7 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
     const data = [];
     rows.forEach((row) => {
       const new_price = Number(row[14]);
-      if (!new_price ||  new_price > 20000|| new_price < 4500) return;
+      if (!new_price || new_price > 20000 || new_price < 4500) return;
       data.push({ nmId: nmIds[row[0]], price: new_price });
     });
 

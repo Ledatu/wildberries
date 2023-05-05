@@ -93,7 +93,10 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
   analytics.sort((a, b) => {
     const a1 = a[0].split(" ").slice(1).join(" ");
     const b1 = b[0].split(" ").slice(1).join(" ");
-    return ("" + b1).localeCompare(a1) || b.slice(0, 6).filter(String).length - a.slice(0, 6).filter(String).length;
+    return (
+      ("" + b1).localeCompare(a1) ||
+      b.slice(0, 6).filter(String).length - a.slice(0, 6).filter(String).length
+    );
   });
   await sheets.spreadsheets.values.clear({
     spreadsheetId: "1c1TXMXLWiyxDEFd-kaP6UxE2zlVC3FVXIsBpfp31S4g",

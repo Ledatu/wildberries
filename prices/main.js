@@ -150,7 +150,8 @@ const buildXlsx = (data, campaign) => {
     const commission = roz_price * (arts_data[vendorCode].commission / 100);
     const delivery = arts_data[vendorCode].delivery;
     const tax = spp_price * (arts_data[vendorCode].tax / 100);
-    const expences = campaign == 'TKS' ? spp_price * 0.11 : arts_data[vendorCode].expences;
+    const expences =
+      campaign == "TKS" ? spp_price * 0.11 : arts_data[vendorCode].expences;
     const prime_cost = arts_data[vendorCode].prime_cost;
     const profit =
       -commission - delivery - tax - expences - prime_cost + roz_price;
@@ -419,7 +420,8 @@ const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
       const commission = roz_price * (arts_data[vendorCode].commission / 100);
       const delivery = arts_data[vendorCode].delivery;
       const tax = spp_price * (arts_data[vendorCode].tax / 100);
-      const expences = campaign == 'TKS' ? spp_price * 0.11 : arts_data[vendorCode].expences;
+      const expences =
+        campaign == "TKS" ? spp_price * 0.11 : arts_data[vendorCode].expences;
       const prime_cost = arts_data[vendorCode].prime_cost;
       const profit =
         -commission - delivery - tax - expences - prime_cost + roz_price;

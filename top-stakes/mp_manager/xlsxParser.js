@@ -1,6 +1,6 @@
-const fs = require('fs');
-const path = require('path');
-const xlsx = require('node-xlsx');
+const fs = require("fs");
+const path = require("path");
+const xlsx = require("node-xlsx");
 
 const columnNumber = 13;
 const rowCount = 5;
@@ -11,17 +11,18 @@ const rowCount = 5;
  * @returns {Array} - An array of extracted data.
  */
 const parseStakeSheet = function (filepath) {
-    const sheet = xlsx.parse(filepath)[0];
-    const data = [];
-    for (let i = 1; i <= rowCount; i++) {
-        const data_row = sheet.data[i];
-        if (!data_row)
-            continue
+  const sheet = xlsx.parse(filepath)[0];
+  const data = [];
+  for (let i = 1; i <= rowCount; i++) {
+    const data_row = sheet.data[i];
+    if (!data_row) continue;
 
-        const cell = data_row[columnNumber];
-        data.push(cell ? cell : null);
-    }
-    return [filepath.slice(0, filepath.lastIndexOf('.')).split(' ').slice(1).join(' ')].concat(data);
+    const cell = data_row[columnNumber];
+    data.push(cell ? cell : null);
+  }
+  return [
+    filepath.slice(0, filepath.lastIndexOf(".")).split(" ").slice(1).join(" "),
+  ].concat(data);
 };
 
 /**
@@ -31,44 +32,49 @@ const parseStakeSheet = function (filepath) {
  * and writes the extracted data to a new excel file in the default directory.
  */
 const parseXlsxFiles = function () {
-    return new Promise((resolve, reject) => {
-        const data = [];
+  return new Promise((resolve, reject) => {
+    const data = [];
 
-        fs.readdir(directory, (err, files) => {
-            if (err) reject(err);
+    fs.readdir(directory, (err, files) => {
+      if (err) reject(err);
 
-            files.forEach((filename) => {
-                const extname = path.extname(filename);
-                if (extname !== '.xlsx') {
-                    console.log(`Skipping file ${filename} because it is not an xlsx file.`);
-                    return;
-                }
+      files.forEach((filename) => {
+        const extname = path.extname(filename);
+        if (extname !== ".xlsx") {
+          console.log(
+            `Skipping file ${filename} because it is not an xlsx file.`
+          );
+          return;
+        }
 
-                const filepath = path.join(directory, filename);
-                const row = parseStakeSheet(filepath);
-                data.push([sheet.name].concat(row))
-            });
+        const filepath = path.join(directory, filename);
+        const row = parseStakeSheet(filepath);
+        data.push([sheet.name].concat(row));
+      });
 
-            for (let i = 1; i < data.length; i++) {
-                const cur = data[i].slice(1, 5)
-                const prev = data[i - 1].slice(1, 5)
-                if (cur.join() == prev.join()) {
-                    data[i] = [data[i][0]].concat(['', '', '', '', ''])
-                }
-            }
+      for (let i = 1; i < data.length; i++) {
+        const cur = data[i].slice(1, 5);
+        const prev = data[i - 1].slice(1, 5);
+        if (cur.join() == prev.join()) {
+          data[i] = [data[i][0]].concat(["", "", "", "", ""]);
+        }
+      }
 
-            const outputBuffer = xlsx.build([{ name: 'Sheet1', data: data }]);
-            fs.writeFileSync(path.join(directory, '..', outputFilename), outputBuffer);
+      const outputBuffer = xlsx.build([{ name: "Sheet1", data: data }]);
+      fs.writeFileSync(
+        path.join(directory, "..", outputFilename),
+        outputBuffer
+      );
 
-            resolve(0);
-        });
+      resolve(0);
     });
+  });
 };
 
-const directory = path.join(__dirname, 'files', 'downloads');
-const outputFilename = 'gathered_stakes.xlsx';
+const directory = path.join(__dirname, "files", "downloads");
+const outputFilename = "gathered_stakes.xlsx";
 
 module.exports = {
-    parseXlsxFiles,
-    parseStakeSheet
+  parseXlsxFiles,
+  parseStakeSheet,
 };

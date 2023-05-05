@@ -23,7 +23,6 @@ function zipDirectory(sourceDir, outPath) {
   });
 }
 
-
 async function saveQRPDF(qrDataArray, filePath) {
   const pdfDoc = await PDFDocument.create();
   const writeStream = fs.createWriteStream(filePath);
@@ -98,7 +97,9 @@ async function saveQRPDF(qrDataArray, filePath) {
 function main() {
   return new Promise((resolve, reject) => {
     const arch = path.join(__dirname, "files/qrcodes.zip");
-    const qrcodes = JSON.parse(fs.readFileSync(path.join(__dirname, "files/qrcodes.json"))).qrcodes;
+    const qrcodes = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "files/qrcodes.json"))
+    ).qrcodes;
     console.log(qrcodes);
 
     // Remove existing files

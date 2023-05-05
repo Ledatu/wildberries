@@ -98,7 +98,7 @@ module.exports = (campaign_id) => {
     const stats = [0, 0, 0, 0, 0, 0];
     for (let day = 0; day < days; day++) {
       for (let i = 0; i < 6; i++) {
-        let val = row[1 + (day * 6) + i];
+        let val = row[1 + day * 6 + i];
         val = Number(val ? val.replace(",", ".") : 0);
         if (i == 1 || i == 3 || i == 5) val /= days;
         stats[i] += val;

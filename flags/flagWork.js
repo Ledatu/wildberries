@@ -1,7 +1,7 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-const flagsDir = path.join(__dirname, 'flag-files');
+const flagsDir = path.join(__dirname, "flag-files");
 
 /**
  * Creates a flag file with the given name in the flags directory.
@@ -10,7 +10,7 @@ const flagsDir = path.join(__dirname, 'flag-files');
  */
 function createFlagFile(flagFile) {
   return new Promise((resolve, reject) => {
-    fs.writeFile(path.join(flagsDir, flagFile), '', (err) => {
+    fs.writeFile(path.join(flagsDir, flagFile), "", (err) => {
       if (err) {
         reject(err);
       } else {
@@ -51,7 +51,7 @@ function checkFlagFilesExist(flagFiles) {
     flagFiles.forEach((flagFile) => {
       fs.access(path.join(flagsDir, flagFile), fs.constants.F_OK, (err) => {
         if (err) {
-          if (err.code !== 'ENOENT') {
+          if (err.code !== "ENOENT") {
             reject(err);
           }
         } else {

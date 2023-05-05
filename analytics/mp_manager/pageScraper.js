@@ -166,7 +166,7 @@ const scraperObject = {
     let index = 0;
     for (link in urls) {
       index++;
-      const parallel = 0;
+      const parallel = 1;
       if (parallel) {
         all_page_promises.push(pagePromise(urls[link], index, urls.length));
         await new Promise((resolve) => setTimeout(resolve, 1000));
