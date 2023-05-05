@@ -56,6 +56,12 @@ async function startXlsxParsing() {
   main();
 }
 
+// parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: false }));
+
+// parse application/json
+app.use(bodyParser.json());
+
 /**
  * Route to return a "Hello World!" message.
  * @function
@@ -91,6 +97,7 @@ app.get("/api/calcNewValues", authenticateToken, (req, res) => {
 
 app.post("/api/updatePrices", authenticateToken, (req, res) => {
   const campaign = req.body.campaign;
+  // console.log(req)
   if (!campaign) {
     res.send("Error: no campaign was provided.");
     return;
@@ -163,9 +170,7 @@ app.get("/api/downloadTemplate", async (req, res) => {
   }
 });
 
-// Use the body-parser middleware to parse request bodies
-app.use(bodyParser.json());
-
+// Use the body-parser middleware to parse request
 /**
  * Endpoint to authenticate a user and return a JWT.
  * @function
