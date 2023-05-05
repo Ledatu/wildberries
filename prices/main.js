@@ -110,22 +110,22 @@ const buildXlsx = (data, campaign) => {
   let new_data = [
     [
       "Артикул продавца",
+      "ЗАКАЗАТЬ",
       "Текущая розн. цена (до скидки)",
       "Текущая скидка на сайте, %",
       "Цена со скидкой",
-      "Оборачиваемость",
-      "ЗАКАЗАТЬ",
+      "Цена СПП",
+      "Профит",
       "остаток",
       "заказов/7",
       "заказов/1",
-      "Профит",
+      "Оборачиваемость",
       "ROI",
       "Новый ROI",
       "Новая РЦ",
       "Новая РЦ с СПП",
       "Новая WB цена",
       "",
-      "Цена СПП",
       "Коммисия",
       "Логистика",
       "Налоги",
@@ -158,22 +158,22 @@ const buildXlsx = (data, campaign) => {
     const roi = profit / (prime_cost + expences);
     new_data.push([
       vendorCode,
+      zakaz > 0 ? zakaz : !orders[el.nmId] ? mult * 5 : 0,
       el.price,
       el.discount,
       roz_price, // розничная стоимость
-      obor,
-      zakaz > 0 ? zakaz : !orders[el.nmId] ? mult * 5 : 0,
+      spp_price,
+      profit,
       stock,
       orders[el.nmId],
       per_day,
-      profit,
+      obor,
       roi,
       "",
       "",
       "",
       "",
       "",
-      spp_price,
       commission,
       delivery,
       tax,
@@ -390,10 +390,12 @@ const fetchOrdersAndWriteToJSON = (campaign) => {
     .catch((error) => console.error(error));
 };
 
-const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
+const calculateNewValuesAndWriteToXlsx = (campaign) => {
   const afs = require("fs");
-  const enteredROI = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", campaign, "enteredROI.json"))
+  const enteredValues = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "enteredValues.json")
+    )
   );
   const arts_data = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files/data.json"))
@@ -406,17 +408,17 @@ const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
     let row = data[i];
     // console.log(row);
     const vendorCode = row[0];
-    if (!vendorCode || !arts_data[vendorCode] || !enteredROI[vendorCode]) {
-      row[11] = "";
+    if (!vendorCode || !arts_data[vendorCode] || !enteredValues[vendorCode]) {
       row[12] = "";
       row[13] = "";
       row[14] = "";
+      row[15] = "";
 
       data[i] = row;
       continue;
     }
 
-    const calcROI = (roz_price) => {
+    const calc = (roz_price) => {
       const spp_price = Math.floor(
         roz_price * (1 - arts_data[vendorCode].spp / 100)
       );
@@ -428,23 +430,45 @@ const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
       const prime_cost = arts_data[vendorCode].prime_cost;
       const profit =
         -commission - delivery - tax - expences - prime_cost + roz_price;
-      const wb_price = roz_price / (1 - row[2] / 100);
+      const wb_price = roz_price / (1 - row[3] / 100);
 
       const roi = profit / (prime_cost + expences);
       return {
         new_roi: roi,
-        new_price: roz_price,
+        new_roz_price: roz_price,
         new_spp_price: spp_price,
         new_wb_price: wb_price,
       };
     };
-    const entered_roi = enteredROI[vendorCode] / 100;
+    const entered_roi = enteredValues[vendorCode].roi / 100;
+    const entered_roz_price = enteredValues[vendorCode].roz_price;
+    const entered_spp_price = enteredValues[vendorCode].spp_price;
+    let count = 0;
+    if (entered_roi) count++;
+    if (entered_roz_price) count++;
+    if (entered_spp_price) count++;
+    if (count != 1) {
+      row[12] = "";
+      row[13] = "";
+      row[14] = "";
+      row[15] = "";
+
+      data[i] = row;
+      continue;
+    }
 
     const diffs = [];
     const calculateds = {};
-    for (let i = 400; i < 5000; i++) {
-      const calculated = calcROI(i);
-      const diff = Math.abs(calculated.new_roi - entered_roi);
+    for (let i = 450; i < 2000; i++) {
+      const calculated = calc(i);
+      let diff = undefined;
+      if (entered_roi) {
+        diff = Math.abs(calculated.new_roi - entered_roi);
+      } else if (entered_roz_price) {
+        diff = Math.abs(calculated.new_roz_price - entered_roz_price);
+      } else if (entered_spp_price) {
+        diff = Math.abs(calculated.new_spp_price - entered_spp_price);
+      }
       diffs.push(diff);
       calculateds[String(diff)] = calculated;
       // break;
@@ -453,10 +477,10 @@ const calculateNewValuesBasedOnEnteredROIAndWriteToXlsx = (campaign) => {
     diffs.sort();
     const min_diff = String(diffs[0]);
     // console.log(min_diff, diffs, calculateds[min_diff])
-    row[11] = calculateds[min_diff].new_roi;
-    row[12] = calculateds[min_diff].new_price;
-    row[13] = calculateds[min_diff].new_spp_price;
-    row[14] = calculateds[min_diff].new_wb_price;
+    row[12] = calculateds[min_diff].new_roi;
+    row[13] = calculateds[min_diff].new_roz_price;
+    row[14] = calculateds[min_diff].new_spp_price;
+    row[15] = calculateds[min_diff].new_wb_price;
 
     data[i] = row;
   }
@@ -474,6 +498,6 @@ module.exports = {
   fetchStocksAndWriteToJSON,
   fetchOrdersAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
-  calculateNewValuesBasedOnEnteredROIAndWriteToXlsx,
+  calculateNewValuesAndWriteToXlsx,
   updatePrices,
 };

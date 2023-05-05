@@ -5,13 +5,13 @@ const {
   fetchOrdersAndWriteToJSON,
   fetchStocksAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
-  calculateNewValuesBasedOnEnteredROIAndWriteToXlsx,
+  calculateNewValuesAndWriteToXlsx,
 } = require("./main");
 const {
   writePrices,
   writeDetailedByPeriod,
   fetchDataAndWriteToJSON,
-  fetchEnteredROIAndWriteToJSON,
+  fetchEnteredValuesAndWriteToJSON,
   copyPricesToDataSpreadsheet,
 } = require("./google_sheets/index");
 
@@ -57,8 +57,8 @@ const calcNewValues = async () => {
   // await fetchDataAndWriteToJSON()
   campaigns.forEach(async (campaign) => {
     Promise.all([
-      await fetchEnteredROIAndWriteToJSON(campaign),
-      await calculateNewValuesBasedOnEnteredROIAndWriteToXlsx(campaign),
+      await fetchEnteredValuesAndWriteToJSON(campaign),
+      await calculateNewValuesAndWriteToXlsx(campaign),
     ])
       .then(async () => {
         console.log("All tasks completed successfully");
