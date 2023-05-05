@@ -310,9 +310,11 @@ const updatePrices = async (campaign) => {
     `files/${campaign}/newPrices.json`
   );
   const newPrices = JSON.parse(await fs.readFile(newPricesPath));
-  console.log(newPrices);
-  fs.rm(newPricesPath);
-  return 0;
+  console.log(campaign, newPrices);
+  if (!newPrices.length) {
+    fs.rm(newPricesPath);
+    return 0;
+  }
   axios
     .post(
       "https://suppliers-api.wildberries.ru/public/api/v1/prices",
@@ -325,6 +327,7 @@ const updatePrices = async (campaign) => {
     )
     .then((response) => response.data)
     .catch((error) => console.error(error));
+  fs.rm(newPricesPath);
 };
 
 const fetchDataAndWriteToXlsx = (campaign) => {
