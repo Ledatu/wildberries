@@ -89,13 +89,13 @@ app.get("/api/calcNewValues", authenticateToken, (req, res) => {
   res.send("Prices getting started!");
 });
 
-app.get("/api/updatePrices", authenticateToken, (req, res) => {
-  const campaign = req.params.campaign;
+app.post("/api/updatePrices", authenticateToken, (req, res) => {
+  const campaign = req.body.campaign;
   if (!campaign) {
     res.send("Error: no campaign was provided.");
     return;
   }
-  // console.log(campaign);
+
   fetchNewPricesAndWriteToJSON(campaign).then((pr) => {
     console.log("Prices fetched.");
     updatePrices(campaign);
