@@ -217,8 +217,8 @@ async function fetchDataAndWriteToJSON(auth) {
         commission: Math.abs(Number(row[5] ? row[5].replace("%", "") : 0)),
         delivery: Math.abs(Number(row[6] ? row[6].replace(",", ".") : 0)),
         tax: Math.abs(Number(row[7] ? row[7].replace("%", "") : 0)),
-        expences: Math.abs(Number(row[8] ?? 0)),
-        prime_cost: Math.abs(Number(row[9] ?? 0)),
+        expences: Math.abs(Number(row[8] ? row[8].replace(",", ".") : 0)),
+        prime_cost: Math.abs(Number(row[9] ? row[9].replace(",", ".") : 0)),
         spp: Math.abs(Number(row[10] ? row[10].replace("%", "") : 0)),
       };
     });
