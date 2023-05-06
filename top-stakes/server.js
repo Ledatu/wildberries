@@ -116,7 +116,7 @@ app.post("/api/updatePrices", authenticateToken, (req, res) => {
 
 app.get("/api/getDelivery", authenticateToken, (req, res) => {
   getDelivery()
-    .then((pr) => res.send(pr))
+    .then((pr) => res.send(JSON.stringify(pr)))
     .catch((err) => res.send(err));
 });
 
