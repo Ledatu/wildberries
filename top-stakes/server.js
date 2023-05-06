@@ -115,8 +115,9 @@ app.post("/api/updatePrices", authenticateToken, (req, res) => {
 });
 
 app.get("/api/getDelivery", authenticateToken, (req, res) => {
-  getDelivery();
-  res.send("Delivery getting started!");
+  getDelivery()
+    .then((pr) => res.send(pr))
+    .catch((err) => res.send(err));
 });
 
 app.get("/api/copyZakaz", authenticateToken, (req, res) => {

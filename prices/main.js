@@ -1,6 +1,7 @@
 const xlsx = require("node-xlsx");
 const axios = require("axios");
 const fs = require("fs").promises;
+const afs = require("fs");
 const path = require("path");
 
 const sortData = (data) => {
@@ -92,7 +93,6 @@ const getOrders = (authToken, params) => {
 };
 
 const buildXlsx = (data, campaign) => {
-  const afs = require("fs");
   const vendorCodes = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "files", campaign, "vendorCodes.json")
@@ -254,54 +254,99 @@ const writeOrdersToJson = (data, campaign) => {
     .catch((error) => console.error(error));
 };
 
-const writeDetailedByPeriodToJson = (data, campaign) => {
-  const jsonData = {};
-  data.forEach((item) => {
-    const type = item.sa_name.split("_")[0];
-    if (type in jsonData) {
-      jsonData[type].buyout += item.quantity;
-      jsonData[type].delivery += item.delivery_rub;
-    } else jsonData[type] = { buyout: 0, delivery: item.delivery_rub };
+const writeDetailedByPeriodToJson = (data, campaign) =>
+  new Promise((resolve, reject) => {
+    const jsonData = {};
+    if (data) {
+      data.forEach((item) => {
+        const type = item.sa_name.split("_")[0];
+        if (type in jsonData) {
+          jsonData[type].buyout += item.quantity;
+          jsonData[type].delivery += item.delivery_rub;
+        } else jsonData[type] = { buyout: 0, delivery: item.delivery_rub };
+      });
+      for (const key in jsonData) {
+        jsonData[key].delivery = Math.round(jsonData[key].delivery);
+        jsonData[key]["average_delivery"] =
+          jsonData[key].delivery / jsonData[key].buyout;
+      }
+    }
+    return fs
+      .writeFile(
+        path.join(__dirname, "files", campaign, "detailedByPeriod.json"),
+        JSON.stringify(jsonData ?? {})
+      )
+      .then(() => {
+        console.log("detailedByPeriod.json created.");
+        resolve(jsonData);
+      })
+      .catch((error) => {
+        console.error(error);
+        reject(error);
+      });
   });
-  for (const key in jsonData) {
-    jsonData[key]["average_delivery"] =
-      jsonData[key].delivery / jsonData[key].buyout;
-  }
-  return fs
-    .writeFile(
-      path.join(__dirname, "files", campaign, "detailedByPeriod.json"),
-      JSON.stringify(jsonData)
-    )
-    .then(() => console.log("detailedByPeriod.json created."))
-    .catch((error) => console.error(error));
-};
 
-const fetchDetailedByPeriodAndWriteToJSON = (campaign) => {
-  const authToken = getAuthToken("api-statistic-token", campaign);
-  const prevMonday = new Date();
-  prevMonday.setDate(
-    prevMonday.getDate() - 7 - ((prevMonday.getDay() + 6) % 7)
-  );
-  const prevSunday = new Date();
-  prevSunday.setDate(
-    prevSunday.getDate() - 7 - ((prevSunday.getDay() - 7) % 7)
-  );
-  const params = {
-    dateFrom: prevMonday.toISOString().split("T")[0],
-    dateTo: prevSunday.toISOString().split("T")[0],
-  };
-  console.log(params);
-  // return 0;
-  return getDetailedByPeriod(authToken, params)
-    .then((data) => {
-      fs.writeFile(
-        path.join(__dirname, "files", campaign, "detailedByPeriod_full.json"),
-        JSON.stringify(data)
-      );
-      return writeDetailedByPeriodToJson(data, campaign);
-    })
-    .catch((error) => console.error(error));
-};
+const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
+  new Promise(async (resolve, reject) => {
+    const filePath = path.join(
+      __dirname,
+      `files/${campaign}/detailedByPeriod.json`
+    );
+    let old_delivery = {};
+    if (afs.existsSync(filePath)) {
+      old_delivery = JSON.parse(await fs.readFile(filePath));
+    } else {
+      console.log(`File ${filePath} does not exist.`);
+    }
+
+    const authToken = getAuthToken("api-statistic-token", campaign);
+    const prevMonday = new Date();
+    prevMonday.setDate(
+      prevMonday.getDate() - 7 - ((prevMonday.getDay() + 6) % 7)
+    );
+    const prevSunday = new Date();
+    prevSunday.setDate(
+      prevSunday.getDate() - 7 - ((prevSunday.getDay() - 7) % 7)
+    );
+    const params = {
+      dateFrom: prevMonday.toISOString().split("T")[0],
+      dateTo: prevSunday.toISOString().split("T")[0],
+    };
+    console.log(params);
+    // return 0;
+    return getDetailedByPeriod(authToken, params)
+      .then((data) => {
+        console.log(campaign, data ? true : false);
+        fs.writeFile(
+          path.join(__dirname, "files", campaign, "detailedByPeriod_full.json"),
+          JSON.stringify(data ?? {})
+        );
+        return writeDetailedByPeriodToJson(data, campaign).then((pr) => {
+          const shallowEqual = (object1, object2) => {
+            // console.log(object1, object2)
+            const keys1 = Object.keys(object1);
+            const keys2 = Object.keys(object2);
+            if (keys1.length !== keys2.length) return false;
+            for (let key of keys1) {
+              const innerKeys1 = Object.keys(object1[key]);
+              const innerKeys2 = Object.keys(object2[key]);
+              if (innerKeys1.length !== innerKeys2.length) return false;
+              for (let innerKey of innerKeys1) {
+                if (object1[key][innerKey] !== object2[key][innerKey])
+                  return false;
+              }
+            }
+            return true;
+          };
+
+          const new_delivery = pr;
+          const isEqual = shallowEqual(old_delivery, new_delivery);
+          console.log(isEqual);
+          resolve(isEqual);
+        });
+      })
+      .catch((error) => console.error(error));
+  });
 
 const updatePrices = async (campaign) => {
   const authToken = getAuthToken("api-token", campaign);
