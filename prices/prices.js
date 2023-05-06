@@ -38,10 +38,13 @@ const getPrices = async () => {
   });
 };
 
-const getDelivery = () =>
+const getDelivery = (camp = undefined) =>
   new Promise((resolve, reject) => {
     const updateStatus = {};
     const promises = campaigns.map((campaign) => {
+      if (camp && campaign != camp) {
+        return 0;
+      }
       return fetchDetailedByPeriodAndWriteToJSON(campaign)
         .then((pr) => {
           updateStatus[campaign] = !pr;

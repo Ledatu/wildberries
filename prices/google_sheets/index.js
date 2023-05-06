@@ -146,7 +146,7 @@ async function writeDetailedByPeriod(auth, campaign) {
       const type = row[0].split("_")[0];
       // console.log(type);
       data[i][0] = `${
-        delivery[type] ? -delivery[type].average_delivery : data[i][0]
+        delivery[type] ? delivery[type].average_delivery : data[i][0]
       }`.replace(".", ",");
       // console.log(campaign, type, data[i]);
     }

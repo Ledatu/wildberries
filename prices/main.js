@@ -258,6 +258,7 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
   new Promise((resolve, reject) => {
     const jsonData = {};
     if (data) {
+      jsonData["date"] = data[0].create_dt.slice(0, 10);
       data.forEach((item) => {
         const type = item.sa_name.split("_")[0];
         if (type in jsonData) {
@@ -322,25 +323,25 @@ const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
           JSON.stringify(data ?? {})
         );
         return writeDetailedByPeriodToJson(data, campaign).then((pr) => {
-          const shallowEqual = (object1, object2) => {
-            // console.log(object1, object2)
-            const keys1 = Object.keys(object1);
-            const keys2 = Object.keys(object2);
-            if (keys1.length !== keys2.length) return false;
-            for (let key of keys1) {
-              const innerKeys1 = Object.keys(object1[key]);
-              const innerKeys2 = Object.keys(object2[key]);
-              if (innerKeys1.length !== innerKeys2.length) return false;
-              for (let innerKey of innerKeys1) {
-                if (object1[key][innerKey] !== object2[key][innerKey])
-                  return false;
-              }
-            }
-            return true;
-          };
+          // const shallowEqual = (object1, object2) => {
+          //   // console.log(object1, object2)
+          //   const keys1 = Object.keys(object1);
+          //   const keys2 = Object.keys(object2);
+          //   if (keys1.length !== keys2.length) return false;
+          //   for (let key of keys1) {
+          //     const innerKeys1 = Object.keys(object1[key]);
+          //     const innerKeys2 = Object.keys(object2[key]);
+          //     if (innerKeys1.length !== innerKeys2.length) return false;
+          //     for (let innerKey of innerKeys1) {
+          //       if (object1[key][innerKey] !== object2[key][innerKey])
+          //         return false;
+          //     }
+          //   }
+          //   return true;
+          // };
 
           const new_delivery = pr;
-          const isEqual = shallowEqual(old_delivery, new_delivery);
+          const isEqual = new_delivery.date == old_delivery.date;
           console.log(isEqual);
           resolve(isEqual);
         });

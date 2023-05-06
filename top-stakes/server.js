@@ -114,8 +114,11 @@ app.post("/api/updatePrices", authenticateToken, (req, res) => {
   res.send("Updating prices.");
 });
 
-app.get("/api/getDelivery", authenticateToken, (req, res) => {
-  getDelivery()
+app.post("/api/getDelivery", authenticateToken, (req, res) => {
+  const campaign = req.body.campaign;
+  // console.log(req)
+
+  getDelivery(campaign)
     .then((pr) => res.send(JSON.stringify(pr)))
     .catch((err) => res.send(err));
 });
