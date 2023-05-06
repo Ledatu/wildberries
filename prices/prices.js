@@ -48,9 +48,7 @@ const getDelivery = (camp = undefined) =>
       return fetchDetailedByPeriodAndWriteToJSON(campaign)
         .then((pr) => {
           updateStatus[campaign] = !pr;
-          if (!pr) {
-            return writeDetailedByPeriod(campaign);
-          }
+          return writeDetailedByPeriod(campaign);
         })
         .catch((error) => {
           console.error("An error occurred:", error);
