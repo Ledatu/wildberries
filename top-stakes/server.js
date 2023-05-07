@@ -138,8 +138,9 @@ app.get("/api/generateQRs", authenticateToken, (req, res) => {
   res.send("QR Generation started!");
 });
 
-app.get("/api/autofillCurrent", authenticateToken, (req, res) => {
-  autofillCurrent().then((count) => res.send({ count: count }));
+app.post("/api/autofillCurrent", authenticateToken, (req, res) => {
+  const name = req.body.sheetname;
+  autofillCurrent(name).then((count) => res.send({ count: count }));
 });
 
 app.get("/api/downloadQRs", async (req, res) => {

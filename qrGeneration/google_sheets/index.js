@@ -84,9 +84,9 @@ async function writeCurrent(auth, campaign) {
     });
   };
 
-  const data = xlsx.parse(
-    path.join(__dirname, `../files/current.xlsx`)
-  )[0]["data"];
+  const data = xlsx.parse(path.join(__dirname, `../files/current.xlsx`))[0][
+    "data"
+  ];
   // console.log(data);
   const sheets = google.sheets({ version: "v4", auth });
 
@@ -122,26 +122,46 @@ async function fetchQrCodesAndWriteToJSON(auth) {
   });
 }
 
-async function fetchTagsAndWriteToJSON(auth) {
+async function fetchTagsAndWriteToJSON(auth, name) {
   return new Promise(async (resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
 
     // Retrieve the values from the specified range
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-      range: "Поставка!A2:B",
-    });
+    if (name) {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ",
+        range: `${name}!C2:F`,
+      });
 
-    // Parse the values into a JSON object
-    const rows = res.data.values;
-    const data = { tags: [] };
-    rows.forEach((row) => {
-      data["tags"].push({ tag: row[0], count: row[1] });
-    });
+      // Parse the values into a JSON object
+      const rows = res.data.values;
+      const data = { tags: [] };
+      rows.forEach((row) => {
+        if (!row[0] || !row[3]) return;
+        data["tags"].push({ tag: row[3], count: row[0] });
+      });
 
-    writeDataToFile(data, path.join(__dirname, "../files/tags.json")).then(
-      (pr) => resolve()
-    );
+      writeDataToFile(data, path.join(__dirname, "../files/tags.json")).then(
+        (pr) => resolve()
+      );
+    } else {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+        range: "Поставка!A2:B",
+      });
+
+      // Parse the values into a JSON object
+      const rows = res.data.values;
+      const data = { tags: [] };
+      rows.forEach((row) => {
+        if (!row[0] || !row[1]) return;
+        data["tags"].push({ tag: row[0], count: row[1] });
+      });
+
+      writeDataToFile(data, path.join(__dirname, "../files/tags.json")).then(
+        (pr) => resolve()
+      );
+    }
   });
 }
 
@@ -168,10 +188,10 @@ module.exports = {
       resolve();
     });
   },
-  fetchTagsAndWriteToJSON: () => {
+  fetchTagsAndWriteToJSON: (name) => {
     return new Promise(async (resolve, reject) => {
       const auth = await authorize();
-      await fetchTagsAndWriteToJSON(auth).catch(console.error);
+      await fetchTagsAndWriteToJSON(auth, name).catch(console.error);
       resolve();
     });
   },

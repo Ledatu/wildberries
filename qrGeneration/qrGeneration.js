@@ -19,14 +19,14 @@ const qrGeneration = () => {
 
 const tagsGeneration = () => {
   return new Promise(async (resolve, reject) => {
-    await fetchTagsAndWriteToJSON();
+    // await fetchTagsAndWriteToJSON();
     generateTags().then((pr) => resolve());
   });
 };
 
-const autofillCurrent = () => {
+const autofillCurrent = (name) => {
   return new Promise(async (resolve, reject) => {
-    await fetchTagsAndWriteToJSON();
+    await fetchTagsAndWriteToJSON(name);
     autofillAndWriteToXlsx().then(async (count) => {
       await writeCurrent();
       resolve(count);
