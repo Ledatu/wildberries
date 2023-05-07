@@ -173,10 +173,7 @@ function generateTags() {
   for (let i = 0; i < tags.length; i++) {
     fs.copyFileSync(
       path.join(mainTagsDir, tags[i] + ".pdf"),
-      path.join(currentTagsDir, tags[i] + ".pdf"),
-      (err) => {
-        if (err) throw err;
-      }
+      path.join(currentTagsDir, tags[i] + ".pdf")
     );
   }
 
