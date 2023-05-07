@@ -165,4 +165,11 @@ module.exports = {
       resolve();
     });
   },
+  fetchTagsAndWriteToJSON: () => {
+    return new Promise(async (resolve, reject) => {
+      const auth = await authorize();
+      await fetchTagsAndWriteToJSON(auth).catch(console.error);
+      resolve();
+    });
+  },
 };

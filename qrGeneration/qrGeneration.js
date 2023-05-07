@@ -1,4 +1,4 @@
-const { fetchQrCodesAndWriteToJSON } = require("./google_sheets/index");
+const { fetchQrCodesAndWriteToJSON, fetchTagsAndWriteToJSON } = require("./google_sheets/index");
 const { main, zipDirectory, generateTags } = require("./main");
 
 const qrGeneration = () => {
@@ -10,7 +10,7 @@ const qrGeneration = () => {
 
 const tagsGeneration = () => {
   return new Promise(async (resolve, reject) => {
-    await fetchQrCodesAndWriteToJSON();
+    await fetchTagsAndWriteToJSON();
     generateTags().then((pr) => resolve());
   });
 };
