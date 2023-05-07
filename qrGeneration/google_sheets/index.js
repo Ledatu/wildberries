@@ -76,7 +76,7 @@ async function writeCurrent(auth, campaign) {
   const update_data = async (data) => {
     await sheets.spreadsheets.values.update({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-      range: "Готовый!1:1000",
+      range: "Готовый!1:2400",
       valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
       resource: {
         values: data,
@@ -92,7 +92,7 @@ async function writeCurrent(auth, campaign) {
 
   await sheets.spreadsheets.values.clear({
     spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-    range: "Готовый!1:1000",
+    range: "Готовый!1:2400",
   });
 
   await update_data(data);
