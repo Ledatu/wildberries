@@ -224,7 +224,7 @@ function autofillAndWriteToXlsx() {
         "QR короба",
       ],
     ];
-    current_qr_index = 1;
+    current_qr_index = 0;
     for (let i = 0; i < tags.length; i++) {
       const calcTag = (tag) => {
         console.log(tag);
@@ -242,6 +242,7 @@ function autofillAndWriteToXlsx() {
 
         const num_of_boxes = tag.count / arts_data[tag.tag].multiplicity;
         // let boxes = [];
+        current_qr_index++;
         for (let j = 0; j < num_of_boxes; j++) {
           data.push(
             box.concat([
@@ -253,7 +254,6 @@ function autofillAndWriteToXlsx() {
               tag.tag,
             ])
           );
-          current_qr_index++;
         }
         // return boxes;
       };
@@ -265,7 +265,7 @@ function autofillAndWriteToXlsx() {
 
     const buffer = xlsx.build([{ name: "Готовый", data: data }]);
     fs.writeFileSync(path.join(__dirname, "files", "current.xlsx"), buffer);
-    resolve();
+    resolve(current_qr_index);
   });
 }
 

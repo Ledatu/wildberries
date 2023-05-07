@@ -27,8 +27,8 @@ const tagsGeneration = () => {
 const autofillCurrent = () => {
   return new Promise(async (resolve, reject) => {
     await fetchTagsAndWriteToJSON();
-    autofillAndWriteToXlsx().then((pr) =>
-      writeCurrent().then((pr) => resolve())
+    autofillAndWriteToXlsx().then((count) =>
+      writeCurrent().then((pr) => resolve(count))
     );
   });
 };
