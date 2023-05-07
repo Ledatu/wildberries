@@ -122,6 +122,29 @@ async function fetchQrCodesAndWriteToJSON(auth) {
   });
 }
 
+async function fetchTagsAndWriteToJSON(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+
+    // Retrieve the values from the specified range
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Поставка!A2:A",
+    });
+
+    // Parse the values into a JSON object
+    const rows = res.data.values;
+    const data = { tags: [] };
+    rows.forEach((tag) => {
+      data["tags"].push(row[0]);
+    });
+
+    writeDataToFile(data, path.join(__dirname, "../files/tags.json")).then(
+      (pr) => resolve()
+    );
+  });
+}
+
 // Define the function to write data to a JSON file
 const writeDataToFile = (data, filename) => {
   return fs.writeFile(filename, JSON.stringify(data), (err) => {

@@ -156,9 +156,8 @@ app.get("/api/downloadQRs", async (req, res) => {
 app.get("/api/downloadTags", async (req, res) => {
   // console.log(req)
   try {
-    const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
     const arch = path.join(__dirname, "../qrGeneration/files/tags.zip");
-    zipDirectory(mainTagsDir, arch).then(() => {
+    tagsGeneration().then(() => {
       res.download(arch);
     });
   } catch (error) {

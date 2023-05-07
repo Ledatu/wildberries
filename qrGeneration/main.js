@@ -153,7 +153,41 @@ function main() {
   });
 }
 
+function generateTags() {
+  const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
+  const currentTagsDir = path.join(
+    __dirname,
+    "../qrGeneration/files/tags_current"
+  );
+  if (fs.existsSync(currentTagsDir)) {
+    fs.rmSync(currentTagsDir, { recursive: true, force: true }, (err) => {
+      if (err) reject(err);
+    });
+  }
+  fs.mkdirSync(currentTagsDir);
+ 
+  const tags = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "files/tags.json"))
+  ).tags;
+  console.log(tags);
+  for (let i = 0; i < tags.length; i++) {
+    fs.copyFile(
+      path.join(mainTagsDir, tags[i], ".pdf"),
+      path.join(currentTagsDir, tags[i], ".pdf"),
+      (err) => {
+        if (err) throw err;
+      }
+    );
+  }
+
+  const arch = path.join(__dirname, "../qrGeneration/files/tags.zip");
+  return zipDirectory(currentTagsDir, arch).then(() => {
+    res.download(arch);
+  });
+}
+
 module.exports = {
   main,
   zipDirectory,
+  generateTags,
 };
