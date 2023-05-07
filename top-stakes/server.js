@@ -16,7 +16,7 @@ const {
   copyZakazToOtherSpreadsheet,
   fetchNewPricesAndWriteToJSON,
 } = require("../prices/google_sheets/index");
-const { qrGeneration } = require("../qrGeneration/qrGeneration");
+const { qrGeneration, tagsGeneration } = require("../qrGeneration/qrGeneration");
 const { getPrices, getDelivery, calcNewValues } = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
