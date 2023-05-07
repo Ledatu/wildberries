@@ -169,7 +169,7 @@ app.get("/api/downloadTags", async (req, res) => {
       if (err) {
         res.status(500).end(err);
       } else {
-        res.download(file); // Set disposition and send it.
+        res.download(arch); // Set disposition and send it.
       }
     });
   } catch (error) {
