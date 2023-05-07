@@ -184,12 +184,12 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
     const rows = res.data.values;
     const data = [];
     rows.forEach((row) => {
+      const new_price = Number(row[15]);
+      if (!new_price || new_price > 20000 || new_price < 4500) return;
       const roi = Number(
         row[12].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
-      const new_price = Number(row[15]);
-      if (roi < 0 || !new_price || new_price > 20000 || new_price < 4500)
-        return;
+      if (roi < 0) return;
       data.push({ nmId: nmIds[row[0]], price: new_price });
     });
 
