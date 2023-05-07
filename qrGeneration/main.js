@@ -154,32 +154,44 @@ function main() {
 }
 
 function generateTags() {
-  const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
-  const currentTagsDir = path.join(
-    __dirname,
-    "../qrGeneration/files/tags_current"
-  );
-  if (fs.existsSync(currentTagsDir)) {
-    fs.rmSync(currentTagsDir, { recursive: true, force: true }, (err) => {
-      if (err) reject(err);
-    });
-  }
-  fs.mkdirSync(currentTagsDir);
- 
-  const tags = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "files/tags.json"))
-  ).tags;
-  console.log(tags);
-  for (let i = 0; i < tags.length; i++) {
-    fs.copyFileSync(
-      path.join(mainTagsDir, tags[i] + ".pdf"),
-      path.join(currentTagsDir, tags[i] + ".pdf")
+  return new Promise((resolve, reject) => {
+    const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
+    const currentTagsDir = path.join(
+      __dirname,
+      "../qrGeneration/files/tags_current"
     );
-  }
+    if (fs.existsSync(currentTagsDir)) {
+      fs.rmSync(currentTagsDir, { recursive: true, force: true }, (err) => {
+        if (err) reject(err);
+      });
+    }
+    fs.mkdirSync(currentTagsDir);
 
-  const arch = path.join(__dirname, "../qrGeneration/files/tags.zip");
-  return zipDirectory(currentTagsDir, arch).then(() => {
-    res.download(arch);
+    const tags = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "files/tags.json"))
+    ).tags;
+    console.log(tags);
+
+    const promises = [];
+    for (let i = 0; i < tags.length; i++) {
+      const tag = tags[i].replace("Й", "Й");
+      promises.push(
+        fs.copyFile(
+          path.join(mainTagsDir, tag + ".pdf"),
+          path.join(currentTagsDir, tag + ".pdf"),
+          (err) => {
+            if (err) throw err;
+          }
+        )
+      );
+    }
+    Promise.all(promises).then((pr) => {
+      const arch = path.join(__dirname, "../qrGeneration/files/tags.zip");
+      return zipDirectory(currentTagsDir, arch).then(() => {
+        console.log("Zipping complete.");
+        resolve();
+      });
+    });
   });
 }
 
