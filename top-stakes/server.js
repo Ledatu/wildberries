@@ -16,7 +16,7 @@ const {
   copyZakazToOtherSpreadsheet,
   fetchNewPricesAndWriteToJSON,
 } = require("../prices/google_sheets/index");
-const { qrGeneration, tagsGeneration } = require("../qrGeneration/qrGeneration");
+const { qrGeneration, tagsGeneration, autofillCurrent } = require("../qrGeneration/qrGeneration");
 const { getPrices, getDelivery, calcNewValues } = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
@@ -132,6 +132,11 @@ app.get("/api/copyZakaz", authenticateToken, (req, res) => {
 app.get("/api/generateQRs", authenticateToken, (req, res) => {
   qrGeneration();
   res.send("QR Generation started!");
+});
+
+app.get("/api/autofillCurrent", authenticateToken, (req, res) => {
+  autofillCurrent();
+  res.send("autofillCurrent started!");
 });
 
 app.get("/api/downloadQRs", async (req, res) => {

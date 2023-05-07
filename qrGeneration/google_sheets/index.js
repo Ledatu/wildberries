@@ -72,11 +72,11 @@ async function authorize() {
   return client;
 }
 
-async function writePrices(auth, campaign) {
+async function writeCurrent(auth, campaign) {
   const update_data = async (data) => {
     await sheets.spreadsheets.values.update({
-      spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `${campaign}!1:1000`,
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Готовый!1:1000",
       valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
       resource: {
         values: data,
@@ -85,18 +85,18 @@ async function writePrices(auth, campaign) {
   };
 
   const data = xlsx.parse(
-    path.join(__dirname, `../files/${campaign}/data.xlsx`)
+    path.join(__dirname, `../files/current.xlsx`)
   )[0]["data"];
   // console.log(data);
   const sheets = google.sheets({ version: "v4", auth });
 
   await sheets.spreadsheets.values.clear({
-    spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-    range: `${campaign}!1:1000`,
+    spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+    range: "Готовый!1:1000",
   });
 
   await update_data(data);
-  console.log(`Prices data written to the google sheets.`);
+  console.log(`Current autofill data written to the google sheets.`);
 }
 
 async function fetchQrCodesAndWriteToJSON(auth) {
@@ -129,14 +129,14 @@ async function fetchTagsAndWriteToJSON(auth) {
     // Retrieve the values from the specified range
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-      range: "Поставка!A2:A",
+      range: "Поставка!A2:B",
     });
 
     // Parse the values into a JSON object
     const rows = res.data.values;
     const data = { tags: [] };
     rows.forEach((row) => {
-      data["tags"].push(row[0]);
+      data["tags"].push({ tag: row[0], count: row[1] });
     });
 
     writeDataToFile(data, path.join(__dirname, "../files/tags.json")).then(
@@ -154,9 +154,12 @@ const writeDataToFile = (data, filename) => {
 };
 
 module.exports = {
-  writePrices: async (campaign) => {
-    const auth = await authorize();
-    await writePrices(auth, campaign).catch(console.error);
+  writeCurrent: async (campaign) => {
+    return new Promise(async (resolve, reject) => {
+      const auth = await authorize();
+      await writeCurrent(auth, campaign).catch(console.error);
+      resolve();
+    });
   },
   fetchQrCodesAndWriteToJSON: () => {
     return new Promise(async (resolve, reject) => {

@@ -8,8 +8,8 @@ const { fetchDetailedByPeriodAndWriteToJSON, updatePrices } = require("./main");
 const { getPrices, getDelivery, calcNewValues } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
-getDelivery().then((pr) => console.log(pr));
-// fetchDataAndWriteToJSON()
+// getDelivery().then((pr) => console.log(pr));
+fetchDataAndWriteToJSON()
 // getPrices();
 // calcNewValues()
 // copyPricesToDataSpreadsheet()

@@ -216,6 +216,7 @@ async function fetchDataAndWriteToJSON(auth) {
     const data = {};
     rows.forEach((row) => {
       data[row[0]] = {
+        barcode: row[1],
         multiplicity: Math.abs(Number(row[2] ?? 0)),
         seller_id: row[4],
         commission: Math.abs(Number(row[5] ? row[5].replace("%", "") : 0)),

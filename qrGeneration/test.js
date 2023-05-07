@@ -1,4 +1,5 @@
 const { fetchQrCodesAndWriteToJSON } = require("./google_sheets/index");
-const { qrGeneration, tagsGeneration } = require("./qrGeneration");
+const { qrGeneration, tagsGeneration, autofillCurrent } = require("./qrGeneration");
 // fetchQrCodesAndWriteToJSON()
-tagsGeneration();
+// tagsGeneration();
+autofillCurrent()

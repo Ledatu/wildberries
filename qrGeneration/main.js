@@ -2,6 +2,7 @@ const QRCode = require("qrcode");
 const { PDFDocument } = require("pdf-lib");
 const path = require("path");
 const fs = require("fs");
+const xlsx = require("node-xlsx");
 const archiver = require("archiver");
 /**
  * @param {String} sourceDir: /some/folder/to/compress
@@ -174,7 +175,7 @@ function generateTags() {
 
     const promises = [];
     for (let i = 0; i < tags.length; i++) {
-      const tag = tags[i].replace("Й", "Й");
+      const tag = tags[i].tag.replace("Й", "Й");
       promises.push(
         fs.copyFile(
           path.join(mainTagsDir, tag + ".pdf"),
@@ -195,8 +196,82 @@ function generateTags() {
   });
 }
 
+function autofillAndWriteToXlsx() {
+  return new Promise((resolve, reject) => {
+    const tags = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "files/tags.json"))
+    ).tags;
+    const arts_data = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../prices/files/data.json"))
+    );
+
+    const generate_qr_data = (index, seller_id, multiplicity) => {
+      let uniqueId = new Date().toISOString();
+      uniqueId = uniqueId.replace(/-/g, "");
+      uniqueId = uniqueId.replace(/:/g, "");
+      uniqueId = uniqueId.replace(/T/g, "");
+      uniqueId = uniqueId.slice(0, 12);
+      return `#wbbox#0002;${seller_id};${uniqueId}${index};${multiplicity}`;
+    };
+
+    const data = [
+      [
+        "шк единицы товара",
+        "кол-во товаров",
+        "если товар с кизом, заполните – да",
+        "шк короба",
+        "срок годности",
+        "QR короба",
+      ],
+    ];
+    current_qr_index = 1;
+    for (let i = 0; i < tags.length; i++) {
+      const calcTag = (tag) => {
+        console.log(tag);
+        const box = [
+          arts_data[tag.tag].barcode,
+          arts_data[tag.tag].multiplicity,
+          "Да",
+          "",
+          "",
+        ];
+
+        if (tag.count % arts_data[tag.tag].multiplicity != 0) {
+          throw Error(`Некратное кол-во шт в поставке ${tag.tag}.`);
+        }
+
+        const num_of_boxes = tag.count / arts_data[tag.tag].multiplicity;
+        // let boxes = [];
+        for (let j = 0; j < num_of_boxes; j++) {
+          data.push(
+            box.concat([
+              generate_qr_data(
+                current_qr_index,
+                arts_data[tag.tag].seller_id,
+                arts_data[tag.tag].multiplicity
+              ),
+              tag.tag,
+            ])
+          );
+          current_qr_index++;
+        }
+        // return boxes;
+      };
+
+      // data.concat();
+      calcTag(tags[i]);
+    }
+    // console.log(data);
+
+    const buffer = xlsx.build([{ name: "Готовый", data: data }]);
+    fs.writeFileSync(path.join(__dirname, "files", "current.xlsx"), buffer);
+    resolve();
+  });
+}
+
 module.exports = {
   main,
   zipDirectory,
   generateTags,
+  autofillAndWriteToXlsx,
 };
