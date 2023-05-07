@@ -242,8 +242,8 @@ function autofillAndWriteToXlsx() {
 
         const num_of_boxes = tag.count / arts_data[tag.tag].multiplicity;
         // let boxes = [];
-        current_qr_index++;
         for (let j = 0; j < num_of_boxes; j++) {
+          current_qr_index++;
           data.push(
             box.concat([
               generate_qr_data(
