@@ -135,7 +135,7 @@ async function fetchTagsAndWriteToJSON(auth) {
     // Parse the values into a JSON object
     const rows = res.data.values;
     const data = { tags: [] };
-    rows.forEach((tag) => {
+    rows.forEach((row) => {
       data["tags"].push(row[0]);
     });
 
