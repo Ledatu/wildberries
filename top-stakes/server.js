@@ -158,19 +158,8 @@ app.get("/api/downloadTags", async (req, res) => {
   try {
     const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
     const arch = path.join(__dirname, "../qrGeneration/files/tags.zip");
-    zipDirectory(mainTagsDir, arch)
-      .then(() => {
-        console.log("Zipping complete.");
-        resolve();
-      })
-      .catch((err) => reject(err));
-
-    fs.access(arch, fs.constants.F_OK, (err) => {
-      if (err) {
-        res.status(500).end(err);
-      } else {
-        res.download(arch); // Set disposition and send it.
-      }
+    zipDirectory(mainTagsDir, arch).then(() => {
+      res.download(arch);
     });
   } catch (error) {
     res.status(500).end(error);
