@@ -171,7 +171,7 @@ function generateTags() {
   ).tags;
   console.log(tags);
   for (let i = 0; i < tags.length; i++) {
-    fs.copyFile(
+    fs.copyFileSync(
       path.join(mainTagsDir, tags[i] + ".pdf"),
       path.join(currentTagsDir, tags[i] + ".pdf"),
       (err) => {
