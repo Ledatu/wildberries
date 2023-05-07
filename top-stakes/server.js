@@ -19,6 +19,7 @@ const {
 const { qrGeneration } = require("../qrGeneration/qrGeneration");
 const { getPrices, getDelivery, calcNewValues } = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
+const { zipDirectory } = require("../qrGeneration/main");
 
 const app = express();
 const port = 24456;
@@ -141,6 +142,30 @@ app.get("/api/downloadQRs", async (req, res) => {
     const file = path.join(__dirname, "../qrGeneration/files/qrcodes.zip");
     // Wait for the file to be created before attempting to download it
     fs.access(file, fs.constants.F_OK, (err) => {
+      if (err) {
+        res.status(500).end(err);
+      } else {
+        res.download(file); // Set disposition and send it.
+      }
+    });
+  } catch (error) {
+    res.status(500).end(error);
+  }
+});
+
+app.get("/api/downloadTags", async (req, res) => {
+  // console.log(req)
+  try {
+    const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
+    const arch = path.join(__dirname, "../qrGeneration/files/tags.zip");
+    zipDirectory(mainTagsDir, arch)
+      .then(() => {
+        console.log("Zipping complete.");
+        resolve();
+      })
+      .catch((err) => reject(err));
+
+    fs.access(arch, fs.constants.F_OK, (err) => {
       if (err) {
         res.status(500).end(err);
       } else {
