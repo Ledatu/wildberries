@@ -272,19 +272,21 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
           jsonData[key].delivery / jsonData[key].buyout;
       }
     }
-    return fs
-      .writeFile(
-        path.join(__dirname, "files", campaign, "detailedByPeriod.json"),
-        JSON.stringify(jsonData ?? {})
-      )
-      .then(() => {
-        console.log("detailedByPeriod.json created.");
-        resolve(jsonData);
-      })
-      .catch((error) => {
-        console.error(error);
-        reject(error);
-      });
+    return jsonData.date
+      ? fs
+          .writeFile(
+            path.join(__dirname, "files", campaign, "detailedByPeriod.json"),
+            JSON.stringify(jsonData ?? {})
+          )
+          .then(() => {
+            console.log("detailedByPeriod.json created.");
+            resolve(jsonData);
+          })
+          .catch((error) => {
+            console.error(error);
+            reject(error);
+          })
+      : 0;
   });
 
 const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
