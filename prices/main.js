@@ -286,7 +286,7 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
             console.error(error);
             reject(error);
           })
-      : 0;
+      : resolve(undefined);
   });
 
 const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
@@ -343,8 +343,9 @@ const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
           // };
 
           const new_delivery = pr;
-          const isEqual = new_delivery.date == old_delivery.date;
-          console.log(isEqual);
+          let isEqual = new_delivery.date == old_delivery.date;
+          if (!new_delivery) isEqual = true;
+          // console.log(isEqual);
           resolve(isEqual);
         });
       })
