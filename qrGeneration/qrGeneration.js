@@ -37,7 +37,7 @@ const autofillCurrent = (name) => {
 
 const exportAll = () => {
   return new Promise(async (resolve, reject) => {
-    await Promise.all([qrGeneration(), tagsGeneration()]);
+    await qrGeneration().then(() => tagsGeneration());
     const arch = path.join(__dirname, "../qrGeneration/files/Поставка");
     return zipDirectory(arch, arch + ".zip").then(() => {
       console.log("Zipping complete.");

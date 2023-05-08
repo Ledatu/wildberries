@@ -97,22 +97,22 @@ async function saveQRPDF(qrDataArray, filePath) {
 
 function main() {
   return new Promise((resolve, reject) => {
-    const arch = path.join(__dirname, "files/Поставка/qrcodes.zip");
     const current = xlsx.parse(path.join(__dirname, "files/current.xlsx"))[0]
-      .data;
+    .data;
     const qrcodes = [];
     for (let i = 1; i < current.length; i++) {
       qrcodes.push(current[i][5]);
     }
     console.log(qrcodes);
-
-    // Remove existing files
-    if (fs.existsSync(arch)) {
-      fs.rm(arch, (err) => {
-        if (err) reject(err);
-      });
-    }
-    const mainQrDir = path.join(__dirname, "files/qrcodes");
+    
+    // // Remove existing files
+    // const arch = path.join(__dirname, "files/Поставка/qrcodes.zip");
+    // if (fs.existsSync(arch)) {
+    //   fs.rm(arch, (err) => {
+    //     if (err) reject(err);
+    //   });
+    // }
+    const mainQrDir = path.join(__dirname, "files/Поставка");
     if (fs.existsSync(mainQrDir)) {
       fs.rmSync(mainQrDir, { recursive: true, force: true }, (err) => {
         if (err) reject(err);
@@ -143,12 +143,12 @@ function main() {
       Promise.all(promises)
         .then(() => {
           // Zip directory
-          zipDirectory(mainQrDir, arch)
-            .then(() => {
-              console.log("Zipping complete.");
-              resolve();
-            })
-            .catch((err) => reject(err));
+          // zipDirectory(mainQrDir, arch)
+          // .then(() => {
+          //   console.log("Zipping complete.");
+          // })
+          // .catch((err) => reject(err));
+            resolve();
         })
         .catch((err) => reject(err));
     });
@@ -160,7 +160,7 @@ function generateTags() {
     const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
     const currentTagsDir = path.join(
       __dirname,
-      "../qrGeneration/files/tags_current"
+      "../qrGeneration/files/Поставка/Этикетки"
     );
     if (fs.existsSync(currentTagsDir)) {
       fs.rmSync(currentTagsDir, { recursive: true, force: true }, (err) => {
@@ -188,14 +188,14 @@ function generateTags() {
       );
     }
     Promise.all(promises).then((pr) => {
-      const arch = path.join(
-        __dirname,
-        "../qrGeneration/files/Поставка/tags.zip"
-      );
-      return zipDirectory(currentTagsDir, arch).then(() => {
-        console.log("Zipping complete.");
-        resolve();
-      });
+      // const arch = path.join(
+      //   __dirname,
+      //   "../qrGeneration/files/Поставка/tags.zip"
+      // );
+      // return zipDirectory(currentTagsDir, arch).then(() => {
+      //   console.log("Zipping complete.");
+      // });
+      resolve();
     });
   });
 }

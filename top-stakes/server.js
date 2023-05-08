@@ -144,36 +144,36 @@ app.post("/api/autofillCurrent", authenticateToken, (req, res) => {
   autofillCurrent(name).then((count) => res.send({ count: count }));
 });
 
-app.get("/api/downloadQRs", async (req, res) => {
-  // console.log(req)
-  try {
-    await qrGeneration();
+// app.get("/api/downloadQRs", async (req, res) => {
+//   // console.log(req)
+//   try {
+//     await qrGeneration();
 
-    const file = path.join(__dirname, "../qrGeneration/files/Поставка/qrcodes.zip");
-    // Wait for the file to be created before attempting to download it
-    fs.access(file, fs.constants.F_OK, (err) => {
-      if (err) {
-        res.status(500).end(err);
-      } else {
-        res.download(file); // Set disposition and send it.
-      }
-    });
-  } catch (error) {
-    res.status(500).end(error);
-  }
-});
+//     const file = path.join(__dirname, "../qrGeneration/files/Поставка/qrcodes.zip");
+//     // Wait for the file to be created before attempting to download it
+//     fs.access(file, fs.constants.F_OK, (err) => {
+//       if (err) {
+//         res.status(500).end(err);
+//       } else {
+//         res.download(file); // Set disposition and send it.
+//       }
+//     });
+//   } catch (error) {
+//     res.status(500).end(error);
+//   }
+// });
 
-app.get("/api/downloadTags", async (req, res) => {
-  // console.log(req)
-  try {
-    const arch = path.join(__dirname, "../qrGeneration/files/Поставка/tags.zip");
-    tagsGeneration().then(() => {
-      res.download(arch);
-    });
-  } catch (error) {
-    res.status(500).end(error);
-  }
-});
+// app.get("/api/downloadTags", async (req, res) => {
+//   // console.log(req)
+//   try {
+//     const arch = path.join(__dirname, "../qrGeneration/files/Поставка/tags.zip");
+//     tagsGeneration().then(() => {
+//       res.download(arch);
+//     });
+//   } catch (error) {
+//     res.status(500).end(error);
+//   }
+// });
 
 app.get("/api/downloadAll", async (req, res) => {
   // console.log(req)
