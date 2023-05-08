@@ -97,10 +97,13 @@ async function saveQRPDF(qrDataArray, filePath) {
 
 function main() {
   return new Promise((resolve, reject) => {
-    const arch = path.join(__dirname, "files/qrcodes.zip");
-    const qrcodes = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "files/qrcodes.json"))
-    ).qrcodes;
+    const arch = path.join(__dirname, "files/Поставка/qrcodes.zip");
+    const current = xlsx.parse(path.join(__dirname, "files/current.xlsx"))[0]
+      .data;
+    const qrcodes = [];
+    for (let i = 1; i < current.length; i++) {
+      qrcodes.push(current[i][5]);
+    }
     console.log(qrcodes);
 
     // Remove existing files
@@ -115,8 +118,6 @@ function main() {
         if (err) reject(err);
       });
     }
-
-    // Create directory
     fs.mkdir(mainQrDir, (err) => {
       if (err) reject(err);
 
@@ -187,7 +188,10 @@ function generateTags() {
       );
     }
     Promise.all(promises).then((pr) => {
-      const arch = path.join(__dirname, "../qrGeneration/files/tags.zip");
+      const arch = path.join(
+        __dirname,
+        "../qrGeneration/files/Поставка/tags.zip"
+      );
       return zipDirectory(currentTagsDir, arch).then(() => {
         console.log("Zipping complete.");
         resolve();

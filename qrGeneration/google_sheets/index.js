@@ -1,9 +1,11 @@
 const fs = require("fs").promises;
+const afs = require("fs");
 const path = require("path");
 const { authenticate } = require("@google-cloud/local-auth");
 const { google } = require("googleapis");
 const console = require("console");
 const xlsx = require("node-xlsx").default;
+const https = require("https");
 
 // If modifying these scopes, delete token.json.
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -173,6 +175,26 @@ const writeDataToFile = (data, filename) => {
   });
 };
 
+async function exportTZToXlsx(auth) {
+  // const sheets = google.sheets({ version: "v4", auth });
+  // const options = {
+  // spreadsheetId: "1iEsqj8Wvyvq31JMd-wtgNxEyBGxcG1UrD93_Y6Z8DeI",
+  // mimeType:
+  // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  // };
+  // const response = await sheets.spreadsheets.export(options);
+  const filename = `ТЗ 2.0.xlsx`;
+  const filepath = path.join(__dirname, "../files/Поставка", filename);
+  const file = afs.createWriteStream(filepath);
+  const request = https.get(
+    `https://docs.google.com/spreadsheets/d/1iEsqj8Wvyvq31JMd-wtgNxEyBGxcG1UrD93_Y6Z8DeI/export`,
+    function (response) {
+      response.pipe(file);
+    }
+  );
+  console.log(`Exported ${filename} to files.`);
+}
+
 module.exports = {
   writeCurrent: async (campaign) => {
     return new Promise(async (resolve, reject) => {
@@ -192,6 +214,13 @@ module.exports = {
     return new Promise(async (resolve, reject) => {
       const auth = await authorize();
       await fetchTagsAndWriteToJSON(auth, name).catch(console.error);
+      resolve();
+    });
+  },
+  exportTZToXlsx: () => {
+    return new Promise(async (resolve, reject) => {
+      const auth = await authorize();
+      await exportTZToXlsx(auth).catch(console.error);
       resolve();
     });
   },

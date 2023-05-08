@@ -20,6 +20,7 @@ const {
   qrGeneration,
   tagsGeneration,
   autofillCurrent,
+  exportAll,
 } = require("../qrGeneration/qrGeneration");
 const { getPrices, getDelivery, calcNewValues } = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
@@ -148,7 +149,7 @@ app.get("/api/downloadQRs", async (req, res) => {
   try {
     await qrGeneration();
 
-    const file = path.join(__dirname, "../qrGeneration/files/qrcodes.zip");
+    const file = path.join(__dirname, "../qrGeneration/files/Поставка/qrcodes.zip");
     // Wait for the file to be created before attempting to download it
     fs.access(file, fs.constants.F_OK, (err) => {
       if (err) {
@@ -165,8 +166,20 @@ app.get("/api/downloadQRs", async (req, res) => {
 app.get("/api/downloadTags", async (req, res) => {
   // console.log(req)
   try {
-    const arch = path.join(__dirname, "../qrGeneration/files/tags.zip");
+    const arch = path.join(__dirname, "../qrGeneration/files/Поставка/tags.zip");
     tagsGeneration().then(() => {
+      res.download(arch);
+    });
+  } catch (error) {
+    res.status(500).end(error);
+  }
+});
+
+app.get("/api/downloadAll", async (req, res) => {
+  // console.log(req)
+  try {
+    const arch = path.join(__dirname, "../qrGeneration/files/Поставка.zip");
+    exportAll().then(() => {
       res.download(arch);
     });
   } catch (error) {

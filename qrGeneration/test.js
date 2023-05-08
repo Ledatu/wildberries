@@ -1,5 +1,8 @@
-const { fetchQrCodesAndWriteToJSON } = require("./google_sheets/index");
-const { qrGeneration, tagsGeneration, autofillCurrent } = require("./qrGeneration");
+const { fetchQrCodesAndWriteToJSON, exportTZToXlsx } = require("./google_sheets/index");
+const { qrGeneration, tagsGeneration, autofillCurrent, exportAll } = require("./qrGeneration");
 // fetchQrCodesAndWriteToJSON()
 // tagsGeneration();
-autofillCurrent().then(count => console.log(count))
+// qrGeneration()
+// autofillCurrent().then(count => console.log(count))
+// exportTZToXlsx()
+exportAll()
