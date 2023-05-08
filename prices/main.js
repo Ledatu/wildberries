@@ -343,8 +343,8 @@ const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
           // };
 
           const new_delivery = pr;
-          let isEqual = new_delivery.date == old_delivery.date;
-          if (!new_delivery) isEqual = true;
+          if (!new_delivery) resolve(true);
+          const isEqual = new_delivery.date == old_delivery.date;
           // console.log(isEqual);
           resolve(isEqual);
         });
