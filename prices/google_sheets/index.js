@@ -281,6 +281,60 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
   });
 }
 
+function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
+  return new Promise((resolve, reject) => {
+    if (campaign == "TKS") {
+      writeDataToFile(
+        {},
+        path.join(__dirname, `../files/${campaign}/analytics.json`)
+      ).then((pr) => resolve());
+      return;
+    }
+
+    const sheets = google.sheets({ version: "v4", auth });
+    data = {};
+    sheets.spreadsheets.values
+      .get({
+        spreadsheetId: "1c1TXMXLWiyxDEFd-kaP6UxE2zlVC3FVXIsBpfp31S4g",
+        range: `${campaign}!A3:AW`,
+      })
+      .then((res) => {
+        const rows = res.data.values;
+        // console.log(rows);
+        for (row of rows) {
+          const mask = row[0].split(" ")[1];
+          // if (mask == "НАМАТРАСНИК_120") {
+          //   console.log(row, mask);
+          // }
+          if (!mask) return;
+          const days = (row.length - 1) / 6;
+          const stats = [0, 0, 0, 0, 0, 0];
+          for (let day = 0; day < days; day++) {
+            for (let i = 0; i < 6; i++) {
+              let val = row[1 + day * 6 + i];
+              val = Number(val ? val.replace(",", ".").replace(/\s/g, "") : 0);
+              if (i == 1 || i == 3 || i == 5) val /= days;
+              stats[i] += val;
+            }
+          }
+          data[mask] = {
+            rashod: stats[0],
+            crm: stats[1],
+            clicks: stats[2],
+            srs: stats[3],
+          };
+        }
+        writeDataToFile(
+          data,
+          path.join(__dirname, `../files/${campaign}/analytics.json`)
+        ).then((pr) => resolve());
+      });
+  }).catch((err) => {
+    console.log(`The API returned an error: ${err}`);
+    reject(err);
+  });
+}
+
 // Define the function to write data to a JSON file
 const writeDataToFile = (data, filename) => {
   return fs.writeFile(filename, JSON.stringify(data), (err) => {
@@ -459,6 +513,12 @@ module.exports = {
   fetchEnteredValuesAndWriteToJSON: async (campaign) => {
     const auth = await authorize();
     await fetchEnteredValuesAndWriteToJSON(auth, campaign).catch(console.error);
+  },
+  fetchAnalyticsLastWeekValuesAndWriteToJSON: async (campaign) => {
+    const auth = await authorize();
+    await fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign).catch(
+      console.error
+    );
   },
   copyPricesToDataSpreadsheet: async () => {
     const auth = await authorize();

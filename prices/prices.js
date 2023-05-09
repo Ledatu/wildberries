@@ -6,12 +6,14 @@ const {
   fetchStocksAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
   calculateNewValuesAndWriteToXlsx,
+  calcAdvertismentAndWriteToJSON,
 } = require("./main");
 const {
   writePrices,
   writeDetailedByPeriod,
   fetchDataAndWriteToJSON,
   fetchEnteredValuesAndWriteToJSON,
+  fetchAnalyticsLastWeekValuesAndWriteToJSON,
   copyPricesToDataSpreadsheet,
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
@@ -23,6 +25,8 @@ const getPrices = async () => {
 
   campaigns.forEach(async (campaign) => {
     Promise.all([
+      await fetchAnalyticsLastWeekValuesAndWriteToJSON(campaign),
+      await calcAdvertismentAndWriteToJSON(campaign),
       await fetchCardsAndWriteToJSON(campaign),
       await fetchOrdersAndWriteToJSON(campaign),
       await fetchStocksAndWriteToJSON(campaign),
@@ -45,6 +49,7 @@ const getDelivery = (camp = undefined) =>
       if (camp && campaign != camp) {
         return 0;
       }
+
       return fetchDetailedByPeriodAndWriteToJSON(campaign)
         .then((isUpdated) => {
           updateStatus[campaign] = isUpdated;

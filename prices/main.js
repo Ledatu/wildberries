@@ -107,6 +107,9 @@ const buildXlsx = (data, campaign) => {
   const arts_data = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files/data.json"))
   );
+  const ads = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "ads.json"))
+  );
   let new_data = [
     [
       "Артикул продавца",
@@ -126,11 +129,13 @@ const buildXlsx = (data, campaign) => {
       "Новая РЦ с СПП",
       "Новая WB цена",
       "",
+      "Себестоимость",
       "Коммисия",
       "Логистика",
       "Налоги",
       "Расходы",
-      "Себестоимость",
+      "Реклама",
+      "%ДРР",
     ],
   ];
   data.forEach((el) => {
@@ -153,9 +158,21 @@ const buildXlsx = (data, campaign) => {
     const expences =
       campaign == "TKS" ? spp_price * 0.11 : arts_data[vendorCode].expences;
     const prime_cost = arts_data[vendorCode].prime_cost;
+
+    // ads
+    const find_ad = () => {
+      for (const code in ads) {
+        if (vendorCode.match(code.replace("+", "\\+"))) return ads[code].ads;
+      }
+      return 0;
+    };
+    const ad = find_ad();
+    const drr = ad / spp_price;
+
     const profit =
-      -commission - delivery - tax - expences - prime_cost + roz_price;
+      -ad - commission - delivery - tax - expences - prime_cost + roz_price;
     const roi = profit / (prime_cost + expences);
+
     new_data.push([
       vendorCode,
       zakaz > 0 ? zakaz : !orders[el.nmId] ? mult * 5 : 0,
@@ -174,11 +191,13 @@ const buildXlsx = (data, campaign) => {
       "",
       "",
       "",
+      prime_cost,
       commission,
       delivery,
       tax,
       expences,
-      prime_cost,
+      ad,
+      drr,
     ]);
   });
   // console.log(new_data);
@@ -442,6 +461,48 @@ const fetchOrdersAndWriteToJSON = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const calcAdvertismentAndWriteToJSON = (campaign) => {
+  const analytics = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "analytics.json"))
+  );
+  const orders = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "orders.json"))
+  );
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const calcAds = (mask) => {
+    let allOrders = 0;
+    // console.log(mask);
+    for (const nmId in orders) {
+      const code = vendorCodes[nmId];
+      if (!code) continue;
+      if (code.match(mask.replace("+", "\\+"))) {
+        allOrders += orders[nmId];
+      }
+    }
+
+    // console.log(allOrders, analytics[mask].rashod)
+    return { ads: analytics[mask].rashod / allOrders };
+  };
+
+  const jsonData = {};
+  for (const mask in analytics) {
+    // console.log(mask);
+    jsonData[mask] = calcAds(mask);
+  }
+
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "ads.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("ads.json created."))
+    .catch((error) => console.error(error));
+};
+
 const calculateNewValuesAndWriteToXlsx = (campaign) => {
   const afs = require("fs");
   const enteredValues = JSON.parse(
@@ -455,6 +516,9 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
   const data = xlsx.parse(
     path.join(__dirname, `files/${campaign}/data.xlsx`)
   )[0]["data"];
+  const ads = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "ads.json"))
+  );
 
   for (let i = 1; i < data.length; i++) {
     let row = data[i];
@@ -480,8 +544,18 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
       const expences =
         campaign == "TKS" ? spp_price * 0.11 : arts_data[vendorCode].expences;
       const prime_cost = arts_data[vendorCode].prime_cost;
+      // ads
+      const find_ad = () => {
+        for (const code in ads) {
+          if (vendorCode.match(code.replace("+", "\\+"))) return ads[code].ads;
+        }
+        return 0;
+      };
+      const ad = find_ad();
+      const drr = ad / spp_price;
+
       const profit =
-        -commission - delivery - tax - expences - prime_cost + roz_price;
+        -ad - commission - delivery - tax - expences - prime_cost + roz_price;
       const wb_price = roz_price / (1 - row[3] / 100);
 
       const roi = profit / (prime_cost + expences);
@@ -549,6 +623,7 @@ module.exports = {
   fetchCardsAndWriteToJSON,
   fetchStocksAndWriteToJSON,
   fetchOrdersAndWriteToJSON,
+  calcAdvertismentAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
   calculateNewValuesAndWriteToXlsx,
   updatePrices,
