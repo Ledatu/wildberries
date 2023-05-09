@@ -143,7 +143,7 @@ async function writeDetailedByPeriod(auth, campaign) {
 
       if (row[4] != seller_ids[campaign]) continue;
 
-      const type = row[0].split("_")[0];
+      const type = row[0].split("_").slice(0, 2).join("_");
       // console.log(type);
       data[i][0] = `${
         delivery[type] ? delivery[type].average_delivery : data[i][0]
