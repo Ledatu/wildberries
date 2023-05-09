@@ -46,8 +46,8 @@ const getDelivery = (camp = undefined) =>
         return 0;
       }
       return fetchDetailedByPeriodAndWriteToJSON(campaign)
-        .then((pr) => {
-          updateStatus[campaign] = !pr;
+        .then((isUpdated) => {
+          updateStatus[campaign] = isUpdated;
           return writeDetailedByPeriod(campaign);
         })
         .catch((error) => {

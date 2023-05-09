@@ -272,6 +272,7 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
           jsonData[key].delivery / jsonData[key].buyout;
       }
     }
+    // console.log(campaign, jsonData.date)
     return jsonData.date
       ? fs
           .writeFile(
@@ -295,12 +296,6 @@ const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
       __dirname,
       `files/${campaign}/detailedByPeriod.json`
     );
-    let old_delivery = {};
-    if (afs.existsSync(filePath)) {
-      old_delivery = JSON.parse(await fs.readFile(filePath));
-    } else {
-      console.log(`File ${filePath} does not exist.`);
-    }
 
     const authToken = getAuthToken("api-statistic-token", campaign);
     const prevMonday = new Date();
@@ -344,12 +339,17 @@ const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
 
           const new_delivery = pr;
           if (!new_delivery) {
-            resolve(true);
+            resolve(false);
             return;
           }
-          const isEqual = new_delivery.date == old_delivery.date;
+          const prevMonday = new Date();
+          prevMonday.setDate(
+            prevMonday.getDate() - ((prevMonday.getDay() + 6) % 7)
+          );
+          const isUpdated =
+            new_delivery.date == prevMonday.toISOString().slice(0, 10);
           // console.log(isEqual);
-          resolve(isEqual);
+          resolve(isUpdated);
         });
       })
       .catch((error) => console.error(error));
