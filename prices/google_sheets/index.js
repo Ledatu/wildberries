@@ -307,13 +307,13 @@ function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
           //   console.log(row, mask);
           // }
           if (!mask) return;
-          const days = (row.length - 1) / 6;
+          const days = 8;
           const stats = [0, 0, 0, 0, 0, 0];
-          for (let day = 0; day < days; day++) {
+          for (let day = 1; day < days; day++) {
             for (let i = 0; i < 6; i++) {
               let val = row[1 + day * 6 + i];
               val = Number(val ? val.replace(",", ".").replace(/\s/g, "") : 0);
-              if (i == 1 || i == 3 || i == 5) val /= days;
+              if (i == 1 || i == 3 || i == 5) val /= days-1;
               stats[i] += val;
             }
           }
