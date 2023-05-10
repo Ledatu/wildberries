@@ -189,7 +189,7 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
       const roi = Number(
         row[12].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
-      if (roi < 0) return;
+      if (roi < -30) return;
       data.push({ nmId: nmIds[row[0]], price: new_price });
     });
 
@@ -313,7 +313,7 @@ function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
             for (let i = 0; i < 6; i++) {
               let val = row[1 + day * 6 + i];
               val = Number(val ? val.replace(",", ".").replace(/\s/g, "") : 0);
-              if (i == 1 || i == 3 || i == 5) val /= days-1;
+              if (i == 1 || i == 3 || i == 5) val /= days - 1;
               stats[i] += val;
             }
           }
