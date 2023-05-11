@@ -176,7 +176,7 @@ function generateTags() {
 
     const promises = [];
     for (let i = 0; i < tags.length; i++) {
-      const tag = tags[i].tag.replace("Й", "Й");
+      const tag = tags[i];
       promises.push(
         fs.copyFile(
           path.join(mainTagsDir, tag + ".pdf"),
