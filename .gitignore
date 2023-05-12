@@ -1,5 +1,5 @@
 secrets/
-*/node_modules
+node_modules/
 flags/flag-files/
 
 analytics/files

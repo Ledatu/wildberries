@@ -86,7 +86,7 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
   };
 
   console.log(`Started writing ${campaign_id} data to the google sheets`);
-  const analytics = xlsx.parse(`./files/${campaign_id}.xlsx`)[0]["data"];
+  const analytics = xlsx.parse(`${__dirname}/../files/${campaign_id}.xlsx`)[0]["data"];
   //console.log(analytics)
   const sheets = google.sheets({ version: "v4", auth });
 
@@ -104,7 +104,7 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
   });
   await update_data(analytics, `${sheet_name}!A3:FY`);
 
-  const pivot = xlsx.parse(`./files/${campaign_id}.xlsx`)[1]["data"];
+  const pivot = xlsx.parse(`${__dirname}/../files/${campaign_id}.xlsx`)[1]["data"];
   pivot.sort((a, b) => {
     const a1 = a[0].split(" ").slice(1).join(" ");
     const b1 = b[0].split(" ").slice(1).join(" ");

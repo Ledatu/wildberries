@@ -22,14 +22,14 @@ const scraperObject = {
     await page.waitForSelector(
       ".MuiTypography-root.MuiTypography-inherit.MuiLink-root.MuiLink-underlineNone"
     );
-    await page.waitForTimeout(10000);
+    // await page.waitForTimeout(10000);
 
     await page.$$eval(".MuiButtonBase-root.MuiAccordionSummary-root", (els) =>
       els.forEach(async (el) => {
         await el.click();
       })
     );
-    await page.waitForTimeout(5000);
+    // await page.waitForTimeout(5000);
     let urls = await page.$$eval("a", (links) => {
       // Extract the links from the data
       links = links.map((el) => el.href);
@@ -50,7 +50,7 @@ const scraperObject = {
 
       const ids = [];
       urls.forEach((link) => ids.push(`[${link.split("/")[7]}]`));
-      const path_to_file = `./files/${campaign_id}_presented.xlsx`;
+      const path_to_file = `${__dirname}/../files/${campaign_id}_presented.xlsx`;
       fs.writeFileSync(
         path_to_file,
         xlsx.build([{ name: campaign_id, data: [ids] }])
@@ -71,7 +71,7 @@ const scraperObject = {
 
         await newPage.goto(link);
         await newPage.waitForLoadState();
-        await newPage.waitForTimeout(10000);
+        // await newPage.waitForTimeout(10000);
 
         await newPage
           .waitForSelector(".MuiTypography-root.MuiTypography-h3.css-11j0d37")
@@ -105,7 +105,7 @@ const scraperObject = {
           ".MuiButtonBase-root.MuiAccordionSummary-root.css-1dkwt8e",
           (el) => el.click()
         );
-        await newPage.waitForTimeout(20000);
+        // await newPage.waitForTimeout(20000);
 
         // await newPage.getByText('Интервал').first().evaluate(el => el.click());
 
@@ -130,7 +130,7 @@ const scraperObject = {
         // console.log(await download.path());
         // Save downloaded file somewhere
 
-        const path_to_file = `./files/${campaign_id}/${dataObj["id"]}.xlsx`;
+        const path_to_file = `${__dirname}/../files/${campaign_id}/${dataObj["id"]}.xlsx`;
         await download.saveAs(path_to_file);
 
         // change sheet name to match current name in mp_manager
@@ -166,7 +166,7 @@ const scraperObject = {
     let index = 0;
     for (link in urls) {
       index++;
-      const parallel = 0;
+      const parallel = 1;
       if (parallel) {
         all_page_promises.push(pagePromise(urls[link], index, urls.length));
         await new Promise((resolve) => setTimeout(resolve, 1000));

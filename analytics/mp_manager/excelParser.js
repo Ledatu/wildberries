@@ -3,8 +3,8 @@ const fs = require("fs");
 
 module.exports = (campaign_id) => {
   console.log(`Started pasrsing ${campaign_id} data from the files`);
-  const downloadsForlder = `./files/${campaign_id}/`;
-  const presented_ids = xlsx.parse(`./files/${campaign_id}_presented.xlsx`)[0][
+  const downloadsForlder = `${__dirname}/../files/${campaign_id}/`;
+  const presented_ids = xlsx.parse(`${__dirname}/../files/${campaign_id}_presented.xlsx`)[0][
     "data"
   ][0];
   //	console.log(presented_ids)
@@ -109,7 +109,7 @@ module.exports = (campaign_id) => {
 
   // console.log(pivotSheet);
   fs.writeFileSync(
-    `./files/${campaign_id}.xlsx`,
+    `${__dirname}/../files/${campaign_id}.xlsx`,
     xlsx.build([
       { name: "Аналитика", data: resultSheet },
       { name: "Сводка", data: pivotSheet },
