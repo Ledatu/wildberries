@@ -178,7 +178,7 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
     // console.log(data);
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `${campaign}!A2:P`,
+      range: `${campaign}!A2:Q`,
     });
 
     const rows = res.data.values;
@@ -242,14 +242,14 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
     sheets.spreadsheets.values
       .get({
         spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-        range: `${campaign}!A2:O`,
+        range: `${campaign}!A2:P`,
       })
       .then((res) => {
         const rows = res.data.values;
         // console.log(rows);
         const data = {};
         rows.forEach((row) => {
-          if (!row.slice(12).length) return;
+          if (!row.slice(13).length) return;
           data[row[0]] = {
             roi: Number(
               row[13]
