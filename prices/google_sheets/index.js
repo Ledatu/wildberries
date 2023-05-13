@@ -187,7 +187,7 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
       const new_price = Number(row[15]);
       if (!new_price || new_price > 20000 || new_price < 4500) return;
       const roi = Number(
-        row[12].replace("%", "").replace(",", ".").replace(/\s/g, "")
+        row[13].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
       if (roi < -30) return;
       data.push({ nmId: nmIds[row[0]], price: new_price });
@@ -252,18 +252,18 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
           if (!row.slice(12).length) return;
           data[row[0]] = {
             roi: Number(
-              row[12]
-                ? row[12].replace("%", "").replace(",", ".").replace(/\s/g, "")
-                : 0
-            ),
-            roz_price: Number(
               row[13]
                 ? row[13].replace("%", "").replace(",", ".").replace(/\s/g, "")
                 : 0
             ),
-            spp_price: Number(
+            roz_price: Number(
               row[14]
                 ? row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
+                : 0
+            ),
+            spp_price: Number(
+              row[15]
+                ? row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
                 : 0
             ),
           };
