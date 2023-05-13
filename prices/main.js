@@ -177,7 +177,7 @@ const buildXlsx = (data, campaign) => {
 
     new_data.push([
       vendorCode,
-      !orders[el.nmId] ? zakaz > mult * 5 ? zakaz : mult * 5 : zakaz,
+      !orders[el.nmId] ? zakaz > mult * 5 ? zakaz : mult * 5 : zakaz > 0 ? zakaz : 0,
       el.price,
       el.discount,
       roz_price, // розничная стоимость
