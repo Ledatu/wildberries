@@ -175,9 +175,10 @@ const buildXlsx = (data, campaign) => {
     const roi = profit / (prime_cost + expences);
     const rentabelnost = profit/spp_price;
 
+    const realZakaz = !stock ? (zakaz > mult * 5 ? zakaz : mult * 5) : (zakaz > 0 ? zakaz : 0) 
     new_data.push([
       vendorCode,
-      !orders[el.nmId] ? zakaz > mult * 5 ? zakaz : mult * 5 : zakaz > 0 ? zakaz : 0,
+      realZakaz,
       el.price,
       el.discount,
       roz_price, // розничная стоимость
