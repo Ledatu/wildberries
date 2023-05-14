@@ -105,17 +105,17 @@ const scraperObject = {
           ".MuiButtonBase-root.MuiAccordionSummary-root.css-1dkwt8e",
           (el) => el.click()
         );
-        // await newPage.waitForTimeout(20000);
-
+        
         // await newPage.getByText('Интервал').first().evaluate(el => el.click());
 
         // await newPage.locator('.rmdp-left')
         // await newPage.waitForTimeout(1000)
         // await newPage.locator('.sd').first().evaluate(el => el.click())
         // await newPage.waitForTimeout(1000)
-
+        
         // await newPage.getByText('Экспорт').first().waitFor()
-
+        
+        await newPage.waitForTimeout(10000);
         const downloadPromise = newPage.waitForEvent("download");
         await newPage
           .getByText("Экспорт")
