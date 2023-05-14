@@ -162,39 +162,41 @@ const scraperObject = {
     // 	scrapedData.push(currentPageData);
     // 	console.log(currentPageData);
     // }
-    let all_page_promises = [];
     let index = 0;
-    for (link in urls) {
-      index++;
-      const parallel = 1;
-      if (parallel) {
-        all_page_promises.push(pagePromise(urls[link], index, urls.length));
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      } else {
-        try {
-          await pagePromise(urls[link], index, urls.length)
-            .then((pr) => all_page_promises.push(pr))
-            .catch((error) => {
-              console.log("Caught");
-              throw error;
-            });
-        } catch (error) {
-          //console.log(error)
-          console.log("Retrying...");
-          await pagePromise(urls[link], index, urls.length)
-            .then((pr) => all_page_promises.push(pr))
-            .catch((error) => {
-              console.log("Caught");
-            });
+    const batch = 6;
+    for (let i = 0; i < urls.length; i += batch) {
+      let all_page_promises = [];
+      for (link in urls.slice(i, i + batch)) {
+        index++;
+        const parallel = 1;
+        if (parallel) {
+          all_page_promises.push(pagePromise(urls[link], index, urls.length));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } else {
+          try {
+            await pagePromise(urls[link], index, urls.length)
+              .then((pr) => all_page_promises.push(pr))
+              .catch((error) => {
+                console.log("Caught");
+                throw error;
+              });
+          } catch (error) {
+            //console.log(error)
+            console.log("Retrying...");
+            await pagePromise(urls[link], index, urls.length)
+              .then((pr) => all_page_promises.push(pr))
+              .catch((error) => {
+                console.log("Caught");
+              });
+          }
         }
       }
+      await Promise.all(all_page_promises);
+      for (pr in all_page_promises) {
+        scrapedData.push(pr);
+        //			console.log(pr);
+      }
     }
-    await Promise.all(all_page_promises);
-    for (pr in all_page_promises) {
-      scrapedData.push(pr);
-      //			console.log(pr);
-    }
-
     await parse_xlsx(campaign_id);
   },
 };

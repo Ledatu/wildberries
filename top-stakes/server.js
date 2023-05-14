@@ -25,6 +25,7 @@ const {
 const { getPrices, getDelivery, calcNewValues } = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
+const { analyticsOneTimeRun } = require("../analytics/oneTimeRun");
 
 const app = express();
 const port = 24456;
@@ -137,6 +138,11 @@ app.get("/api/copyZakaz", authenticateToken, (req, res) => {
 app.get("/api/generateQRs", authenticateToken, (req, res) => {
   qrGeneration();
   res.send("QR Generation started!");
+});
+
+app.get("/api/analyticsRun", authenticateToken, (req, res) => {
+  analyticsOneTimeRun();
+  res.send("Analytics is updating...");
 });
 
 app.post("/api/autofillCurrent", authenticateToken, (req, res) => {
