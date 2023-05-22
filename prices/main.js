@@ -555,7 +555,7 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
       const delivery = arts_data[vendorCode].delivery;
       const tax = spp_price * (arts_data[vendorCode].tax / 100);
       const expences =
-        campaign == "TKS" ? spp_price * 0.11 : arts_data[vendorCode].expences;
+        campaign == "TKS" ? spp_price * 0.07 : arts_data[vendorCode].expences;
       const prime_cost = arts_data[vendorCode].prime_cost;
       // ads
       const find_ad = () => {
