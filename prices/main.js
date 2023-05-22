@@ -157,7 +157,7 @@ const buildXlsx = (data, campaign) => {
     const delivery = arts_data[vendorCode].delivery;
     const tax = spp_price * (arts_data[vendorCode].tax / 100);
     const expences =
-      campaign == "TKS" ? spp_price * 0.11 : arts_data[vendorCode].expences;
+      campaign == "TKS" ? spp_price * 0.07 : arts_data[vendorCode].expences;
     const prime_cost = arts_data[vendorCode].prime_cost;
 
     // ads
@@ -167,15 +167,24 @@ const buildXlsx = (data, campaign) => {
       }
       return 0;
     };
-    const ad = find_ad();
-    const drr = ad / spp_price;
+    // const ad = find_ad(); //analytics ad
+    // const drr = ad / spp_price;
+
+    const ad = roz_price * (arts_data[vendorCode].ad / 100);
+    const drr = ad / roz_price;
 
     const profit =
       -ad - commission - delivery - tax - expences - prime_cost + roz_price;
     const roi = profit / (prime_cost + expences);
-    const rentabelnost = profit/spp_price;
+    const rentabelnost = profit / spp_price;
 
-    const realZakaz = !stock ? (zakaz > mult * 5 ? zakaz : mult * 5) : (zakaz > 0 ? zakaz : 0) 
+    const realZakaz = !stock
+      ? zakaz > mult * 5
+        ? zakaz
+        : mult * 5
+      : zakaz > 0
+      ? zakaz
+      : 0;
     new_data.push([
       vendorCode,
       realZakaz,
@@ -555,8 +564,12 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
         }
         return 0;
       };
-      const ad = find_ad();
-      const drr = ad / spp_price;
+
+      // const ad = find_ad(); //analytics ad
+      // const drr = ad / spp_price;
+
+      const ad = roz_price * (arts_data[vendorCode].ad / 100);
+      const drr = ad / roz_price;
 
       const profit =
         -ad - commission - delivery - tax - expences - prime_cost + roz_price;

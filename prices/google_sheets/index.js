@@ -207,7 +207,7 @@ async function fetchDataAndWriteToJSON(auth) {
     // Retrieve the values from the specified range
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-      range: "Данные!A2:K",
+      range: "Данные!A2:L",
     });
 
     // Parse the values into a JSON object
@@ -219,12 +219,13 @@ async function fetchDataAndWriteToJSON(auth) {
         barcode: row[1],
         multiplicity: Math.abs(Number(row[2] ?? 0)),
         seller_id: row[4],
-        commission: Math.abs(Number(row[5] ? row[5].replace("%", "") : 0)),
+        commission: Math.abs(Number(row[5] ? row[5].replace("%", "").replace(",", ".") : 0)),
         delivery: Math.abs(Number(row[6] ? row[6].replace(",", ".") : 0)),
-        tax: Math.abs(Number(row[7] ? row[7].replace("%", "") : 0)),
+        tax: Math.abs(Number(row[7] ? row[7].replace("%", "").replace(",", ".") : 0)),
         expences: Math.abs(Number(row[8] ? row[8].replace(",", ".") : 0)),
         prime_cost: Math.abs(Number(row[9] ? row[9].replace(",", ".") : 0)),
-        spp: Math.abs(Number(row[10] ? row[10].replace("%", "") : 0)),
+        spp: Math.abs(Number(row[10] ? row[10].replace("%", "").replace(",", ".") : 0)),
+        ad: Math.abs(Number(row[11] ? row[11].replace("%", "").replace(",", ".") : 0)),
       };
     });
 
