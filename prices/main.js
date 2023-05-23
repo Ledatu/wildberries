@@ -292,7 +292,7 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
     if (data) {
       jsonData["date"] = data[0].create_dt.slice(0, 10);
       data.forEach((item) => {
-        if (item.supplier_oper_name == "Перевыставление расходов по логистике")
+        if (item.supplier_oper_name != "Логистика" && item.supplier_oper_name != "Продажа")
           return;
 
         const type = item.sa_name.split("_").slice(0, 2).join("_");
