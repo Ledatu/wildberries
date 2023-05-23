@@ -292,6 +292,9 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
     if (data) {
       jsonData["date"] = data[0].create_dt.slice(0, 10);
       data.forEach((item) => {
+        if (item.supplier_oper_name == "Перевыставление расходов по логистике")
+          return;
+
         const type = item.sa_name.split("_").slice(0, 2).join("_");
         if (type in jsonData) {
           jsonData[type].buyout += item.quantity;
