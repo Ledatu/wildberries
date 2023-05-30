@@ -132,15 +132,15 @@ async function fetchTagsAndWriteToJSON(auth, name) {
     if (name) {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ",
-        range: `${name}!C2:F`,
+        range: `${name}!B2:E`,
       });
 
       // Parse the values into a JSON object
       const rows = res.data.values;
       const data = { tags: [] };
       rows.forEach((row) => {
-        if (!row[0] || !row[2]) return;
-        data["tags"].push({ tag: row[2], count: row[0] });
+        if (!row[0] || !row[3]) return;
+        data["tags"].push({ tag: row[3], count: row[0] });
       });
 
       writeDataToFile(data, path.join(__dirname, "../files/tags.json")).then(
