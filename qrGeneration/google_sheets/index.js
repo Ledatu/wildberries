@@ -139,8 +139,8 @@ async function fetchTagsAndWriteToJSON(auth, name) {
       const rows = res.data.values;
       const data = { tags: [] };
       rows.forEach((row) => {
-        if (!row[0] || !row[3]) return;
-        data["tags"].push({ tag: row[3], count: row[0] });
+        if (!row[0] || !row[2]) return;
+        data["tags"].push({ tag: row[2], count: row[0] });
       });
 
       writeDataToFile(data, path.join(__dirname, "../files/tags.json")).then(
