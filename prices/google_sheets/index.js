@@ -412,7 +412,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
   const update_data = async (sheet, data) => {
     await sheets.spreadsheets.values.update({
       spreadsheetId: destinationSpreadsheetId,
-      range: `${sheet}!A2:C`,
+      range: `${sheet}!A2:B`,
       valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
       resource: {
         values: data,
@@ -430,7 +430,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
     const data = [];
     rows.forEach((row) => {
       if (row[1] > 0) {
-        data.push([row[0], "", row[1]]);
+        data.push([row[0], row[1]]);
       }
     });
     return data;
