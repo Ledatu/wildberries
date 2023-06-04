@@ -290,15 +290,29 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
   new Promise((resolve, reject) => {
     const jsonData = {};
     if (data) {
-      jsonData["date"] = data.reduce((prev, current) => (prev.create_dt.slice(0, 10) > current.create_dt.slice(0, 10)) ? prev : current).create_dt.slice(0, 10)
+      jsonData["date"] = data
+        .reduce((prev, current) =>
+          prev.create_dt.slice(0, 10) > current.create_dt.slice(0, 10)
+            ? prev
+            : current
+        )
+        .create_dt.slice(0, 10);
       data.forEach((item) => {
-        if (item.supplier_oper_name != "Логистика" && item.supplier_oper_name != "Продажа")
+        if (
+          item.supplier_oper_name != "Логистика" &&
+          item.supplier_oper_name != "Продажа" &&
+          item.supplier_oper_name != "Логистика сторно"
+        )
           return;
 
         const type = item.sa_name.split("_").slice(0, 2).join("_");
         if (type in jsonData) {
           jsonData[type].buyout += item.quantity;
-          jsonData[type].delivery += item.delivery_rub;
+          const delivery_rub = item.delivery_rub;
+          jsonData[type].delivery +=
+            item.supplier_oper_name == "Логистика сторно"
+              ? -delivery_rub
+              : delivery_rub;
         } else jsonData[type] = { buyout: 0, delivery: item.delivery_rub };
       });
       for (const key in jsonData) {
