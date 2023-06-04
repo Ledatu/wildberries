@@ -290,7 +290,7 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
   new Promise((resolve, reject) => {
     const jsonData = {};
     if (data) {
-      jsonData["date"] = data[0].create_dt.slice(0, 10);
+      jsonData["date"] = data.reduce((prev, current) => (prev.create_dt.slice(0, 10) > current.create_dt.slice(0, 10)) ? prev : current).create_dt.slice(0, 10)
       data.forEach((item) => {
         if (item.supplier_oper_name != "Логистика" && item.supplier_oper_name != "Продажа")
           return;
@@ -335,7 +335,7 @@ const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
     const authToken = getAuthToken("api-statistic-token", campaign);
     const prevMonday = new Date();
     prevMonday.setDate(
-      prevMonday.getDate() - 7 - ((prevMonday.getDay() + 6) % 7)
+      prevMonday.getDate() - 28 - ((prevMonday.getDay() + 6) % 7)
     );
     const prevSunday = new Date();
     prevSunday.setDate(
