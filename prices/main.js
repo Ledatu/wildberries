@@ -143,8 +143,8 @@ const buildXlsx = (data, campaign) => {
     let vendorCode = vendorCodes[el.nmId];
     if (!vendorCode || !arts_data[vendorCode]) return;
     vendorCode = String(vendorCode);
-    const per_day = orders[el.nmId] / 7;
-    const stock = stocks[el.nmId];
+    const per_day = orders[vendorCode];
+    const stock = stocks["today"][vendorCode];
     const obor = stock / per_day;
     const mult = arts_data[vendorCode].multiplicity;
     const zakaz = Math.round((per_day * 30 - stock) / mult) * mult;
@@ -194,7 +194,7 @@ const buildXlsx = (data, campaign) => {
       spp_price,
       profit,
       stock,
-      orders[el.nmId],
+      orders[vendorCode] * 7,
       per_day,
       obor,
       rentabelnost,
@@ -240,38 +240,56 @@ const writeVendorCodeToJson = (data, campaign) => {
     .catch((error) => console.error(error));
 };
 
-const writeStocksToJson = (data, campaign) => {
+const writeStocksToJson = (data, campaign, date) => {
+  const stocks = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
+  );
   const jsonData = {};
   data.forEach((item) => {
-    if (item.nmId in jsonData) jsonData[item.nmId] += item.quantity;
-    else jsonData[item.nmId] = item.quantity;
+    if (item.supplierArticle in jsonData)
+      jsonData[item.supplierArticle] += item.quantity;
+    else jsonData[item.supplierArticle] = item.quantity;
   });
+  stocks[date] = jsonData;
+  stocks["today"] = jsonData;
   return fs
     .writeFile(
       path.join(__dirname, "files", campaign, "stocks.json"),
-      JSON.stringify(jsonData)
+      JSON.stringify(stocks)
     )
     .then(() => console.log("stocks.json created."))
     .catch((error) => console.error(error));
 };
 
-const writeOrdersToJson = (data, campaign) => {
-  const today = new Date().getDate();
-  const dateFrom = new Date();
-  dateFrom.setDate(dateFrom.getDate() - 8);
-  dateFrom.setHours(0);
-  dateFrom.setMinutes(0);
+const writeOrdersToJson = (data, campaign, date) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const dateFrom = new Date(date);
+  console.log(dateFrom);
   const jsonData = {};
   const excluded = { excluded: [] };
   data.forEach((item) => {
     const order_date = new Date(item.date);
     if (order_date < dateFrom) {
-      excluded.excluded.push({ order_date: order_date, nmId: item.nmId });
+      excluded.excluded.push({
+        order_date: order_date,
+        supplierArticle: item.supplierArticle,
+        reason: "Date less than dateFrom",
+      });
       return;
     }
-    if (item.isCancel || order_date.getDate() == today) return;
-    if (item.nmId in jsonData) jsonData[item.nmId] += 1;
-    else jsonData[item.nmId] = 1;
+    const order_date_string = item.date.slice(0, 10);
+    if (item.isCancel || order_date_string == today) {
+      excluded.excluded.push({
+        order_date: order_date,
+        supplierArticle: item.supplierArticle,
+        reason: "isCancel or today == order_date_string",
+      });
+      return;
+    }
+    if (!(order_date_string in jsonData)) jsonData[order_date_string] = {};
+    if (item.supplierArticle in jsonData[order_date_string])
+      jsonData[order_date_string][item.supplierArticle] += 1;
+    else jsonData[order_date_string][item.supplierArticle] = 1;
   });
   fs.writeFile(
     path.join(__dirname, "files", campaign, "excluded.json"),
@@ -279,10 +297,10 @@ const writeOrdersToJson = (data, campaign) => {
   ).then(() => console.log("excluded.xlsx created."));
   return fs
     .writeFile(
-      path.join(__dirname, "files", campaign, "orders.json"),
+      path.join(__dirname, "files", campaign, "orders by day.json"),
       JSON.stringify(jsonData)
     )
-    .then(() => console.log("orders.json created."))
+    .then(() => console.log("orders by days.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -460,6 +478,7 @@ const fetchCardsAndWriteToJSON = (campaign) => {
 const fetchStocksAndWriteToJSON = (campaign) => {
   const authToken = getAuthToken("api-statistic-token", campaign);
   const dateFrom = new Date();
+  const date_today = dateFrom.toISOString().slice(0, 10);
   dateFrom.setDate(dateFrom.getDate() - 1);
   const date = dateFrom.toISOString().slice(0, 10);
   // console.log(date);
@@ -467,14 +486,14 @@ const fetchStocksAndWriteToJSON = (campaign) => {
     dateFrom: date,
   };
   return getStocks(authToken, params)
-    .then((data) => writeStocksToJson(data, campaign))
+    .then((data) => writeStocksToJson(data, campaign, date_today))
     .catch((error) => console.error(error));
 };
 
 const fetchOrdersAndWriteToJSON = (campaign) => {
   const authToken = getAuthToken("api-statistic-token", campaign);
   const dateFrom = new Date();
-  dateFrom.setDate(dateFrom.getDate() - 8);
+  dateFrom.setDate(dateFrom.getDate() - 30);
   const date = dateFrom.toISOString().slice(0, 10);
   console.log(date);
   const params = {
@@ -482,7 +501,7 @@ const fetchOrdersAndWriteToJSON = (campaign) => {
   };
   return getOrders(authToken, params)
     .then((data) => {
-      writeOrdersToJson(data, campaign);
+      writeOrdersToJson(data, campaign, date);
       fs.writeFile(
         path.join(__dirname, "files", campaign, "orders_full.json"),
         JSON.stringify(data)
@@ -506,11 +525,11 @@ const calcAdvertismentAndWriteToJSON = (campaign) => {
   const calcAds = (mask) => {
     let allOrders = 0;
     // console.log(mask);
-    for (const nmId in orders) {
-      const code = vendorCodes[nmId];
+    for (const supplierArticle in orders) {
+      const code = vendorCodes[supplierArticle];
       if (!code) continue;
       if (code.match(mask.replace("+", "\\+"))) {
-        allOrders += orders[nmId];
+        allOrders += orders[supplierArticle];
       }
     }
 
@@ -530,6 +549,71 @@ const calcAdvertismentAndWriteToJSON = (campaign) => {
       JSON.stringify(jsonData)
     )
     .then(() => console.log("ads.json created."))
+    .catch((error) => console.error(error));
+};
+
+const calcAvgOrdersAndWriteToJSON = (campaign) => {
+  const orders_by_day = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "orders by day.json")
+    )
+  );
+  const stocks = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
+  );
+  // console.log(orders_by_day, stocks);
+  const calcAvgOrders = (date) => {
+    // console.log(date);
+    for (const supplierArticle in orders_by_day[date]) {
+      if (
+        supplierArticle &&
+        stocks[date] &&
+        stocks[date][supplierArticle] &&
+        stocks[date][supplierArticle] >= orders_by_day[date][supplierArticle]
+      ) {
+        // console.log(supplierArticle, date, stocks[date][supplierArticle], orders_by_day[date][supplierArticle])
+        if (supplierArticle in jsonData) {
+          jsonData[supplierArticle].count += 1;
+          jsonData[supplierArticle].orders +=
+            orders_by_day[date][supplierArticle];
+        } else
+          jsonData[supplierArticle] = {
+            count: 1,
+            orders: orders_by_day[date][supplierArticle],
+            avg: 0,
+          };
+        jsonData[supplierArticle].avg =
+          jsonData[supplierArticle].orders / jsonData[supplierArticle].count;
+      }
+    }
+  };
+
+  const jsonData = {};
+  const dateFrom = new Date(new Date().toISOString().slice(0, 10));
+  dateFrom.setDate(dateFrom.getDate() - 30);
+  for (order_data_date in orders_by_day) {
+    const order_date = new Date(order_data_date);
+    // console.log(order_date, dateFrom);
+    if (
+      order_date < dateFrom ||
+      order_data_date == new Date().toISOString().slice(0, 10)
+    ) {
+      continue;
+    }
+    calcAvgOrders(order_data_date);
+  }
+
+  const avgData = {};
+  for (supplierArticle in jsonData) {
+    avgData[supplierArticle] = jsonData[supplierArticle].avg;
+  }
+
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "orders.json"),
+      JSON.stringify(avgData)
+    )
+    .then(() => console.log("orders.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -657,6 +741,7 @@ module.exports = {
   fetchCardsAndWriteToJSON,
   fetchStocksAndWriteToJSON,
   fetchOrdersAndWriteToJSON,
+  calcAvgOrdersAndWriteToJSON,
   calcAdvertismentAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
   calculateNewValuesAndWriteToXlsx,

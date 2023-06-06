@@ -7,6 +7,7 @@ const {
   fetchDetailedByPeriodAndWriteToJSON,
   calculateNewValuesAndWriteToXlsx,
   calcAdvertismentAndWriteToJSON,
+  calcAvgOrdersAndWriteToJSON,
 } = require("./main");
 const {
   writePrices,
@@ -30,6 +31,7 @@ const getPrices = async () => {
       await fetchCardsAndWriteToJSON(campaign),
       await fetchOrdersAndWriteToJSON(campaign),
       await fetchStocksAndWriteToJSON(campaign),
+      await calcAvgOrdersAndWriteToJSON(campaign),
       await fetchDataAndWriteToXlsx(campaign),
     ])
       .then(async () => {
