@@ -760,3 +760,24 @@ module.exports = {
   calculateNewValuesAndWriteToXlsx,
   updatePrices,
 };
+
+const indexToColumn = (index) => {
+  // Validate index size
+  const maxIndex = 18278;
+  if (index > maxIndex) {
+    return "";
+  }
+
+  // Get column from index
+  const l = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  if (index > 26) {
+    const letterA = indexToColumn(Math.floor((index - 1) / 26));
+    const letterB = indexToColumn(index % 26);
+    return letterA + letterB;
+  } else {
+    if (index == 0) {
+      index = 26;
+    }
+    return l[index - 1];
+  }
+};
