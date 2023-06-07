@@ -22,7 +22,12 @@ const {
   autofillCurrent,
   exportAll,
 } = require("../qrGeneration/qrGeneration");
-const { getPrices, getDelivery, calcNewValues } = require("../prices/prices");
+const {
+  getPrices,
+  getDelivery,
+  calcNewValues,
+  updateAnalytics,
+} = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { analyticsOneTimeRun } = require("../analytics/oneTimeRun");
@@ -142,6 +147,11 @@ app.get("/api/generateQRs", authenticateToken, (req, res) => {
 
 app.get("/api/analyticsRun", authenticateToken, (req, res) => {
   analyticsOneTimeRun();
+  res.send("Analytics is updating...");
+});
+
+app.get("/api/updateAnalytics", authenticateToken, (req, res) => {
+  updateAnalytics();
   res.send("Analytics is updating...");
 });
 

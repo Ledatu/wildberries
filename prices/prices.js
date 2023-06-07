@@ -16,6 +16,7 @@ const {
   fetchEnteredValuesAndWriteToJSON,
   fetchAnalyticsLastWeekValuesAndWriteToJSON,
   copyPricesToDataSpreadsheet,
+  updateAnalyticsOrders,
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 
@@ -37,6 +38,18 @@ const getPrices = async () => {
       .then(async () => {
         console.log("All tasks completed successfully");
         await writePrices(campaign);
+      })
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      });
+  });
+};
+
+const updateAnalytics = async () => {
+  campaigns.forEach(async (campaign) => {
+    Promise.all([await updateAnalyticsOrders(campaign)])
+      .then(async () => {
+        console.log("All tasks completed successfully");
       })
       .catch((error) => {
         console.error("An error occurred:", error);
@@ -86,4 +99,5 @@ module.exports = {
   getPrices,
   getDelivery,
   calcNewValues,
+  updateAnalytics,
 };
