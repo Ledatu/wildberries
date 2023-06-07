@@ -266,6 +266,13 @@ const writeOrdersToJson = (data, campaign, date) => {
   const dateFrom = new Date(date);
   console.log(dateFrom);
   const jsonData = {};
+
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+
   const excluded = { excluded: [] };
   data.forEach((item) => {
     const order_date = new Date(item.date);
@@ -286,7 +293,13 @@ const writeOrdersToJson = (data, campaign, date) => {
       });
       return;
     }
-    if (!(order_date_string in jsonData)) jsonData[order_date_string] = {};
+    if (!(order_date_string in jsonData)) {
+      jsonData[order_date_string] = {};
+      for (key in vendorCodes) {
+        jsonData[order_date_string][vendorCodes[key]] = 0;
+      }
+      // console.log(jsonData[order_date_string]);
+    }
     if (item.supplierArticle in jsonData[order_date_string])
       jsonData[order_date_string][item.supplierArticle] += 1;
     else jsonData[order_date_string][item.supplierArticle] = 1;
@@ -747,3 +760,7 @@ module.exports = {
   calculateNewValuesAndWriteToXlsx,
   updatePrices,
 };
+
+var st = "05.06.2023";
+st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
+console.log(st);
