@@ -219,13 +219,21 @@ async function fetchDataAndWriteToJSON(auth) {
         barcode: row[1],
         multiplicity: Math.abs(Number(row[2] ?? 0)),
         seller_id: row[4],
-        commission: Math.abs(Number(row[5] ? row[5].replace("%", "").replace(",", ".") : 0)),
+        commission: Math.abs(
+          Number(row[5] ? row[5].replace("%", "").replace(",", ".") : 0)
+        ),
         delivery: Math.abs(Number(row[6] ? row[6].replace(",", ".") : 0)),
-        tax: Math.abs(Number(row[7] ? row[7].replace("%", "").replace(",", ".") : 0)),
+        tax: Math.abs(
+          Number(row[7] ? row[7].replace("%", "").replace(",", ".") : 0)
+        ),
         expences: Math.abs(Number(row[8] ? row[8].replace(",", ".") : 0)),
         prime_cost: Math.abs(Number(row[9] ? row[9].replace(",", ".") : 0)),
-        spp: Math.abs(Number(row[10] ? row[10].replace("%", "").replace(",", ".") : 0)),
-        ad: Math.abs(Number(row[11] ? row[11].replace("%", "").replace(",", ".") : 0)),
+        spp: Math.abs(
+          Number(row[10] ? row[10].replace("%", "").replace(",", ".") : 0)
+        ),
+        ad: Math.abs(
+          Number(row[11] ? row[11].replace("%", "").replace(",", ".") : 0)
+        ),
       };
     });
 
@@ -329,6 +337,99 @@ function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
           data,
           path.join(__dirname, `../files/${campaign}/analytics.json`)
         ).then((pr) => resolve());
+      });
+  }).catch((err) => {
+    console.log(`The API returned an error: ${err}`);
+    reject(err);
+  });
+}
+
+function updateAnalyticsOrders(auth, campaign) {
+  return new Promise(async (resolve, reject) => {
+    const orders = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "orders by day.json")
+      )
+    );
+
+    const sheets = google.sheets({ version: "v4", auth });
+    sheets.spreadsheets.values
+      .get({
+        spreadsheetId: "1RaTfs-706kXQ21UjuFqVofIcZ7q8-iQLMfmAlYaDYSQ",
+        range: `${campaign}!1:1000`,
+      })
+      .then((res) => {
+        const data = {};
+
+        const rows = res.data.values;
+        const masks = rows[0].filter(String);
+        console.log(masks);
+
+        for (const mask in masks) {
+          // console.log(mask);
+          data[masks[mask]] = {};
+          for (const day in orders) {
+            data[masks[mask]][day] = 0;
+            for (const art in orders[day]) {
+              if (art.includes(masks[mask])) {
+                // console.log(masks[mask], day, art, orders[day][art]);
+                data[masks[mask]][day] += orders[day][art];
+              }
+            }
+          }
+        }
+        // console.log(data);
+
+        const temp = {};
+        for (let i = 2; i < rows.length; i++) {
+          let st = rows[i][0];
+          if (!st) continue;
+          st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
+          for (const mask in data) {
+            if (!(mask in temp)) temp[mask] = [];
+            temp[mask].push([data[mask][st]]);
+          }
+        }
+        // console.log(temp);
+        const indexToColumn = (index) => {
+          // Validate index size
+          const maxIndex = 18278;
+          if (index > maxIndex) {
+            return "";
+          }
+
+          // Get column from index
+          const l = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+          if (index > 26) {
+            const letterA = indexToColumn(
+              Math.floor((index - 1) / 26)
+            );
+            const letterB = indexToColumn(index % 26);
+            return letterA + letterB;
+          } else {
+            if (index == 0) {
+              index = 26;
+            }
+            return l[index - 1];
+          }
+        };
+        const columns = [];
+        for (let i = 0; i < rows[1].length; i++) {
+          if (rows[1][i] != "Заказы") continue;
+          columns.push(indexToColumn(i+1));
+        }
+        console.log(columns);
+        console.log(temp);
+        for (const i in columns) {
+          sheets.spreadsheets.values.update({
+            spreadsheetId: '1RaTfs-706kXQ21UjuFqVofIcZ7q8-iQLMfmAlYaDYSQ',
+            range: `${campaign}!${columns[i]}3:${columns[i]}`,
+            valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+            resource: {
+              values: temp[masks[i]],
+            },
+          });
+        }
       });
   }).catch((err) => {
     console.log(`The API returned an error: ${err}`);
@@ -520,6 +621,10 @@ module.exports = {
     await fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign).catch(
       console.error
     );
+  },
+  updateAnalyticsOrders: async (campaign) => {
+    const auth = await authorize();
+    await updateAnalyticsOrders(auth, campaign).catch(console.error);
   },
   copyPricesToDataSpreadsheet: async () => {
     const auth = await authorize();

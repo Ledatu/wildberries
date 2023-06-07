@@ -760,7 +760,3 @@ module.exports = {
   calculateNewValuesAndWriteToXlsx,
   updatePrices,
 };
-
-var st = "05.06.2023";
-st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
-console.log(st);
