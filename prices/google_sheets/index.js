@@ -393,19 +393,23 @@ function updateAnalyticsOrders(auth, campaign) {
           }
         }
         // console.log(data);
-
+        const days = Object.keys(orders).reverse();
+        // console.log(days);
         const temp = {};
-        for (let i = 2; i < rows.length; i++) {
+        const sheet_data = rows.slice(2);
+        for (let i = 0; i < sheet_data.length; i++) {
           let maskValuesStrartIndex = 0;
           for (const mask in data) {
-            let st = rows[i][0];
+            let st = sheet_data[i][0];
             if (!st) {
               continue;
             }
             st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
+            // console.log(st);
             const stats = [0, 0, 0, 0, 0, 0, 0, 0];
             for (let j = 0; j < stats.length; j++) {
-              let val = rows[i][1 + maskValuesStrartIndex * stats.length + j];
+              let val =
+                sheet_data[i][1 + maskValuesStrartIndex * stats.length + j];
               val = Number(val ? val.replace(",", ".").replace(/\s/g, "") : 0);
               stats[j] = val;
               // console.log(mask, st, [1 + maskValuesStrartIndex * stats.length + j],  maskValuesStrartIndex);
@@ -431,7 +435,7 @@ function updateAnalyticsOrders(auth, campaign) {
             temp[mask][st].ctr = temp[mask][st].clicks / temp[mask][st].shows;
             temp[mask][st].crc = temp[mask][st].rashod / temp[mask][st].clicks;
             temp[mask][st].crm =
-            temp[mask][st].rashod / (temp[mask][st].shows / 1000);
+              temp[mask][st].rashod / (temp[mask][st].shows / 1000);
             temp[mask][st].cpo = temp[mask][st].rashod / temp[mask][st].orders;
             // console.log(mask, st, temp[mask][st]);
             // console.log(temp[mask][st]);
@@ -439,41 +443,67 @@ function updateAnalyticsOrders(auth, campaign) {
         }
         // console.log(temp);
         // return;
-        const sheet_data = rows.slice(2);
-        for (let i = 0; i < sheet_data.length; i++) {
+        for (let i = 0; i < days.length; i++) {
           for (const j in masks) {
-            let st = sheet_data[i][0];
+            if (!sheet_data[i]) {
+              sheet_data.push(sheet_data[0].length);
+            }
+            let st = days[i];
             if (!st) {
               sheet_data[i] = [];
               continue;
             }
-            st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
+            // st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
+            sheet_data[i][0] = st;
             maskValuesStrartIndex = 0;
-            for (const [key, value] of Object.entries(temp[masks[j]][st])) {
-              // console.log(masks[j], j, [
-              //   1 +
-              //     j * Object.keys(temp[masks[j]][st]).length +
-              //     maskValuesStrartIndex
-              // ], temp[masks[j]][st], `${key}: ${value}`);
-              sheet_data[i][
-                1 +
-                  j * Object.keys(temp[masks[j]][st]).length +
-                  maskValuesStrartIndex
-              ] = value;
-              maskValuesStrartIndex += 1;
+            // console.log(st, temp[masks[j]][st]);
+            if (temp[masks[j]][st]) {
+              for (const [key, value] of Object.entries(temp[masks[j]][st])) {
+                // console.log(masks[j], j, [
+                //   1 +
+                //     j * Object.keys(temp[masks[j]][st]).length +
+                //     maskValuesStrartIndex
+                // ], temp[masks[j]][st], `${key}: ${value}`);
+                sheet_data[i][
+                  1 +
+                    j * Object.keys(temp[masks[j]][st]).length +
+                    maskValuesStrartIndex
+                ] = value;
+                maskValuesStrartIndex += 1;
+              }
+            } else {
+              sheet_data[i] = Array(sheet_data[0].length);
+              sheet_data[i][0] = st;
+              for (const column in columns["Заказы"]) {
+                // console.log(i, [columns["Заказы"][column]]);
+                sheet_data[i][columns["Заказы"][column]] =
+                  data[masks[j]][st].orders;
+              }
+              // console.log(st, sheet_data[i])
             }
+            // console.log(sheet_data[i]);
           }
         }
         // console.log(sheet_data);
         // return;
-        sheets.spreadsheets.values.update({
-          spreadsheetId: "1RaTfs-706kXQ21UjuFqVofIcZ7q8-iQLMfmAlYaDYSQ",
-          range: `${campaign}!3:1000`,
-          valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
-          resource: {
-            values: sheet_data,
-          },
-        });
+        sheets.spreadsheets.values
+          .clear({
+            spreadsheetId: "1RaTfs-706kXQ21UjuFqVofIcZ7q8-iQLMfmAlYaDYSQ",
+            range: `${campaign}!3:1000`,
+          })
+          .then((pr) =>
+            sheets.spreadsheets.values
+              .update({
+                spreadsheetId: "1RaTfs-706kXQ21UjuFqVofIcZ7q8-iQLMfmAlYaDYSQ",
+                range: `${campaign}!3:1000`,
+                valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+                resource: {
+                  values: sheet_data,
+                },
+              })
+              .then((pr) => resolve())
+              .catch((err) => reject(err))
+          );
       });
   }).catch((err) => {
     console.log(`The API returned an error: ${err}`);

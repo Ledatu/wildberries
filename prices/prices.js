@@ -33,6 +33,7 @@ const getPrices = async () => {
       await fetchOrdersAndWriteToJSON(campaign),
       await fetchStocksAndWriteToJSON(campaign),
       await calcAvgOrdersAndWriteToJSON(campaign),
+      await updateAnalyticsOrders(campaign),
       await fetchDataAndWriteToXlsx(campaign),
     ])
       .then(async () => {
