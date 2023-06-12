@@ -344,7 +344,7 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
             item.supplier_oper_name == "Логистика сторно"
               ? -delivery_rub
               : delivery_rub;
-        } else jsonData[type] = { buyout: 0, delivery: item.delivery_rub };
+        } else jsonData[type] = { buyout: item.quantity, delivery: item.delivery_rub };
       });
       for (const key in jsonData) {
         jsonData[key].delivery = Math.round(jsonData[key].delivery);
