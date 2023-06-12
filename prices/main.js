@@ -337,14 +337,15 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
           return;
 
         const type = item.sa_name.split("_").slice(0, 2).join("_");
-        if (type in jsonData) {
-          jsonData[type].buyout += item.quantity;
-          const delivery_rub = item.delivery_rub;
-          jsonData[type].delivery +=
-            item.supplier_oper_name == "Логистика сторно"
-              ? -delivery_rub
-              : delivery_rub;
-        } else jsonData[type] = { buyout: item.quantity, delivery: item.delivery_rub };
+        if (!(type in jsonData)) {
+          jsonData[type] = { buyout: 0, delivery: 0 };
+        }
+        jsonData[type].buyout += item.quantity;
+        const delivery_rub = item.delivery_rub;
+        jsonData[type].delivery +=
+          item.supplier_oper_name == "Логистика сторно"
+            ? -delivery_rub
+            : delivery_rub;
       });
       for (const key in jsonData) {
         jsonData[key].delivery = Math.round(jsonData[key].delivery);
