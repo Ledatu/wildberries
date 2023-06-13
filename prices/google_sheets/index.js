@@ -446,7 +446,8 @@ function updateAnalyticsOrders(auth, campaign) {
         for (let i = 0; i < days.length; i++) {
           for (const j in masks) {
             if (!sheet_data[i]) {
-              sheet_data.push(sheet_data[0].length);
+              sheet_data.push(145);
+              // sheet_data.push(sheet_data[0].length);
             }
             let st = days[i];
             if (!st) {
