@@ -458,7 +458,7 @@ function updateAnalyticsOrders(auth, campaign) {
             sheet_data[i][0] = st;
             maskValuesStrartIndex = 0;
             // console.log(st, temp[masks[j]][st]);
-            if (temp[masks[j]][st]) {
+            if (temp[masks[j]] && temp[masks[j]][st]) {
               for (const [key, value] of Object.entries(temp[masks[j]][st])) {
                 // console.log(masks[j], j, [
                 //   1 +
