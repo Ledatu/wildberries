@@ -20,10 +20,14 @@ const {
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 
-const getPrices = async () => {
+const updateAtriculesData = async () => {
   await copyPricesToDataSpreadsheet().then(
     async (pr) => await fetchDataAndWriteToJSON()
   );
+};
+
+const getPrices = async () => {
+  await updateAtriculesData();
 
   campaigns.forEach(async (campaign) => {
     Promise.all([
@@ -101,4 +105,5 @@ module.exports = {
   getDelivery,
   calcNewValues,
   updateAnalytics,
+  updateAtriculesData,
 };

@@ -9,6 +9,9 @@ const {
   autofillAndWriteToXlsx,
   generateTags,
 } = require("./main");
+const {
+  updateAtriculesData,
+} = require("../prices/prices");
 const path = require("path");
 
 const qrGeneration = () => {
@@ -27,6 +30,7 @@ const tagsGeneration = () => {
 
 const autofillCurrent = (name) => {
   return new Promise(async (resolve, reject) => {
+  await updateAtriculesData(); //prices
     await fetchTagsAndWriteToJSON(name);
     autofillAndWriteToXlsx().then(async (count) => {
       await writeCurrent();
