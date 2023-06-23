@@ -563,7 +563,8 @@ async function copyPricesToDataSpreadsheet(auth) {
     data_rows.forEach((row) => {
       let regex = row[0].split("_").slice(0, 2).join("_");
       if (row[0].includes("КПБ")) {
-        regex += "_СТРАЙП";
+        if (row[0].includes("СТРАЙП")) regex += "_СТРАЙП";
+        if (row[0].includes("МОНТЕ")) regex += "_МОНТЕ";
       }
       if (row[0].includes("НАМАТРАСНИК")) {
         regex += "_ОТК";

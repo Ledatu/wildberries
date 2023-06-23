@@ -17,8 +17,8 @@ const { getPrices, getDelivery, calcNewValues, updateAnalytics } = require("./pr
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
 // getDelivery().then((pr) => console.log(pr));
 // fetchDataAndWriteToJSON()
-// getPrices();
-updateAnalyticsOrders("mayusha");
+getPrices();
+// updateAnalyticsOrders("mayusha");
 // calcNewValues()
 // copyPricesToDataSpreadsheet()
 // fetchNewPricesAndWriteToJSON("mayusha").then((pr) => {
