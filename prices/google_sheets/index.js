@@ -244,6 +244,50 @@ async function fetchDataAndWriteToJSON(auth) {
   }
 }
 
+async function fetchHandStocks(auth, campaign) {
+  try {
+    const sheets = google.sheets({ version: "v4", auth });
+
+    // Retrieve the values from the specified range
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
+      range: "Остатки руч.!A2:B",
+    });
+
+    // Parse the values into a JSON object
+    const rows = res.data.values;
+    const arts_data = JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files/data.json"))
+    );
+    const seller_ids = (
+      await JSON.parse(
+        await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
+      )
+    ).seller_ids;
+
+    const jsonData = {};
+
+    for (const art in arts_data) {
+      if (arts_data[art].seller_id != seller_ids[campaign]) continue;
+      jsonData[arts_data[art].supplierArticle] = 0;
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const supplierArticle = row[0].replace(/\s/g, "");
+      if (!(supplierArticle in arts_data)) continue;
+      if (arts_data[supplierArticle].seller_id != seller_ids[campaign])
+        continue;
+      jsonData[supplierArticle] = parseInt(row[1]);
+    }
+    // console.log(jsonData);
+    return jsonData;
+  } catch (err) {
+    console.log(`The API returned an error: ${err}`);
+    return null;
+  }
+}
+
 function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
   return new Promise((resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
@@ -683,6 +727,10 @@ module.exports = {
   fetchDataAndWriteToJSON: async () => {
     const auth = await authorize();
     await fetchDataAndWriteToJSON(auth).catch(console.error);
+  },
+  fetchHandStocks: async (campaign) => {
+    const auth = await authorize();
+    return await fetchHandStocks(auth, campaign).catch(console.error);
   },
   fetchNewPricesAndWriteToJSON: async (campaign) => {
     const auth = await authorize();

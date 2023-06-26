@@ -3,6 +3,7 @@ const axios = require("axios");
 const fs = require("fs").promises;
 const afs = require("fs");
 const path = require("path");
+const { fetchHandStocks } = require("./google_sheets");
 
 const sortData = (data) => {
   const header = data.shift(); // Remove the header row and store it in a variable
@@ -229,7 +230,7 @@ const writeDataToXlsx = (data, campaign) => {
 const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
   data.forEach((item) => {
-    jsonData[item.nmID] = item.vendorCode.replace(/\s/g, '');
+    jsonData[item.nmID] = item.vendorCode.replace(/\s/g, "");
   });
   return fs
     .writeFile(
@@ -240,17 +241,24 @@ const writeVendorCodeToJson = (data, campaign) => {
     .catch((error) => console.error(error));
 };
 
-const writeStocksToJson = (data, campaign, date) => {
+const writeStocksToJson = async (data, campaign, date) => {
   const stocks = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
   );
-  const jsonData = {};
+  let jsonData = {};
   data.forEach((item) => {
-    const supplierArticle = item.supplierArticle.replace(/\s/g, '')
-    if (supplierArticle in jsonData)
-      jsonData[supplierArticle] += item.quantity;
+    const supplierArticle = item.supplierArticle.replace(/\s/g, "");
+    if (supplierArticle in jsonData) jsonData[supplierArticle] += item.quantity;
     else jsonData[supplierArticle] = item.quantity;
   });
+
+  if (Object.keys(jsonData).length == 0) {
+    await fetchHandStocks(campaign).then((pr) => {
+      jsonData = pr;
+      console.log(jsonData);
+    });
+  }
+
   stocks[date] = jsonData;
   stocks["today"] = jsonData;
   return fs
@@ -277,7 +285,7 @@ const writeOrdersToJson = (data, campaign, date) => {
   const excluded = { excluded: [] };
   data.forEach((item) => {
     const order_date = new Date(item.date);
-    const supplierArticle = item.supplierArticle.replace(/\s/g, '')
+    const supplierArticle = item.supplierArticle.replace(/\s/g, "");
     if (order_date < dateFrom) {
       excluded.excluded.push({
         order_date: order_date,
