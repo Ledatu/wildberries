@@ -229,7 +229,7 @@ const writeDataToXlsx = (data, campaign) => {
 const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
   data.forEach((item) => {
-    jsonData[item.nmID] = item.vendorCode;
+    jsonData[item.nmID] = item.vendorCode.replace(/\s/g, '');
   });
   return fs
     .writeFile(
@@ -246,9 +246,10 @@ const writeStocksToJson = (data, campaign, date) => {
   );
   const jsonData = {};
   data.forEach((item) => {
-    if (item.supplierArticle in jsonData)
-      jsonData[item.supplierArticle] += item.quantity;
-    else jsonData[item.supplierArticle] = item.quantity;
+    const supplierArticle = item.supplierArticle.replace(/\s/g, '')
+    if (supplierArticle in jsonData)
+      jsonData[supplierArticle] += item.quantity;
+    else jsonData[supplierArticle] = item.quantity;
   });
   stocks[date] = jsonData;
   stocks["today"] = jsonData;
@@ -276,10 +277,11 @@ const writeOrdersToJson = (data, campaign, date) => {
   const excluded = { excluded: [] };
   data.forEach((item) => {
     const order_date = new Date(item.date);
+    const supplierArticle = item.supplierArticle.replace(/\s/g, '')
     if (order_date < dateFrom) {
       excluded.excluded.push({
         order_date: order_date,
-        supplierArticle: item.supplierArticle,
+        supplierArticle: supplierArticle,
         reason: "Date less than dateFrom",
       });
       return;
@@ -288,7 +290,7 @@ const writeOrdersToJson = (data, campaign, date) => {
     if (item.isCancel || order_date_string == today) {
       excluded.excluded.push({
         order_date: order_date,
-        supplierArticle: item.supplierArticle,
+        supplierArticle: supplierArticle,
         reason: "isCancel or today == order_date_string",
       });
       return;
@@ -300,9 +302,9 @@ const writeOrdersToJson = (data, campaign, date) => {
       }
       // console.log(jsonData[order_date_string]);
     }
-    if (item.supplierArticle in jsonData[order_date_string])
-      jsonData[order_date_string][item.supplierArticle] += 1;
-    else jsonData[order_date_string][item.supplierArticle] = 1;
+    if (supplierArticle in jsonData[order_date_string])
+      jsonData[order_date_string][supplierArticle] += 1;
+    else jsonData[order_date_string][supplierArticle] = 1;
   });
   fs.writeFile(
     path.join(__dirname, "files", campaign, "excluded.json"),
