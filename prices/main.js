@@ -255,7 +255,7 @@ const writeStocksToJson = async (data, campaign, date) => {
   if (Object.keys(jsonData).length == 0) {
     await fetchHandStocks(campaign).then((pr) => {
       jsonData = pr;
-      console.log(jsonData);
+      // console.log(jsonData);
     });
   }
 
@@ -590,10 +590,15 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
     // console.log(date);
     for (const supplierArticle in orders_by_day[date]) {
       if (
+
         supplierArticle &&
-        stocks[date] &&
-        stocks[date][supplierArticle] &&
-        stocks[date][supplierArticle] >= orders_by_day[date][supplierArticle]
+
+        // stocks[date] &&
+        // stocks[date][supplierArticle] &&                // Stocks based
+        // stocks[date][supplierArticle] >= orders_by_day[date][supplierArticle] &&
+
+        orders_by_day[date][supplierArticle] > 0           // Orders based
+
       ) {
         // console.log(supplierArticle, date, stocks[date][supplierArticle], orders_by_day[date][supplierArticle])
         if (supplierArticle in jsonData) {
