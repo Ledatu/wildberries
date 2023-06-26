@@ -675,6 +675,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
   for (const sourceSheet of sourceSheets.data.sheets) {
     try {
       const title = sourceSheet.properties.title;
+      if (title == "Остатки руч.") continue;
       const oldSheet = destinationSheets.data.sheets.find(
         (sheet) => sheet.properties.title === title
       );
