@@ -246,17 +246,22 @@ const writeStocksToJson = async (data, campaign, date) => {
     afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
   );
   let jsonData = {};
-  data.forEach((item) => {
-    const supplierArticle = item.supplierArticle.replace(/\s/g, "");
-    if (supplierArticle in jsonData) jsonData[supplierArticle] += item.quantity;
-    else jsonData[supplierArticle] = item.quantity;
+  await fetchHandStocks(campaign).then((pr) => {
+    jsonData = pr;
+    // console.log(jsonData);
   });
 
   if (Object.keys(jsonData).length == 0) {
-    await fetchHandStocks(campaign).then((pr) => {
-      jsonData = pr;
-      // console.log(jsonData);
-    });
+    if (data && data.length) {
+      data.forEach((item) => {
+        const supplierArticle = item.supplierArticle.replace(/\s/g, "");
+        if (supplierArticle in jsonData)
+          jsonData[supplierArticle] += item.quantity;
+        else jsonData[supplierArticle] = item.quantity;
+      });
+    } else {
+      jsonData = date in stocks ? stocks[date] : {};
+    }
   }
 
   stocks[date] = jsonData;
@@ -590,15 +595,12 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
     // console.log(date);
     for (const supplierArticle in orders_by_day[date]) {
       if (
-
         supplierArticle &&
-
         // stocks[date] &&
         // stocks[date][supplierArticle] &&                // Stocks based
         // stocks[date][supplierArticle] >= orders_by_day[date][supplierArticle] &&
 
-        orders_by_day[date][supplierArticle] > 0           // Orders based
-
+        orders_by_day[date][supplierArticle] > 0 // Orders based
       ) {
         // console.log(supplierArticle, date, stocks[date][supplierArticle], orders_by_day[date][supplierArticle])
         if (supplierArticle in jsonData) {

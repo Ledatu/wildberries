@@ -247,7 +247,7 @@ async function fetchDataAndWriteToJSON(auth) {
 async function fetchHandStocks(auth, campaign) {
   try {
     const sheets = google.sheets({ version: "v4", auth });
-
+    console.log("Hand stocks taken into account");
     // Retrieve the values from the specified range
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
@@ -256,6 +256,8 @@ async function fetchHandStocks(auth, campaign) {
 
     // Parse the values into a JSON object
     const rows = res.data.values;
+    if (!rows) return {};
+
     const arts_data = JSON.parse(
       await fs.readFile(path.join(__dirname, "../files/data.json"))
     );
