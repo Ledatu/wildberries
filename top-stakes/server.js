@@ -30,7 +30,7 @@ const {
 } = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
-const { analyticsOneTimeRun } = require("../analytics/oneTimeRun");
+const { fetchAnalytics } = require("../analytics/main");
 
 const app = express();
 const port = 24456;
@@ -146,7 +146,7 @@ app.get("/api/generateQRs", authenticateToken, (req, res) => {
 });
 
 app.get("/api/analyticsRun", authenticateToken, (req, res) => {
-  analyticsOneTimeRun();
+  fetchAnalytics();
   res.send("Analytics is updating...");
 });
 
