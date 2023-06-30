@@ -12,13 +12,20 @@ const {
   fetchOrdersAndWriteToJSON,
   calcAvgOrdersAndWriteToJSON,
 } = require("./main");
-const { getPrices, getDelivery, calcNewValues, updateAnalytics } = require("./prices");
+const {
+  getPrices,
+  getDelivery,
+  calcNewValues,
+  updateAnalytics,
+} = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
 // getDelivery().then((pr) => console.log(pr));
 // fetchDataAndWriteToJSON()
-getPrices();
-// updateAnalyticsOrders("mayusha");
+// getPrices();
+updateAnalyticsOrders("mayusha");
+updateAnalyticsOrders("TKS");
+updateAnalyticsOrders("delicatus");
 // calcNewValues()
 // copyPricesToDataSpreadsheet()
 // fetchNewPricesAndWriteToJSON("mayusha").then((pr) => {
@@ -28,4 +35,3 @@ getPrices();
 // fetchOrdersAndWriteToJSON("mayusha");
 // fetchStocksAndWriteToJSON("mayusha")
 // calcAvgOrdersAndWriteToJSON("mayusha")
-

@@ -8,12 +8,14 @@ const fs = require("fs");
   const page = await context.newPage();
 
   await page.goto(
-    "https://app.mpmgr.ru/organizations/Q8OWW7YMRgq5h4wk7UHHvA/campaigns/auto-campaigns"
+    `https://cmp.wildberries.ru/statistics/6459782`
   );
 
-  await page.waitForURL(
-    "https://app.mpmgr.ru/organizations/Q8OWW7YMRgq5h4wk7UHHvA"
-  );
+  // await page.waitForURL(
+  //   "https://app.mpmgr.ru/organizations/Q8OWW7YMRgq5h4wk7UHHvA"
+  // );
+
+  await page.waitForTimeout(60000)  
 
   const cookies = await context.cookies();
   const cookieJson = JSON.stringify(cookies);

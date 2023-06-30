@@ -6,7 +6,7 @@ async function startBrowser() {
     console.log("Opening the browser......");
     browser = await playwright.chromium.launch({
       // headless: true,
-      // headless: false,
+      headless: false,
       // args: ["--disable-setuid-sandbox"],
       // 'ignoreHTTPSErrors': true
     });

@@ -1,8 +1,10 @@
 const fs = require("fs").promises;
+const afs = require("fs");
 const path = require("path");
 const { authenticate } = require("@google-cloud/local-auth");
 const { google } = require("googleapis");
 const console = require("console");
+const { analytics } = require("googleapis/build/src/apis/analytics");
 const xlsx = require("node-xlsx").default;
 
 // If modifying these scopes, delete token.json.
@@ -404,7 +406,7 @@ function updateAnalyticsOrders(auth, campaign) {
         spreadsheetId: "1RaTfs-706kXQ21UjuFqVofIcZ7q8-iQLMfmAlYaDYSQ",
         range: `${campaign}!1:1000`,
       })
-      .then((res) => {
+      .then(async (res) => {
         const data = {};
 
         const rows = res.data.values;
@@ -414,7 +416,7 @@ function updateAnalyticsOrders(auth, campaign) {
           if (!(rows[1][i] in columns)) columns[rows[1][i]] = [];
           columns[rows[1][i]].push(i);
         }
-        // console.log(masks, columns);
+        console.log(masks, columns);
 
         for (const mask in masks) {
           // console.log(mask);
@@ -443,31 +445,45 @@ function updateAnalyticsOrders(auth, campaign) {
         // console.log(days);
         const temp = {};
         const sheet_data = rows.slice(2);
+        // console.log(sheet_data);
         for (let i = 0; i < sheet_data.length; i++) {
           let maskValuesStrartIndex = 0;
           for (const mask in data) {
+            // console.log(mask);
+            const mainDlDir = path.join(
+              __dirname,
+              "../../analytics/files",
+              campaign,
+              mask
+            );
+
+            // console.log(i, sheet_data.length, mainDlDir);
+
             let st = sheet_data[i][0];
             if (!st) {
+              // console.log(st, "con");
               continue;
             }
-            st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
             // console.log(st);
-            const stats = [0, 0, 0, 0, 0, 0, 0, 0];
-            for (let j = 0; j < stats.length; j++) {
-              let val =
-                sheet_data[i][1 + maskValuesStrartIndex * stats.length + j];
-              val = Number(val ? val.replace(",", ".").replace(/\s/g, "") : 0);
-              stats[j] = val;
-              // console.log(mask, st, [1 + maskValuesStrartIndex * stats.length + j],  maskValuesStrartIndex);
-            }
-            // console.log(stats[columns["Показы"][0] - 1]);
+            const date = st;
+            st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
+            const analytics_data = afs.existsSync(
+              path.join(mainDlDir, `${date}.xlsx`)
+            )
+              ? xlsx
+                  .parse(path.join(mainDlDir, `${date}.xlsx`))[0]
+                  .data.slice(-1)[0]
+              : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+            // console.log(mainDlDir, analytics_data);
+
             const maskStat = {
-              shows: stats[columns["Показы"][0] - 1],
-              clicks: stats[columns["Клики"][0] - 1],
+              shows: parseInt(String(analytics_data[2]).replace(/\s/g, '')),
+              clicks: parseInt(String(analytics_data[3]).replace(/\s/g, '')),
               ctr: 0,
               crc: 0,
               crm: 0,
-              rashod: stats[columns["Расход"][0] - 1],
+              rashod: parseInt(String(analytics_data[9]).replace(/\s/g, '')),
               orders: 0,
               cpo: 0,
             };

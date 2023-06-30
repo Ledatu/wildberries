@@ -1,35 +1,100 @@
 const fs = require("fs");
-const parse_xlsx = require("./excelParser");
 const xlsx = require("node-xlsx").default;
 const path = require("path");
+const { updateAnalyticsOrders } = require("../../prices/google_sheets");
 const cookies = require(path.join(
   __dirname,
   "../../secrets/mp_manager/cookies"
 ));
-const scraperObject = {
-  async scraper(browser, campaign_id) {
-    const url = `https://app.mpmgr.ru/organizations/${campaign_id}/campaigns/auto-campaigns`;
-    const context = await browser.newContext();
-    //		context.setDefaultTimeout(60000*3)
-    context.addCookies(cookies);
-    const page = await context.newPage();
-    await page.setViewportSize({ width: 1600, height: 30000 });
-    console.log(`Navigating to ${url}...`);
-    // Navigate to the selected page
-    await page.goto(url);
-    await page.waitForLoadState();
-    // Wait for the required DOM to be rendered
-    await page.waitForSelector(
-      ".MuiTypography-root.MuiTypography-inherit.MuiLink-root.MuiLink-underlineNone"
-    );
-    // await page.waitForTimeout(10000);
 
-    await page.$$eval(".MuiButtonBase-root.MuiAccordionSummary-root", (els) =>
-      els.forEach(async (el) => {
-        await el.click();
-      })
-    );
-    // await page.waitForTimeout(5000);
+function getRandomArbitrary(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+const scraperObject = {
+  async scraper(browser, adsIds) {
+    const context = await browser.newContext();
+    context.addCookies(cookies[adsIds.campaign]);
+    const page = await context.newPage();
+    for (const id in adsIds.data) {
+      const adId = adsIds.data[id];
+      console.log(`${parseInt(id) + 1}/${adsIds.data.length}`, adId);
+      if (!adId.id) continue;
+      const url = `https://cmp.wildberries.ru/statistics/${adId.id}`;
+      //		context.setDefaultTimeout(60000*3)
+      // await page.setViewportSize({ width: 1600, height: 30000 });
+      console.log(`Navigating to ${url}...`);
+      // Navigate to the selected page
+      await page.goto(url);
+      await page.waitForLoadState();
+      await page.goto(url);
+      await page.waitForLoadState();
+      await page.waitForTimeout(getRandomArbitrary(10000, 15000));
+
+      // return
+      // Wait for the required DOM to be rendered
+      await page.waitForSelector(
+        "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > input"
+      );
+      // await page.waitForTimeout(10000);
+
+      const fromDate = new Date();
+      for (let i = 1; i < 2; i++) {
+        await page.$eval(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > input",
+          async (el) => await el.click()
+        );
+        await page.waitForTimeout(getRandomArbitrary(4000, 5000));
+
+        const date = new Date();
+        date.setDate(fromDate.getDate() - i);
+        const str_date = date
+          .toISOString()
+          .slice(0, 10)
+          .replace(/(\d{4})-(\d{2})-(\d{2})/, "$3.$2.$1");
+        await page.fill(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > input:nth-child(3)",
+          str_date
+        );
+        await page.waitForTimeout(getRandomArbitrary(500, 2000));
+        await page.fill(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > input:nth-child(5)",
+          str_date
+        );
+        await page.waitForTimeout(getRandomArbitrary(500, 2000));
+        await page.click(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > button"
+        );
+        await page.waitForTimeout(getRandomArbitrary(3000, 7000));
+        const downloadPromise = page.waitForEvent("download");
+        await page.click(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div:nth-child(3) > div > button"
+        );
+
+        const mainDlDir = path.join(
+          __dirname,
+          "../files",
+          adsIds.campaign,
+          adId.title
+        );
+        if (!fs.existsSync(mainDlDir)) {
+          // fs.rmSync(mainQrDir, { recursive: true, force: true }, (err) => {
+          //   if (err) reject(err);
+          // });
+          fs.mkdir(mainDlDir, (err) => {
+            if (err) reject(err);
+          });
+        }
+
+        const download = await downloadPromise;
+        const path_to_file = path.join(mainDlDir, `${str_date}.xlsx`);
+        await download.saveAs(path_to_file);
+        await page.waitForTimeout(getRandomArbitrary(5000, 10000));
+      }
+    }
+
+    await updateAnalyticsOrders(adsIds.campaign);
+    return; // await page.waitForTimeout(5000);
     let urls = await page.$$eval("a", (links) => {
       // Extract the links from the data
       links = links.map((el) => el.href);
@@ -105,16 +170,16 @@ const scraperObject = {
           ".MuiButtonBase-root.MuiAccordionSummary-root.css-1dkwt8e",
           (el) => el.click()
         );
-        
+
         // await newPage.getByText('Интервал').first().evaluate(el => el.click());
 
         // await newPage.locator('.rmdp-left')
         // await newPage.waitForTimeout(1000)
         // await newPage.locator('.sd').first().evaluate(el => el.click())
         // await newPage.waitForTimeout(1000)
-        
+
         // await newPage.getByText('Экспорт').first().waitFor()
-        
+
         await newPage.waitForTimeout(10000);
         const downloadPromise = newPage.waitForEvent("download");
         await newPage
@@ -197,7 +262,6 @@ const scraperObject = {
         //			console.log(pr);
       }
     }
-    await parse_xlsx(campaign_id);
   },
 };
 

@@ -86,7 +86,9 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
   };
 
   console.log(`Started writing ${campaign_id} data to the google sheets`);
-  const analytics = xlsx.parse(`${__dirname}/../files/${campaign_id}.xlsx`)[0]["data"];
+  const analytics = xlsx.parse(`${__dirname}/../files/${campaign_id}.xlsx`)[0][
+    "data"
+  ];
   //console.log(analytics)
   const sheets = google.sheets({ version: "v4", auth });
 
@@ -104,7 +106,9 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
   });
   await update_data(analytics, `${sheet_name}!A3:FY`);
 
-  const pivot = xlsx.parse(`${__dirname}/../files/${campaign_id}.xlsx`)[1]["data"];
+  const pivot = xlsx.parse(`${__dirname}/../files/${campaign_id}.xlsx`)[1][
+    "data"
+  ];
   pivot.sort((a, b) => {
     const a1 = a[0].split(" ").slice(1).join(" ");
     const b1 = b[0].split(" ").slice(1).join(" ");
@@ -117,9 +121,58 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
   await update_data(pivot, `${sheet_name} (свод.)!A3:G`);
 }
 
-module.exports = async (campaign_id, sheet_name) => {
-  console.log("Trying to authenticate...");
-  const auth = await authorize();
-  console.log("Authentication successful!");
-  await writeAnalitics(auth, campaign_id, sheet_name).catch(console.error);
+function fetchAdsIdsAndWriteToJSON(auth, campaign) {
+  return new Promise((resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+
+    sheets.spreadsheets
+      .get({
+        spreadsheetId: "1RaTfs-706kXQ21UjuFqVofIcZ7q8-iQLMfmAlYaDYSQ",
+        ranges: `${campaign}!1:1`,
+        fields: "sheets(data(rowData(values(hyperlink,userEnteredValue))))",
+      })
+      .then((res) => {
+        const rows = res.data.sheets[0].data[0].rowData[0].values;
+        // console.log(rows);
+        const data = [];
+        rows.forEach((row) => {
+          if (!Object.keys(row).length) return;
+          data.push({
+            title: row.userEnteredValue.stringValue,
+            id: Object.keys(row).includes("hyperlink")
+              ? row.hyperlink.split("/").slice(-1)[0]
+              : "",
+          });
+        });
+        // console.log(data);
+        writeDataToFile(
+          { campaign: campaign, data: data },
+          path.join(__dirname, `../files/${campaign}/adsIds.json`)
+        ).then((pr) => resolve());
+      })
+      .catch((err) => {
+        console.log(`The API returned an error: ${err}`);
+        reject(err);
+      });
+  });
+}
+
+const writeDataToFile = (data, filename) => {
+  return fs.writeFile(filename, JSON.stringify(data), (err) => {
+    if (err) return console.log(`Error writing file: ${err}`);
+    console.log(`Data written to ${filename}`);
+  });
+};
+
+module.exports = {
+  fetchAdsIdsAndWriteToJSON: async (campaign) => {
+    const auth = await authorize();
+    await fetchAdsIdsAndWriteToJSON(auth, campaign);
+  },
+  writeAnalitics: async (campaign_id, sheet_name) => {
+    console.log("Trying to authenticate...");
+    const auth = await authorize();
+    console.log("Authentication successful!");
+    await writeAnalitics(auth, campaign_id, sheet_name).catch(console.error);
+  },
 };

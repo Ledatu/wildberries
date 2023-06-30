@@ -1,43 +1,37 @@
 const createXlsx = require("./mp_manager/index.js");
-const writeToGoole = require("./google_sheets/index.js");
+const { fetchAdsIdsAndWriteToJSON } = require("./google_sheets/index.js");
 const {
   createFlagFile,
   deleteFlagFile,
   checkFlagFilesExist,
 } = require("../flags/flagWork");
+const path = require("path");
+const fs = require("fs");
 
-const flagFile = "analytics-flag.txt";
+const campaigns = require(path.join(
+  __dirname,
+  "../prices/files/campaigns"
+)).campaigns.slice(1,2);
 
-/**
- * Runs some operation only if the flag file is not present.
- * @returns {Promise<void>} A promise that resolves when the operation is completed, or rejects with an error.
- */
-module.exports = () => {
-  return new Promise((resolve, reject) => {
-    checkFlagFilesExist([flagFile, "top-stakes-flag.txt"])
-      .then(async (flagExists) => {
-        if (!flagExists) {
-          console.log("Running operation...");
-
-          // await createFlagFile(flagFile)
-
-          let campaign_ids = [
-            "Q8OWW7YMRgq5h4wk7UHHvA",
-            "TsGOXnYrT22nfoDwEsftHw",
-          ];
-          let campaign_names = ["MAYUSHA", "DELICATUS"];
-
-          for (let i = 0; i < campaign_ids.length; i++) {
-            await createXlsx(campaign_ids[i]);
-            await writeToGoole(campaign_ids[i], campaign_names[i]);
-          }
-
-          // await deleteFlagFile(flagFile)
-        } else {
-          console.log(`Flag file present. Skipping operation.`);
-          resolve();
-        }
+const fetchAnalytics = async () => {
+  for (const campaign of campaigns) {
+    await Promise.all([await fetchAdsIdsAndWriteToJSON(campaign)])
+      .then(async () => {
+        console.log("All tasks completed successfully");
+        const adsIds = JSON.parse(
+          fs.readFileSync(
+            path.join(__dirname, "files", campaign, "adsIds.json")
+          )
+        );
+        console.log(adsIds);
+        await createXlsx(adsIds);
       })
-      .catch(reject);
-  });
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      });
+  }
+};
+
+module.exports = {
+  fetchAnalytics,
 };
