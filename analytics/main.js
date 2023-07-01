@@ -11,11 +11,11 @@ const fs = require("fs");
 const campaigns = require(path.join(
   __dirname,
   "../prices/files/campaigns"
-)).campaigns;
+)).campaigns.slice(-1);
 
 const fetchAnalytics = async () => {
   for (const campaign of campaigns) {
-    if (campaign == "delicatus") continue;
+    // if (campaign == "delicatus") continue;
     await Promise.all([await fetchAdsIdsAndWriteToJSON(campaign)])
       .then(async () => {
         console.log("All tasks completed successfully");
