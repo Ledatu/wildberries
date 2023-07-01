@@ -39,7 +39,7 @@ const scraperObject = {
       // await page.waitForTimeout(10000);
 
       const fromDate = new Date();
-      for (let i = 1; i < 30; i++) {
+      for (let i = 1; i < 2; i++) {
         await page.$eval(
           "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > input",
           async (el) => await el.click()
