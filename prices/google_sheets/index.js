@@ -517,8 +517,8 @@ function updateAnalyticsOrders(auth, campaign) {
               pivot[st] = {
                 day: new Date(st).toLocaleString("ru-RU", { weekday: "short" }),
                 rashod: 0,
-                orders: 0,
-                sum_orders: 0,
+                orders: orders[st][''] ?? 0,
+                sum_orders: sum_orders[st][''] ?? 0,
                 drr: 0,
               };
             pivot[st].rashod += temp[mask][st].rashod;
