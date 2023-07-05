@@ -280,6 +280,7 @@ const writeOrdersToJson = (data, campaign, date) => {
   const dateFrom = new Date(date);
   console.log(dateFrom);
   const jsonData = {};
+  const orderSumJsonData = {};
 
   const vendorCodes = JSON.parse(
     afs.readFileSync(
@@ -318,16 +319,34 @@ const writeOrdersToJson = (data, campaign, date) => {
     if (supplierArticle in jsonData[order_date_string])
       jsonData[order_date_string][supplierArticle] += 1;
     else jsonData[order_date_string][supplierArticle] = 1;
+
+    if (!(order_date_string in orderSumJsonData)) {
+      orderSumJsonData[order_date_string] = {};
+      for (key in vendorCodes) {
+        orderSumJsonData[order_date_string][vendorCodes[key]] = 0;
+      }
+      // console.log(orderSumJsonData[order_date_string]);
+    }
+    if (!(supplierArticle in orderSumJsonData[order_date_string]))
+      orderSumJsonData[order_date_string][supplierArticle] = 0;
+
+    orderSumJsonData[order_date_string][supplierArticle] +=
+      item.totalPrice * (1 - item.discountPercent / 100);
   });
   fs.writeFile(
     path.join(__dirname, "files", campaign, "excluded.json"),
     JSON.stringify(excluded)
   ).then(() => console.log("excluded.xlsx created."));
-  return fs
-    .writeFile(
+  return Promise.all([
+    fs.writeFile(
       path.join(__dirname, "files", campaign, "orders by day.json"),
       JSON.stringify(jsonData)
-    )
+    ),
+    fs.writeFile(
+      path.join(__dirname, "files", campaign, "sum of orders by day.json"),
+      JSON.stringify(orderSumJsonData)
+    ),
+  ])
     .then(() => console.log("orders by days.json created."))
     .catch((error) => console.error(error));
 };

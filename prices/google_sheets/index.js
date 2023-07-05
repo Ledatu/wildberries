@@ -400,6 +400,12 @@ function updateAnalyticsOrders(auth, campaign) {
       )
     );
 
+    const sum_orders = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "sum of orders by day.json")
+      )
+    );
+
     const sheets = google.sheets({ version: "v4", auth });
     sheets.spreadsheets.values
       .get({
@@ -416,7 +422,7 @@ function updateAnalyticsOrders(auth, campaign) {
           if (!(rows[1][i] in columns)) columns[rows[1][i]] = [];
           columns[rows[1][i]].push(i);
         }
-        console.log(masks, columns);
+        // console.log(masks, columns);
 
         for (const mask in masks) {
           // console.log(mask);
@@ -430,12 +436,14 @@ function updateAnalyticsOrders(auth, campaign) {
               crm: 0,
               rashod: 0,
               orders: 0,
-              cpo: 0,
+              sum_orders: 0,
+              drr: 0,
             };
             for (const art in orders[day]) {
               if (art.includes(masks[mask])) {
                 // console.log(masks[mask], day, art, orders[day][art]);
                 data[masks[mask]][day].orders += orders[day][art];
+                data[masks[mask]][day].sum_orders += sum_orders[day][art];
               }
             }
           }
@@ -444,6 +452,7 @@ function updateAnalyticsOrders(auth, campaign) {
         const days = Object.keys(orders).reverse();
         // console.log(days);
         const temp = {};
+        const pivot = {};
         const sheet_data = rows.slice(2);
         // console.log(sheet_data);
         for (let i = 0; i < sheet_data.length; i++) {
@@ -476,16 +485,16 @@ function updateAnalyticsOrders(auth, campaign) {
               : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
             // console.log(mainDlDir, analytics_data);
-
             const maskStat = {
-              shows: parseInt(String(analytics_data[2]).replace(/\s/g, '')),
-              clicks: parseInt(String(analytics_data[3]).replace(/\s/g, '')),
+              shows: parseInt(String(analytics_data[2]).replace(/\s/g, "")),
+              clicks: parseInt(String(analytics_data[3]).replace(/\s/g, "")),
               ctr: 0,
               crc: 0,
               crm: 0,
-              rashod: parseInt(String(analytics_data[9]).replace(/\s/g, '')),
+              rashod: parseInt(String(analytics_data[9]).replace(/\s/g, "")),
               orders: 0,
-              cpo: 0,
+              sum_orders: 0,
+              drr: 0,
             };
             if (!(mask in temp)) temp[mask] = {};
             temp[mask][st] = maskStat;
@@ -493,17 +502,32 @@ function updateAnalyticsOrders(auth, campaign) {
             if (!(st in data[mask])) {
               continue;
             }
-            temp[mask][st].orders = data[mask][st].orders;
+            temp[mask][st].orders = data[mask.split(/\s/)[0]][st].orders;
+            temp[mask][st].sum_orders =
+              data[mask.split(/\s/)[0]][st].sum_orders;
             temp[mask][st].ctr = temp[mask][st].clicks / temp[mask][st].shows;
             temp[mask][st].crc = temp[mask][st].rashod / temp[mask][st].clicks;
             temp[mask][st].crm =
               temp[mask][st].rashod / (temp[mask][st].shows / 1000);
-            temp[mask][st].cpo = temp[mask][st].rashod / temp[mask][st].orders;
+            temp[mask][st].drr =
+              temp[mask][st].rashod / temp[mask][st].sum_orders;
             // console.log(mask, st, temp[mask][st]);
             // console.log(temp[mask][st]);
+            if (!(st in pivot))
+              pivot[st] = {
+                day: new Date(st).toLocaleString("ru-RU", { weekday: "short" }),
+                rashod: 0,
+                orders: 0,
+                sum_orders: 0,
+                drr: 0,
+              };
+            pivot[st].rashod += temp[mask][st].rashod;
+            pivot[st].orders += temp[mask][st].orders;
+            pivot[st].sum_orders += temp[mask][st].sum_orders;
+            pivot[st].drr = pivot[st].rashod / pivot[st].sum_orders;
           }
         }
-        // console.log(temp);
+        // console.log(pivot);
         // return;
         for (let i = 0; i < days.length; i++) {
           for (const j in masks) {
@@ -522,6 +546,7 @@ function updateAnalyticsOrders(auth, campaign) {
             // console.log(st, temp[masks[j]][st]);
             if (temp[masks[j]] && temp[masks[j]][st]) {
               for (const [key, value] of Object.entries(temp[masks[j]][st])) {
+                // console.log(Object.entries(temp[masks[j]][st]));
                 // console.log(masks[j], j, [
                 //   1 +
                 //     j * Object.keys(temp[masks[j]][st]).length +
@@ -542,12 +567,18 @@ function updateAnalyticsOrders(auth, campaign) {
                 sheet_data[i][columns["Заказы"][column]] =
                   data[masks[j]][st].orders;
               }
+              for (const column in columns["Сумма"]) {
+                // console.log(i, [columns["Заказы"][column]]);
+                sheet_data[i][columns["Сумма"][column]] =
+                  data[masks[j]][st].sum_orders;
+              }
               // console.log(st, sheet_data[i])
             }
             // console.log(sheet_data[i]);
           }
         }
-        // console.log(sheet_data);
+        if (!sheet_data.slice(-1)[0][0]) sheet_data.pop();
+        // console.log(sheet_data.slice(-1)[0][0]);
         // return;
         sheets.spreadsheets.values
           .clear({
@@ -564,13 +595,55 @@ function updateAnalyticsOrders(auth, campaign) {
                   values: sheet_data,
                 },
               })
-              .then((pr) => resolve())
+              .then((pr) => {
+                const pivot_sheet = [];
+                const blankCells = {
+                  mayusha: 0,
+                  delicatus: 4,
+                  TKS: 8,
+                };
+                for (const st in pivot) {
+                  const row = [st, pivot[st].day];
+                  for (let b = 0; b < blankCells[campaign]; b++) {
+                    row.push(undefined);
+                  }
+                  row.push(pivot[st].rashod);
+                  row.push(pivot[st].orders);
+                  row.push(pivot[st].sum_orders);
+                  row.push(pivot[st].drr);
+
+                  // console.log(row);
+                  pivot_sheet.push(row);
+                }
+                // console.log(pivot_sheet);
+                sheets.spreadsheets.values
+                  .clear({
+                    spreadsheetId:
+                      "1RaTfs-706kXQ21UjuFqVofIcZ7q8-iQLMfmAlYaDYSQ",
+                    range: `Сводный РК!3:1000`,
+                  })
+                  .then((pr) =>
+                    sheets.spreadsheets.values
+                      .update({
+                        spreadsheetId:
+                          "1RaTfs-706kXQ21UjuFqVofIcZ7q8-iQLMfmAlYaDYSQ",
+                        range: `Сводный РК!3:1000`,
+                        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+                        resource: {
+                          values: pivot_sheet,
+                        },
+                      })
+                      .then((pr) => resolve())
+                      .catch((err) => reject(err))
+                  );
+              })
               .catch((err) => reject(err))
           );
+      })
+      .catch((err) => {
+        console.log(`The API returned an error: ${err}`);
+        reject(err);
       });
-  }).catch((err) => {
-    console.log(`The API returned an error: ${err}`);
-    reject(err);
   });
 }
 
