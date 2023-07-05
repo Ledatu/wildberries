@@ -15,83 +15,94 @@ const scraperObject = {
   async scraper(browser, adsIds) {
     const context = await browser.newContext();
     context.addCookies(cookies[adsIds.campaign]);
-    const page = await context.newPage();
-    for (const id in adsIds.data) {
-      const adId = adsIds.data[id];
-      console.log(`${parseInt(id) + 1}/${adsIds.data.length}`, adId);
-      if (!adId.id) continue;
-      const url = `https://cmp.wildberries.ru/statistics/${adId.id}`;
-      //		context.setDefaultTimeout(60000*3)
-      // await page.setViewportSize({ width: 1600, height: 30000 });
-      console.log(`Navigating to ${url}...`);
-      // Navigate to the selected page
-      await page.goto(url);
-      await page.waitForLoadState();
-      await page.goto(url);
-      await page.waitForLoadState();
-      await page.waitForTimeout(getRandomArbitrary(10000, 15000));
+    // for (let id = 0; id < adsIds.data.length; id++) {
 
-      // return
-      // Wait for the required DOM to be rendered
-      await page.waitForSelector(
-        "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > input"
-      );
-      // await page.waitForTimeout(10000);
+    const download = async (id) =>
+      new Promise(async (resolve, reject) => {
+        const adId = adsIds.data[id];
+        console.log(`${parseInt(id) + 1}/${adsIds.data.length}`, adId);
+        if (!adId.id) return;
+        const page = await context.newPage();
+        const url = `https://cmp.wildberries.ru/statistics/${adId.id}`;
+        //		context.setDefaultTimeout(60000*3)
+        // await page.setViewportSize({ width: 1600, height: 30000 });
+        console.log(`Navigating to ${url}...`);
+        // Navigate to the selected page
+        await page.goto(url);
+        await page.waitForLoadState();
+        await page.goto(url);
+        await page.waitForLoadState();
+        await page.waitForTimeout(getRandomArbitrary(10000, 15000));
 
-      const fromDate = new Date();
-      for (let i = 1; i < 2; i++) {
-        await page.$eval(
-          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > input",
-          async (el) => await el.click()
+        // return
+        // Wait for the required DOM to be rendered
+        await page.waitForSelector(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > input"
         );
-        await page.waitForTimeout(getRandomArbitrary(4000, 5000));
+        // await page.waitForTimeout(10000);
 
-        const date = new Date();
-        date.setDate(fromDate.getDate() - i);
-        const str_date = date
-          .toISOString()
-          .slice(0, 10)
-          .replace(/(\d{4})-(\d{2})-(\d{2})/, "$3.$2.$1");
-        await page.fill(
-          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > input:nth-child(3)",
-          str_date
-        );
-        await page.waitForTimeout(getRandomArbitrary(500, 2000));
-        await page.fill(
-          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > input:nth-child(5)",
-          str_date
-        );
-        await page.waitForTimeout(getRandomArbitrary(500, 2000));
-        await page.click(
-          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > button"
-        );
-        await page.waitForTimeout(getRandomArbitrary(3000, 7000));
-        const downloadPromise = page.waitForEvent("download");
-        await page.click(
-          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div:nth-child(3) > div > button"
-        );
+        const fromDate = new Date();
+        for (let i = 1; i < 2; i++) {
+          await page.$eval(
+            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > input",
+            async (el) => await el.click()
+          );
+          await page.waitForTimeout(getRandomArbitrary(4000, 5000));
 
-        const mainDlDir = path.join(
-          __dirname,
-          "../files",
-          adsIds.campaign,
-          adId.title
-        );
-        if (!fs.existsSync(mainDlDir)) {
-          // fs.rmSync(mainQrDir, { recursive: true, force: true }, (err) => {
-          //   if (err) reject(err);
-          // });
-          fs.mkdir(mainDlDir, (err) => {
-            if (err) reject(err);
-          });
+          const date = new Date();
+          date.setDate(fromDate.getDate() - i);
+          const str_date = date
+            .toISOString()
+            .slice(0, 10)
+            .replace(/(\d{4})-(\d{2})-(\d{2})/, "$3.$2.$1");
+          await page.fill(
+            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > input:nth-child(3)",
+            str_date
+          );
+          await page.waitForTimeout(getRandomArbitrary(500, 2000));
+          await page.fill(
+            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > input:nth-child(5)",
+            str_date
+          );
+          await page.waitForTimeout(getRandomArbitrary(500, 2000));
+          await page.click(
+            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > button"
+          );
+          await page.waitForTimeout(getRandomArbitrary(3000, 7000));
+          const downloadPromise = page.waitForEvent("download");
+          await page.click(
+            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div:nth-child(3) > div > button"
+          );
+
+          const mainDlDir = path.join(
+            __dirname,
+            "../files",
+            adsIds.campaign,
+            adId.title
+          );
+          if (!fs.existsSync(mainDlDir)) {
+            // fs.rmSync(mainQrDir, { recursive: true, force: true }, (err) => {
+            //   if (err) reject(err);
+            // });
+            fs.mkdir(mainDlDir, (err) => {
+              if (err) reject(err);
+            });
+          }
+
+          const download = await downloadPromise;
+          const path_to_file = path.join(mainDlDir, `${str_date}.xlsx`);
+          await download.saveAs(path_to_file);
+          await page.waitForTimeout(getRandomArbitrary(5000, 10000));
         }
-
-        const download = await downloadPromise;
-        const path_to_file = path.join(mainDlDir, `${str_date}.xlsx`);
-        await download.saveAs(path_to_file);
-        await page.waitForTimeout(getRandomArbitrary(5000, 10000));
-      }
+        page.close();
+        resolve();
+      });
+    const promises = [];
+    for (const id in adsIds.data) {
+      promises.push(download(id));
+      await new Promise((resolve) => setTimeout(resolve, 10000));
     }
+    Promise.all(promises);
 
     await updateAnalyticsOrders(adsIds.campaign);
     return; // await page.waitForTimeout(5000);
