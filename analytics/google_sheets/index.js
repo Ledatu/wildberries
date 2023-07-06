@@ -144,11 +144,21 @@ function fetchAdsIdsAndWriteToJSON(auth, campaign) {
               : "",
           });
         });
+        const ads = {};
+        for (let i = 0; i < data.length; i++) {
+          ads[data[i].title] = data[i].id;
+        }
         // console.log(data);
         writeDataToFile(
           { campaign: campaign, data: data },
           path.join(__dirname, `../files/${campaign}/adsIds.json`)
-        ).then((pr) => resolve());
+        ).then((pr) => {
+          writeDataToFile(
+            ads,
+            path.join(__dirname, `../../prices/files/${campaign}/adsIds.json`)
+          );
+          resolve();
+        });
       })
       .catch((err) => {
         console.log(`The API returned an error: ${err}`);

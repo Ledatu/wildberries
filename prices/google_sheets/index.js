@@ -406,6 +406,18 @@ function updateAnalyticsOrders(auth, campaign) {
       )
     );
 
+    const adverts = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "adsIds.json")
+      )
+    );
+
+    const advertsCreateDate = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "adverts.json")
+      )
+    );
+
     const sheets = google.sheets({ version: "v4", auth });
     sheets.spreadsheets.values
       .get({
@@ -476,6 +488,10 @@ function updateAnalyticsOrders(auth, campaign) {
             // console.log(st);
             const date = st;
             st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
+
+            if (new Date(st) < new Date(advertsCreateDate[adverts[mask]]))
+              continue;
+
             const analytics_data = afs.existsSync(
               path.join(mainDlDir, `${date}.xlsx`)
             )
@@ -517,8 +533,8 @@ function updateAnalyticsOrders(auth, campaign) {
               pivot[st] = {
                 day: new Date(st).toLocaleString("ru-RU", { weekday: "short" }),
                 rashod: 0,
-                orders: orders[st][''] ?? 0,
-                sum_orders: sum_orders[st][''] ?? 0,
+                orders: orders[st][""] ?? 0,
+                sum_orders: sum_orders[st][""] ?? 0,
                 drr: 0,
               };
             pivot[st].rashod += temp[mask][st].rashod;

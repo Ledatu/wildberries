@@ -43,6 +43,18 @@ const getDetailedByPeriod = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
+const getAdverts = (authToken, params) => {
+  return axios
+    .get("https://advert-api.wb.ru/adv/v0/adverts", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const getInfo = (authToken) => {
   return axios
     .get("https://suppliers-api.wildberries.ru/public/api/v1/info", {
@@ -238,6 +250,22 @@ const writeVendorCodeToJson = (data, campaign) => {
       JSON.stringify(jsonData)
     )
     .then(() => console.log("vendorCodes.json created."))
+    .catch((error) => console.error(error));
+};
+
+const writeAdvertsToJson = (data, campaign) => {
+  const jsonData = {};
+  data.forEach((item) => {
+    jsonData[item.advertId] = new Date(item.createTime)
+      .toISOString()
+      .slice(0, 10);
+  });
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "adverts.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("adverts.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -502,6 +530,16 @@ const fetchDataAndWriteToXlsx = (campaign) => {
   return getInfo(authToken)
     .then((data) => {
       return writeDataToXlsx(data, campaign);
+    })
+    .catch((error) => console.error(error));
+};
+
+const fetchAdvertsAndWriteToJson = (campaign) => {
+  const authToken = getAuthToken("api-advert-token", campaign);
+  const params = {};
+  return getAdverts(authToken, params)
+    .then((data) => {
+      return writeAdvertsToJson(data, campaign);
     })
     .catch((error) => console.error(error));
 };
@@ -794,6 +832,7 @@ module.exports = {
   calcAvgOrdersAndWriteToJSON,
   calcAdvertismentAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
+  fetchAdvertsAndWriteToJson,
   calculateNewValuesAndWriteToXlsx,
   updatePrices,
 };

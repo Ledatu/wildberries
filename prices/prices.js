@@ -5,6 +5,7 @@ const {
   fetchOrdersAndWriteToJSON,
   fetchStocksAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
+  fetchAdvertsAndWriteToJson,
   calculateNewValuesAndWriteToXlsx,
   calcAdvertismentAndWriteToJSON,
   calcAvgOrdersAndWriteToJSON,
@@ -52,7 +53,10 @@ const getPrices = async () => {
 
 const updateAnalytics = async () => {
   campaigns.forEach(async (campaign) => {
-    Promise.all([await updateAnalyticsOrders(campaign)])
+    Promise.all([
+      await fetchAdvertsAndWriteToJson(campaign),
+      await updateAnalyticsOrders(campaign),
+    ])
       .then(async () => {
         console.log("All tasks completed successfully");
       })
