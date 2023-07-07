@@ -30,27 +30,30 @@ const updateAtriculesData = async () => {
 const getPrices = async () => {
   await updateAtriculesData();
 
-  campaigns.forEach(async (campaign) => {
-    Promise.all([
-      await fetchAnalyticsLastWeekValuesAndWriteToJSON(campaign),
-      await calcAdvertismentAndWriteToJSON(campaign),
-      await fetchCardsAndWriteToJSON(campaign),
-      await fetchOrdersAndWriteToJSON(campaign),
-      await fetchStocksAndWriteToJSON(campaign),
-      await calcAvgOrdersAndWriteToJSON(campaign),
-      // await updateAnalyticsOrders(campaign),
-      await fetchDataAndWriteToXlsx(campaign),
-    ])
-      .then(async () => {
-        console.log("All tasks completed successfully");
-        await writePrices(campaign);
-      })
-      .catch((error) => {
-        console.error("An error occurred:", error);
-      });
+  return new Promise((resolve, reject) => {
+    campaigns.forEach(async (campaign) => {
+      Promise.all([
+        await fetchAnalyticsLastWeekValuesAndWriteToJSON(campaign),
+        await calcAdvertismentAndWriteToJSON(campaign),
+        await fetchCardsAndWriteToJSON(campaign),
+        await fetchOrdersAndWriteToJSON(campaign),
+        await fetchStocksAndWriteToJSON(campaign),
+        await calcAvgOrdersAndWriteToJSON(campaign),
+        // await updateAnalyticsOrders(campaign),
+        await fetchDataAndWriteToXlsx(campaign),
+      ])
+        .then(async () => {
+          console.log("All tasks completed successfully");
+          await writePrices(campaign);
+        })
+        .catch((error) => {
+          console.error("An error occurred:", error);
+        });
+    });
+  }).then(async (pr) => {
+    await updateAnalytics();
+    resolve();
   });
-
-  updateAnalytics();
 };
 
 const updateAnalytics = async () => {
