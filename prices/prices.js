@@ -49,6 +49,8 @@ const getPrices = async () => {
         console.error("An error occurred:", error);
       });
   });
+
+  updateAnalytics();
 };
 
 const updateAnalytics = async () => {
