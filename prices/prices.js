@@ -30,8 +30,8 @@ const updateAtriculesData = async () => {
 const getPrices = async () => {
   await updateAtriculesData();
 
-  for (const campaign of campaigns) {
-    await Promise.all([
+  campaigns.forEach(async (campaign) => {
+    Promise.all([
       await fetchAnalyticsLastWeekValuesAndWriteToJSON(campaign),
       await calcAdvertismentAndWriteToJSON(campaign),
       await fetchCardsAndWriteToJSON(campaign),
@@ -48,7 +48,8 @@ const getPrices = async () => {
       .catch((error) => {
         console.error("An error occurred:", error);
       });
-  }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 60000));
   await updateAnalytics();
 };
 
