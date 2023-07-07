@@ -100,8 +100,8 @@ const scraperObject = {
       });
     const promises = [];
     for (const id in adsIds.data) {
-      promises.push(download(id));
-      await new Promise((resolve) => setTimeout(resolve, 30000));
+      promises.push(await download(id));
+      // await new Promise((resolve) => setTimeout(resolve, 30000));
     }
     Promise.all(promises);
 
