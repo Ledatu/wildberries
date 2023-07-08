@@ -489,8 +489,14 @@ function updateAnalyticsOrders(auth, campaign) {
             const date = st;
             st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
 
-            if (new Date(st) < new Date(advertsCreateDate[adverts[mask]]))
+            if (new Date(st) < new Date(advertsCreateDate[adverts[mask]])) {
+              // console.log(
+              //   campaign,
+              //   new Date(st),
+              //   new Date(advertsCreateDate[adverts[mask]])
+              // );
               continue;
+            }
 
             const analytics_data = afs.existsSync(
               path.join(mainDlDir, `${date}.xlsx`)
@@ -548,8 +554,8 @@ function updateAnalyticsOrders(auth, campaign) {
         for (let i = 0; i < days.length; i++) {
           for (const j in masks) {
             if (!sheet_data[i]) {
-              sheet_data.push(145);
-              // sheet_data.push(sheet_data[0].length);
+              // sheet_data.push(145);
+              sheet_data.push(sheet_data[0].length);
             }
             let st = days[i];
             if (!st) {
