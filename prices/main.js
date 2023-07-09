@@ -55,6 +55,41 @@ const getAdverts = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
+const getAdvertInfo = (authToken, params) => {
+  return axios
+    .get("https://advert-api.wb.ru/adv/v0/advert", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const updateAdvertArtActivities = (authToken, params) => {
+  return axios
+    .post("https://advert-api.wb.ru/adv/v0/nmactive", params, {
+      headers: {
+        Authorization: authToken,
+      },
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const getKTErrors = (authToken, params) => {
+  return axios
+    .get("https://suppliers-api.wildberries.ru/content/v1/cards/error/list", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const getInfo = (authToken) => {
   return axios
     .get("https://suppliers-api.wildberries.ru/public/api/v1/info", {
@@ -70,6 +105,21 @@ const getCards = (authToken, params) => {
   return axios
     .post(
       "https://suppliers-api.wildberries.ru/content/v1/cards/cursor/list",
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const getCardsTemp = (authToken, params) => {
+  return axios
+    .post(
+      "https://suppliers-api.wildberries.ru/content/v1/cards/filter",
       params,
       {
         headers: {
@@ -253,6 +303,21 @@ const writeVendorCodeToJson = (data, campaign) => {
     .catch((error) => console.error(error));
 };
 
+const writeCardsTempToJson = (data, campaign) => {
+  const jsonData = {};
+  data.forEach((item) => {
+    jsonData[item.vendorCode] = item.characteristics;
+  });
+  console.log(data);
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "cardsTemp.json"),
+      JSON.stringify(data)
+    )
+    .then(() => console.log("cardsTemp.json created."))
+    .catch((error) => console.error(error));
+};
+
 const writeAdvertsToJson = (data, campaign) => {
   const jsonData = {};
   data.forEach((item) => {
@@ -264,6 +329,16 @@ const writeAdvertsToJson = (data, campaign) => {
     .writeFile(
       path.join(__dirname, "files", campaign, "adverts.json"),
       JSON.stringify(jsonData)
+    )
+    .then(() => console.log("adverts.json created."))
+    .catch((error) => console.error(error));
+};
+
+const writeKTErrorsToJson = (data, campaign) => {
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "KTerrors.json"),
+      JSON.stringify(data)
     )
     .then(() => console.log("adverts.json created."))
     .catch((error) => console.error(error));
@@ -544,6 +619,99 @@ const fetchAdvertsAndWriteToJson = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const fetchAdvertInfosAndWriteToJson = async (campaign) => {
+  const authToken = getAuthToken("api-advert-token", campaign);
+  const adsIds = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "adsIds.json"))
+  );
+  const data = {};
+  for (const [key, id] of Object.entries(adsIds)) {
+    // console.log(key, id);
+    if (!id) continue;
+    const params = { id: id };
+    await getAdvertInfo(authToken, params).then((pr) => (data[key] = pr));
+  }
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "advertInfos.json"),
+      JSON.stringify(data)
+    )
+    .then(() => console.log("advertInfos.json created."))
+    .catch((error) => console.error(error));
+};
+
+const updateAdvertArtActivitiesAndGenerateNotIncluded = async (campaign) => {
+  const authToken = getAuthToken("api-advert-token", campaign);
+  const advertInfos = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advertInfos.json")
+    )
+  );
+
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+
+  const stocks = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
+  ).today;
+
+  const notIncluded = {};
+  for (const [key, data] of Object.entries(advertInfos)) {
+    // console.log(key, id);
+    const nms_temp = data.params[0].nms;
+    // console.log(key, data, nms_temp);
+    const nms = [];
+    for (let i = 0; i < nms_temp.length; i++) {
+      nms.push(String(nms_temp[i].nm));
+    }
+    for (const [id, art] of Object.entries(vendorCodes)) {
+      if (art.match(key)) {
+        if (!nms.includes(id) && stocks[art]) {
+          // console.log(stocks[art], art);
+          if (!(key in notIncluded)) notIncluded[key] = [];
+          // notIncluded[key].push({ nm: id, vendorCode: art });
+          notIncluded[key].push(id);
+        }
+      }
+    }
+    const nms_to_update = [];
+    for (const obj of nms_temp) {
+      obj.active = stocks[vendorCodes[obj.nm]] > 0;
+      nms_to_update.push(obj);
+    }
+    const params = {
+      advertId: data.advertId,
+      active: nms_to_update,
+      param: data.params[0].subjectId ?? data.params[0].setId,
+    };
+    // if (key != "ПР_120") continue;
+    // console.log(key, params);
+    await updateAdvertArtActivities(authToken, params);
+  }
+  // console.log(notIncluded);
+  // return;
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "notIncludedNMs.json"),
+      JSON.stringify(notIncluded)
+    )
+    .then(() => console.log("notIncludedNMs.json created."))
+    .catch((error) => console.error(error));
+};
+
+const getKTErrorsAndWriteToJson = (campaign) => {
+  const authToken = getAuthToken("api-token", campaign);
+  const params = {};
+  return getKTErrors(authToken, params)
+    .then((data) => {
+      return writeKTErrorsToJson(data, campaign);
+    })
+    .catch((error) => console.error(error));
+};
+
 const fetchCardsAndWriteToJSON = (campaign) => {
   const authToken = getAuthToken("api-token", campaign);
   const params = {
@@ -558,6 +726,21 @@ const fetchCardsAndWriteToJSON = (campaign) => {
   };
   return getCards(authToken, params)
     .then((cards) => writeVendorCodeToJson(cards.data.cards, campaign))
+    .catch((error) => console.error(error));
+};
+
+const fetchCardsTempAndWriteToJSON = (campaign) => {
+  const authToken = getAuthToken("api-token", campaign);
+  const params = {
+    vendorCodes: [
+      "ПР_180_РОЗОВЫЙ_ОТК",
+      // "ПР_180_ЛАГУНА_ОТК",
+      // "ПР_180_МОЛОЧНЫЙ_ОТК",
+    ],
+    allowedCategoriesOnly: false,
+  };
+  return getCardsTemp(authToken, params)
+    .then((cards) => writeCardsTempToJson(cards.data, campaign))
     .catch((error) => console.error(error));
 };
 
@@ -827,6 +1010,7 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
 module.exports = {
   fetchDataAndWriteToXlsx,
   fetchCardsAndWriteToJSON,
+  fetchCardsTempAndWriteToJSON,
   fetchStocksAndWriteToJSON,
   fetchOrdersAndWriteToJSON,
   calcAvgOrdersAndWriteToJSON,
@@ -835,6 +1019,9 @@ module.exports = {
   fetchAdvertsAndWriteToJson,
   calculateNewValuesAndWriteToXlsx,
   updatePrices,
+  getKTErrorsAndWriteToJson,
+  fetchAdvertInfosAndWriteToJson,
+  updateAdvertArtActivitiesAndGenerateNotIncluded,
 };
 
 const indexToColumn = (index) => {

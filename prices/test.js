@@ -4,6 +4,7 @@ const {
   copyPricesToDataSpreadsheet,
   fetchNewPricesAndWriteToJSON,
   updateAnalyticsOrders,
+  sendEmail,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -12,12 +13,17 @@ const {
   fetchOrdersAndWriteToJSON,
   calcAvgOrdersAndWriteToJSON,
   fetchAdvertsAndWriteToJson,
+  fetchCardsTempAndWriteToJSON,
+  getKTErrorsAndWriteToJson,
+  fetchAdvertInfosAndWriteToJson,
+  updateAdvertArtActivitiesAndGenerateNotIncluded,
 } = require("./main");
 const {
   getPrices,
   getDelivery,
   calcNewValues,
   updateAnalytics,
+  updateAdvertActivity,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
@@ -25,6 +31,10 @@ const {
 // fetchDataAndWriteToJSON()
 // getPrices();
 // updateAnalyticsOrders("mayusha");
+// sendRKErrors('projecttriggers@gmail.com', 'Ошибки РК', 'Тест');
+// updateAdvertArtActivitiesAndGenerateNotIncluded('mayusha')
+updateAdvertActivity()
+
 // updateAnalyticsOrders("TKS");
 // updateAnalyticsOrders("delicatus");
 // fetchAdvertsAndWriteToJson('TKS')
@@ -37,4 +47,5 @@ const {
 // fetchOrdersAndWriteToJSON("mayusha");
 // fetchStocksAndWriteToJSON("mayusha")
 // calcAvgOrdersAndWriteToJSON("mayusha")
-updateAnalytics()
+// updateAnalytics()
+// fetchAdvertInfosAndWriteToJson("mayusha");

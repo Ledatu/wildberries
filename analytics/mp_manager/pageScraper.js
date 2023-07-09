@@ -21,7 +21,10 @@ const scraperObject = {
       new Promise(async (resolve, reject) => {
         const adId = adsIds.data[id];
         console.log(`${parseInt(id) + 1}/${adsIds.data.length}`, adId);
-        if (!adId.id) return;
+        if (!adId.id) {
+          resolve();
+          return;
+        }
         const page = await context.newPage();
         const url = `https://cmp.wildberries.ru/statistics/${adId.id}`;
         //		context.setDefaultTimeout(60000*3)

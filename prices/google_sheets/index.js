@@ -8,7 +8,10 @@ const { analytics } = require("googleapis/build/src/apis/analytics");
 const xlsx = require("node-xlsx").default;
 
 // If modifying these scopes, delete token.json.
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/gmail.send",
+];
 // The file token.json stores the user's access and refresh tokens, and is
 // created automatically when the authorization flow completes for the first
 // time.
@@ -829,6 +832,31 @@ async function copyZakazToOtherSpreadsheet(auth) {
   }
 }
 
+async function sendEmail(auth, to, subject, body) {
+  const gmail = google.gmail({ version: "v1", auth });
+
+  // Encode the subject as UTF-8
+  const encodedSubject = Buffer.from(subject, 'utf-8').toString('base64');
+
+  // Create the message object
+  const message = {
+    raw: `To: ${to}\nSubject: =?utf-8?B?${encodedSubject}?=\nContent-Type: text/plain; charset="utf-8"\n\n${body}`,
+  };
+
+  // Send the email
+  try {
+    const response = await gmail.users.messages.send({
+      userId: "me",
+      requestBody: {
+        raw: Buffer.from(message.raw).toString("base64"),
+      },
+    });
+    console.log(`Email sent successfully: ${response.data}`);
+  } catch (error) {
+    console.error(`Error sending email: ${error}`);
+  }
+}
+
 module.exports = {
   writePrices: async (campaign) => {
     const auth = await authorize();
@@ -871,5 +899,9 @@ module.exports = {
   copyZakazToOtherSpreadsheet: async () => {
     const auth = await authorize();
     await copyZakazToOtherSpreadsheet(auth).catch(console.error);
+  },
+  sendEmail: async (to, subject, body) => {
+    const auth = await authorize();
+    await sendEmail(auth, to, subject, body).catch(console.error);
   },
 };
