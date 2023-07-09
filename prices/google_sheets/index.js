@@ -766,7 +766,14 @@ async function copyZakazToOtherSpreadsheet(auth) {
 
     const data = [];
     rows.forEach((row) => {
+      // TODO: Delete after all old arts are gone
       if (row[1] > 0) {
+        const array = row[0].split("_");
+        if (array[0] == "ПР" || array[0] == "ПРПЭ") {
+          if (array[1] == "120" || array[1] == "140" || array[1] == "180") {
+            if (array.slice(-1)[0] != "2") return;
+          }
+        }
         data.push([row[0], row[1]]);
       }
     });
@@ -836,7 +843,7 @@ async function sendEmail(auth, to, subject, body) {
   const gmail = google.gmail({ version: "v1", auth });
 
   // Encode the subject as UTF-8
-  const encodedSubject = Buffer.from(subject, 'utf-8').toString('base64');
+  const encodedSubject = Buffer.from(subject, "utf-8").toString("base64");
 
   // Create the message object
   const message = {
