@@ -342,7 +342,7 @@ function autofillAndWriteToXlsx() {
       uniqueId = uniqueId.replace(/-/g, "");
       uniqueId = uniqueId.replace(/:/g, "");
       uniqueId = uniqueId.replace(/T/g, "");
-      uniqueId = uniqueId.slice(0, 12);
+      uniqueId = uniqueId.slice(0, 14);
       return `#wbbox#0002;${seller_id};${uniqueId}${index};${multiplicity}`;
     };
 
