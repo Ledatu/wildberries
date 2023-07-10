@@ -2,16 +2,16 @@ const {
   fetchQrCodesAndWriteToJSON,
   fetchTagsAndWriteToJSON,
   writeCurrent,
+  fetchNewTagsAndWriteToXLSX,
 } = require("./google_sheets/index");
 const {
   main,
   zipDirectory,
   autofillAndWriteToXlsx,
   generateTags,
+  generateNewTags,
 } = require("./main");
-const {
-  updateAtriculesData,
-} = require("../prices/prices");
+const { updateAtriculesData } = require("../prices/prices");
 const path = require("path");
 
 const qrGeneration = () => {
@@ -28,9 +28,18 @@ const tagsGeneration = () => {
   });
 };
 
+const newTagsGeneration = () => {
+  return new Promise(async (resolve, reject) => {
+    // await fetchTagsAndWriteToJSON();
+    fetchNewTagsAndWriteToXLSX().then((pr) => {
+      generateNewTags().then((pr) => resolve());
+    });
+  });
+};
+
 const autofillCurrent = (name) => {
   return new Promise(async (resolve, reject) => {
-  await updateAtriculesData(); //prices
+    await updateAtriculesData(); //prices
     await fetchTagsAndWriteToJSON(name);
     autofillAndWriteToXlsx().then(async (count) => {
       await writeCurrent();
@@ -54,5 +63,6 @@ module.exports = {
   qrGeneration,
   tagsGeneration,
   autofillCurrent,
+  newTagsGeneration,
   exportAll,
 };

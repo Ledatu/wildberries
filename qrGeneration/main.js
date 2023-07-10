@@ -4,6 +4,9 @@ const path = require("path");
 const fs = require("fs");
 const xlsx = require("node-xlsx");
 const archiver = require("archiver");
+const { Canvas, loadImage } = require("canvas");
+const fontkit = require("@pdf-lib/fontkit"); // <= here is the Most Important Thing.
+const JsBarcode = require("jsbarcode");
 /**
  * @param {String} sourceDir: /some/folder/to/compress
  * @param {String} outPath: /path/to/created.zip
@@ -38,6 +41,131 @@ async function saveQRPDF(qrDataArray, filePath) {
   const pdfBytes = await pdfDoc.save();
   writeStream.write(pdfBytes);
   writeStream.end();
+}
+
+async function generateNewTags() {
+  return new Promise(async (resolve, reject) => {
+    const generateBarcode = (value, font) => {
+      const canvas = new Canvas(340 * 10, 220 * 10, "image");
+      JsBarcode(canvas, value, {
+        format: "EAN13",
+        marginLeft: 50,
+        marginBottom: 50,
+        height: 50 * 10,
+        width: 22,
+        fontSize: 250,
+        font: font,
+        textMargin: 0,
+      });
+      return canvas.toBuffer();
+    };
+
+    const makePdf = async (campaign, art, color, type, barcode, logo) => {
+      const pdfDoc = await PDFDocument.create();
+      pdfDoc.registerFontkit(fontkit);
+      const page = pdfDoc.addPage([169, 113]);
+      const openSans = await pdfDoc.embedFont(openSansBytes);
+
+      const canvas = new Canvas(logo.width, logo.height);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(logo, 0, 0);
+      const pngDataUrl = canvas.toDataURL("image/png");
+      const pngBytes = Uint8Array.from(atob(pngDataUrl.split(",")[1]), (c) =>
+        c.charCodeAt(0)
+      );
+      const pngImageEmbed = await pdfDoc.embedPng(pngBytes);
+      const scalars = {
+        // mayusha: pngImageEmbed.scale(0.075),
+        // TKS: pngImageEmbed.scale(0.06),
+        // delicatus: pngImageEmbed.scale(0.05),
+        mayusha: { width: 90, height: 37.5 },
+        delicatus: { width: 64, height: 26.65 },
+        TKS: { width: 76.8, height: 31.98 },
+      };
+      const scalar = scalars[campaign];
+      page.drawImage(pngImageEmbed, {
+        x: (169 - scalar.width) / 2,
+        y: 113 - scalar.height + (campaign != "delicatus" ? 4 : 0),
+        width: scalar.width,
+        height: scalar.height,
+      });
+
+      const buffer = await generateBarcode(barcode, openSans);
+      const barcodeJpg = await pdfDoc.embedPng(buffer);
+      const barcodeDims = barcodeJpg.scale(0.65 / 10);
+      page.drawImage(barcodeJpg, {
+        x: 0,
+        y: 0,
+        width: 149,
+        height: barcodeDims.height,
+      });
+
+      const fontSizeBig = 16;
+      const type_width = openSans.widthOfTextAtSize(type, fontSizeBig);
+      page.drawText(type, {
+        x: (169 - type_width) / 2,
+        y: 63 + 9,
+        size: fontSizeBig,
+        lineHeight: 9,
+        font: openSans,
+      });
+
+      const fontSize = 8;
+      const art_text = "АРТИКУЛ: " + art;
+      const art_text_width = openSans.widthOfTextAtSize(art_text, fontSize);
+      page.drawText(art_text, {
+        x: (169 - art_text_width) / 2,
+        y: 63,
+        size: fontSize,
+        lineHeight: 9,
+        font: openSans,
+      });
+
+      const col_text = "ЦВЕТ: " + color;
+      const col_text_width = openSans.widthOfTextAtSize(col_text, fontSize);
+      page.drawText(col_text, {
+        x: (169 - col_text_width) / 2,
+        y: 63 - fontSize,
+        size: fontSize,
+        lineHeight: 9,
+        font: openSans,
+      });
+
+      const filepath = path.join(__dirname, "files", "tags", `${art}.pdf`);
+      const pdfBytes = await pdfDoc.save();
+      console.log(filepath);
+      fs.writeFileSync(filepath, pdfBytes);
+    };
+
+    const openSansBytes = fs.readFileSync(
+      path.join(__dirname, "files", "OpenSans_Condensed-Bold.ttf")
+    );
+    const newTagsXlsx = xlsx.parse(
+      path.join(__dirname, "files", "newTags.xlsx")
+    );
+
+    for (const sheet of newTagsXlsx) {
+      const logo = await loadImage(
+        path.join(__dirname, "files", "logos", `${sheet.name}.png`)
+      );
+
+      const data = sheet.data;
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        // console.log(row);
+        if (!row.length) continue;
+        await makePdf(
+          sheet.name,
+          row[1].toUpperCase(),
+          row[2].toUpperCase(),
+          row[0].toUpperCase(),
+          String(row[3]),
+          logo
+        );
+      }
+    }
+    resolve();
+  });
 }
 
 // async function saveQRPDF(qrDataArray, filePath) {
@@ -98,13 +226,13 @@ async function saveQRPDF(qrDataArray, filePath) {
 function main() {
   return new Promise((resolve, reject) => {
     const current = xlsx.parse(path.join(__dirname, "files/current.xlsx"))[0]
-    .data;
+      .data;
     const qrcodes = [];
     for (let i = 1; i < current.length; i++) {
       qrcodes.push(current[i][5]);
     }
     console.log(qrcodes);
-    
+
     // // Remove existing files
     // const arch = path.join(__dirname, "files/Поставка/qrcodes.zip");
     // if (fs.existsSync(arch)) {
@@ -148,7 +276,7 @@ function main() {
           //   console.log("Zipping complete.");
           // })
           // .catch((err) => reject(err));
-            resolve();
+          resolve();
         })
         .catch((err) => reject(err));
     });
@@ -277,5 +405,6 @@ module.exports = {
   main,
   zipDirectory,
   generateTags,
+  generateNewTags,
   autofillAndWriteToXlsx,
 };

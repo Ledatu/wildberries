@@ -167,6 +167,33 @@ async function fetchTagsAndWriteToJSON(auth, name) {
   });
 }
 
+async function fetchNewTagsAndWriteToXLSX(auth) {
+  return new Promise(async (resolve, reject) => {
+    const campaigns = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "../../prices/files/campaigns.json")
+      )
+    ).campaigns;
+
+    const sheets = google.sheets({ version: "v4", auth });
+    const xlsxSheets = [];
+    for (const campaign of campaigns) {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: "1Kc-QZBJ-D0mWXwgTRDcsYDw-MoymdVhr4AJDbHSkRqo",
+        range: `${campaign}!A:D`,
+      });
+      // Parse the values into a JSON object
+      const rows = res.data.values;
+      xlsxSheets.push({ name: campaign, data: rows });
+    }
+
+    const buffer = xlsx.build(xlsxSheets);
+    afs.writeFileSync(path.join(__dirname, "../files", "newTags.xlsx"), buffer);
+    // console.log(xlsxSheets);
+    resolve();
+  });
+}
+
 // Define the function to write data to a JSON file
 const writeDataToFile = (data, filename) => {
   return fs.writeFile(filename, JSON.stringify(data), (err) => {
@@ -214,6 +241,13 @@ module.exports = {
     return new Promise(async (resolve, reject) => {
       const auth = await authorize();
       await fetchTagsAndWriteToJSON(auth, name).catch(console.error);
+      resolve();
+    });
+  },
+  fetchNewTagsAndWriteToXLSX: () => {
+    return new Promise(async (resolve, reject) => {
+      const auth = await authorize();
+      await fetchNewTagsAndWriteToXLSX(auth).catch(console.error);
       resolve();
     });
   },

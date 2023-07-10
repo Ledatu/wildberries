@@ -21,6 +21,7 @@ const {
   tagsGeneration,
   autofillCurrent,
   exportAll,
+  newTagsGeneration,
 } = require("../qrGeneration/qrGeneration");
 const {
   getPrices,
@@ -143,7 +144,12 @@ app.get("/api/copyZakaz", authenticateToken, (req, res) => {
 
 app.get("/api/generateQRs", authenticateToken, (req, res) => {
   qrGeneration();
-  res.send("QR Generation started!");
+  res.send("QR generation started!");
+});
+
+app.get("/api/generateNewTags", authenticateToken, (req, res) => {
+  newTagsGeneration();
+  res.send("New tags generation started!");
 });
 
 app.get("/api/updateAdvertActivity", authenticateToken, (req, res) => {
