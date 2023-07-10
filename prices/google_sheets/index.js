@@ -239,7 +239,7 @@ async function fetchDataAndWriteToJSON(auth) {
         ad: Math.abs(
           Number(row[11] ? row[11].replace("%", "").replace(",", ".") : 0)
         ),
-        zakaz_days: Math.abs(
+        pref_obor: Math.abs(
           Number(row[12] ? row[12].replace("%", "").replace(",", ".") : 0)
         ),
         min_zakaz: Math.abs(

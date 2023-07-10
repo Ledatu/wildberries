@@ -210,7 +210,9 @@ const buildXlsx = (data, campaign) => {
     const stock = stocks["today"][vendorCode];
     const obor = stock / per_day;
     const mult = arts_data[vendorCode].multiplicity;
-    const zakaz = Math.round((per_day * 30 - stock) / mult) * mult;
+    const zakaz =
+      Math.round((per_day * arts_data[vendorCode].pref_obor - stock) / mult) *
+      mult;
     const roz_price = Math.round(el.price * (1 - el.discount / 100));
     const min_zakaz = arts_data[vendorCode].min_zakaz;
 
@@ -763,7 +765,7 @@ const fetchStocksAndWriteToJSON = (campaign) => {
 const fetchOrdersAndWriteToJSON = (campaign) => {
   const authToken = getAuthToken("api-statistic-token", campaign);
   const dateFrom = new Date();
-  dateFrom.setDate(dateFrom.getDate() - 90);
+  dateFrom.setDate(dateFrom.getDate() - 30);
   const date = dateFrom.toISOString().slice(0, 10);
   console.log(date);
   const params = {
@@ -831,26 +833,17 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
   const stocks = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
   );
-  const arts_data = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", "data.json"))
-  );
   // console.log(orders_by_day, stocks);
   const calcAvgOrders = (date) => {
     for (const supplierArticle in orders_by_day[date]) {
       if (
         supplierArticle &&
-        arts_data[supplierArticle] &&
         // stocks[date] &&
         // stocks[date][supplierArticle] &&                // Stocks based
         // stocks[date][supplierArticle] >= orders_by_day[date][supplierArticle] &&
 
         orders_by_day[date][supplierArticle] > 0 // Orders based
       ) {
-        const dateFrom = new Date();
-        dateFrom.setDate(
-          dateFrom.getDate() - arts_data[supplierArticle].zakaz_days
-        );
-        if (dateFrom > new Date(date)) continue;
         // console.log(supplierArticle, date, orders_by_day[date][supplierArticle])
         if (supplierArticle in jsonData) {
           jsonData[supplierArticle].count += 1;
@@ -870,7 +863,7 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
 
   const jsonData = {};
   const dateFrom = new Date(new Date().toISOString().slice(0, 10));
-  dateFrom.setDate(dateFrom.getDate() - 90);
+  dateFrom.setDate(dateFrom.getDate() - 30);
   for (order_data_date in orders_by_day) {
     const order_date = new Date(order_data_date);
     // console.log(order_date, dateFrom);
