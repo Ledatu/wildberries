@@ -212,7 +212,7 @@ async function fetchDataAndWriteToJSON(auth) {
     // Retrieve the values from the specified range
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-      range: "Данные!A2:L",
+      range: "Данные!A2:N",
     });
 
     // Parse the values into a JSON object
@@ -238,6 +238,12 @@ async function fetchDataAndWriteToJSON(auth) {
         ),
         ad: Math.abs(
           Number(row[11] ? row[11].replace("%", "").replace(",", ".") : 0)
+        ),
+        zakaz_days: Math.abs(
+          Number(row[12] ? row[12].replace("%", "").replace(",", ".") : 0)
+        ),
+        min_zakaz: Math.abs(
+          Number(row[13] ? row[13].replace("%", "").replace(",", ".") : 0)
         ),
       };
     });
