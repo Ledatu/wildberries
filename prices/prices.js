@@ -24,6 +24,7 @@ const {
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 const fs = require("fs");
+const { fetchAdsIdsAndWriteToJSON } = require("../analytics/google_sheets");
 
 const updateAtriculesData = async () => {
   await copyPricesToDataSpreadsheet().then(
@@ -119,6 +120,7 @@ const updateAdvertActivity = async () => {
   };
   campaigns.forEach(async (campaign) => {
     Promise.all([
+      await fetchAdsIdsAndWriteToJSON(campaign),
       await fetchAdvertInfosAndWriteToJson(campaign),
       await updateAdvertArtActivitiesAndGenerateNotIncluded(campaign),
     ])
