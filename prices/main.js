@@ -910,6 +910,7 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
     JSON.stringify(avgData)
   );
 
+  jsonData = {}
   for (const order_data_date in orders_by_day) {
     const order_date = new Date(order_data_date);
     // console.log(order_date, dateFrom);
