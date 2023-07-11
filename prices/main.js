@@ -910,21 +910,21 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
     JSON.stringify(avgData)
   );
 
-  jsonData = {}
-  for (const order_data_date in orders_by_day) {
-    const order_date = new Date(order_data_date);
-    // console.log(order_date, dateFrom);
-    if (
-      order_date < dateFrom ||
-      order_data_date == new Date().toISOString().slice(0, 10)
-    ) {
-      continue;
-    }
-    jsonData = calcAvgOrders(jsonData, order_data_date, avgData);
-  }
-  for (supplierArticle in jsonData) {
-    avgData[supplierArticle] = jsonData[supplierArticle].avg;
-  }
+  // jsonData = {}
+  // for (const order_data_date in orders_by_day) {
+  //   const order_date = new Date(order_data_date);
+  //   // console.log(order_date, dateFrom);
+  //   if (
+  //     order_date < dateFrom ||
+  //     order_data_date == new Date().toISOString().slice(0, 10)
+  //   ) {
+  //     continue;
+  //   }
+  //   jsonData = calcAvgOrders(jsonData, order_data_date, avgData);
+  // }
+  // for (supplierArticle in jsonData) {
+  //   avgData[supplierArticle] = jsonData[supplierArticle].avg;
+  // }
 
   return fs
     .writeFile(
