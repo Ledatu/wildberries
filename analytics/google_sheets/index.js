@@ -156,8 +156,7 @@ function fetchAdsIdsAndWriteToJSON(auth, campaign) {
           writeDataToFile(
             ads,
             path.join(__dirname, `../../prices/files/${campaign}/adsIds.json`)
-          );
-          resolve();
+          ).then((pr) => resolve());
         });
       })
       .catch((err) => {
