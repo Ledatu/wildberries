@@ -507,13 +507,13 @@ function updateAnalyticsOrders(auth, campaign) {
             // }
             // console.log(date, st);
 
-            const analytics_data = new Date(st) >= new Date(advertsCreateDate[mask].createTime) && afs.existsSync(
-              path.join(mainDlDir, `${date}.xlsx`)
-            )
-              ? xlsx
-                  .parse(path.join(mainDlDir, `${date}.xlsx`))[0]
-                  .data.slice(-1)[0]
-              : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            const analytics_data =
+              new Date(st) >= new Date(advertsCreateDate[mask].createTime) &&
+              afs.existsSync(path.join(mainDlDir, `${date}.xlsx`))
+                ? xlsx
+                    .parse(path.join(mainDlDir, `${date}.xlsx`))[0]
+                    .data.slice(-1)[0]
+                : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
             // console.log(mainDlDir, analytics_data);
             const maskStat = {
@@ -651,6 +651,7 @@ function updateAnalyticsOrders(auth, campaign) {
                   pivot_sheet.push(row);
                 }
                 // console.log(pivot_sheet);
+                pivot_sheet.reverse();
                 sheets.spreadsheets.values
                   .clear({
                     spreadsheetId:
