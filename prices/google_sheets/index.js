@@ -423,7 +423,7 @@ function updateAnalyticsOrders(auth, campaign) {
 
     const advertsCreateDate = await JSON.parse(
       await fs.readFile(
-        path.join(__dirname, "../files", campaign, "adverts.json")
+        path.join(__dirname, "../files", campaign, "advertInfos.json")
       )
     );
 
@@ -476,7 +476,7 @@ function updateAnalyticsOrders(auth, campaign) {
         const pivot = {};
         const sheet_data = rows.slice(2);
         // console.log(sheet_data);
-        for (let i = 0; i < sheet_data.length; i++) {
+        for (const st in orders) {
           let maskValuesStrartIndex = 0;
           for (const mask in data) {
             // console.log(mask);
@@ -489,25 +489,25 @@ function updateAnalyticsOrders(auth, campaign) {
 
             // console.log(i, sheet_data.length, mainDlDir);
 
-            let st = sheet_data[i][0];
-            if (!st) {
+            if (!st || !advertsCreateDate[mask]) {
               // console.log(st, "con");
               continue;
             }
             // console.log(st);
-            const date = st;
-            st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
+            const date = st.replace(/(\d{4})\-(\d{2})\-(\d{2})/, "$3.$2.$1");
 
-            if (new Date(st) < new Date(advertsCreateDate[adverts[mask]])) {
-              // console.log(
-              //   campaign,
-              //   new Date(st),
-              //   new Date(advertsCreateDate[adverts[mask]])
-              // );
-              continue;
-            }
+            // if ()) {
+            //   // console.log(
+            //   //   campaign,
+            //   //   st,
+            //   //   advertsCreateDate[mask],
+            //   //   new Date(advertsCreateDate[mask].createTime)
+            //   // );
+            //   continue;
+            // }
+            // console.log(date, st);
 
-            const analytics_data = afs.existsSync(
+            const analytics_data = new Date(st) >= new Date(advertsCreateDate[mask].createTime) && afs.existsSync(
               path.join(mainDlDir, `${date}.xlsx`)
             )
               ? xlsx
@@ -527,6 +527,7 @@ function updateAnalyticsOrders(auth, campaign) {
               sum_orders: 0,
               drr: 0,
             };
+            // console.log(st, mask, maskStat);
             if (!(mask in temp)) temp[mask] = {};
             temp[mask][st] = maskStat;
             maskValuesStrartIndex += 1;
@@ -542,8 +543,8 @@ function updateAnalyticsOrders(auth, campaign) {
               temp[mask][st].rashod / (temp[mask][st].shows / 1000);
             temp[mask][st].drr =
               temp[mask][st].rashod / temp[mask][st].sum_orders;
-            // console.log(mask, st, temp[mask][st]);
-            // console.log(temp[mask][st]);
+            // console.log(campaign, mask, st, temp[mask][st]);
+            // console.log(st, mask, temp[mask][st]);
             if (!(st in pivot))
               pivot[st] = {
                 day: new Date(st).toLocaleString("ru-RU", { weekday: "short" }),
@@ -558,13 +559,13 @@ function updateAnalyticsOrders(auth, campaign) {
             pivot[st].drr = pivot[st].rashod / pivot[st].sum_orders;
           }
         }
-        // console.log(pivot);
+        // console.log(temp);
         // return;
         for (let i = 0; i < days.length; i++) {
           for (const j in masks) {
             if (!sheet_data[i]) {
               // sheet_data.push(145);
-              sheet_data.push(sheet_data[0].length);
+              sheet_data.push(rows[0].length);
             }
             let st = days[i];
             if (!st) {
@@ -573,6 +574,7 @@ function updateAnalyticsOrders(auth, campaign) {
             }
             // st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
             sheet_data[i][0] = st;
+            // console.log(st);
             maskValuesStrartIndex = 0;
             // console.log(st, temp[masks[j]][st]);
             if (temp[masks[j]] && temp[masks[j]][st]) {
@@ -591,18 +593,20 @@ function updateAnalyticsOrders(auth, campaign) {
                 maskValuesStrartIndex += 1;
               }
             } else {
-              sheet_data[i] = Array(sheet_data[0].length);
-              sheet_data[i][0] = st;
-              for (const column in columns["Заказы"]) {
-                // console.log(i, [columns["Заказы"][column]]);
-                sheet_data[i][columns["Заказы"][column]] =
-                  data[masks[j]][st].orders;
-              }
-              for (const column in columns["Сумма"]) {
-                // console.log(i, [columns["Заказы"][column]]);
-                sheet_data[i][columns["Сумма"][column]] =
-                  data[masks[j]][st].sum_orders;
-              }
+              // console.log(st, masks[j]);
+              // sheet_data[i] = Array(sheet_data[0].length);
+              // sheet_data[i][0] = st;
+              // for (const column in columns["Заказы"]) {
+              //   // console.log(i, [columns["Заказы"][column]]);
+              //   sheet_data[i][columns["Заказы"][column]] =
+              //     data[masks[j]][st].orders;
+              // }
+              // for (const column in columns["Сумма"]) {
+              //   // console.log(i, [columns["Заказы"][column]]);
+              //   sheet_data[i][columns["Сумма"][column]] =
+              //     data[masks[j]][st].sum_orders;
+              // }
+              // maskValuesStrartIndex += 9;
               // console.log(st, sheet_data[i])
             }
             // console.log(sheet_data[i]);

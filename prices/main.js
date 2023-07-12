@@ -691,7 +691,7 @@ const updateAdvertArtActivitiesAndGenerateNotIncluded = async (campaign) => {
       param: data.params[0].subjectId ?? data.params[0].setId,
     };
     // if (key != "ПР_120") continue;
-    // console.log(key, params);
+    console.log(campaign, key, params);
     await updateAdvertArtActivities(authToken, params);
   }
   // console.log(notIncluded);

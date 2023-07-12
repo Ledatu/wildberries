@@ -132,11 +132,11 @@ const updateAdvertActivity = async () => {
         );
         // notIncludedNMs.replace(',', ',\n')
         if (!Object.entries(notIncludedNMs).length) return;
-        // await sendEmail(
-        //   "as7753333@gmail.com",
-        //   `Неучтённые номенклатуры РК для ${campaign_names[campaign]}`,
-        //   JSON.stringify(notIncludedNMs, null, 2)
-        // );
+        await sendEmail(
+          "as7753333@gmail.com",
+          `Неучтённые номенклатуры РК для ${campaign_names[campaign]}`,
+          JSON.stringify(notIncludedNMs, null, 2)
+        );
         console.log("All tasks completed successfully");
       })
       .catch((error) => {
