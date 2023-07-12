@@ -633,6 +633,7 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
     if (!id) continue;
     const params = { id: id };
     await getAdvertInfo(authToken, params).then((pr) => (data[key] = pr));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return fs
     .writeFile(
