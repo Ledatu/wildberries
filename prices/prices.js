@@ -149,7 +149,9 @@ const updateAdvertActivity = async () => {
 
 const fetchStocksForLowRatingArts = () => {
   return new Promise((resolve, reject) => {
-    fetchAvgRatingsAndWriteToJSON().then(() => updateLowRatingStocksSheet());
+    fetchAvgRatingsAndWriteToJSON().then(() =>
+      updateLowRatingStocksSheet().then(() => resolve())
+    );
   });
 };
 

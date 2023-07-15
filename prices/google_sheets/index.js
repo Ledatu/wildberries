@@ -755,11 +755,6 @@ function updateLowRatingStocksSheet(auth) {
           path.join(__dirname, "../files", campaign, "stocks.json")
         )
       ).today;
-      const artRatings = await JSON.parse(
-        await fs.readFile(
-          path.join(__dirname, "../files", campaign, "artRatings.json")
-        )
-      );
       const avgRatings = await JSON.parse(
         await fs.readFile(
           path.join(__dirname, "../files", campaign, "avgRatings.json")
