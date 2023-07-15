@@ -5,6 +5,8 @@ const {
   fetchNewPricesAndWriteToJSON,
   updateAnalyticsOrders,
   sendEmail,
+  updateLowRatingStocksSheet,
+  fetchAvgRatingsAndWriteToJSON,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -17,6 +19,8 @@ const {
   getKTErrorsAndWriteToJson,
   fetchAdvertInfosAndWriteToJson,
   updateAdvertArtActivitiesAndGenerateNotIncluded,
+  fetchArtsRatings,
+  calcAvgRatingsAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -33,7 +37,7 @@ const {
 // updateAnalyticsOrders("mayusha");
 // sendRKErrors('projecttriggers@gmail.com', 'Ошибки РК', 'Тест');
 // updateAdvertArtActivitiesAndGenerateNotIncluded('mayusha')
-updateAdvertActivity()
+// updateAdvertActivity()
 
 // updateAnalyticsOrders("TKS");
 // updateAnalyticsOrders("delicatus");
@@ -46,6 +50,18 @@ updateAdvertActivity()
 // });
 // fetchOrdersAndWriteToJSON("mayusha");
 // fetchStocksAndWriteToJSON("mayusha")
+// fetchStocksAndWriteToJSON("delicatus")
+// fetchStocksAndWriteToJSON("TKS")
 // calcAvgOrdersAndWriteToJSON("mayusha")
 // updateAnalytics()
 // fetchAdvertInfosAndWriteToJson("mayusha");
+// fetchArtsRatings("mayusha");
+// fetchArtsRatings("delicatus");
+// fetchArtsRatings("TKS");
+const a = async () => {
+  // calcAvgRatingsAndWriteToJSON("mayusha");
+  // calcAvgRatingsAndWriteToJSON("delicatus");
+  // calcAvgRatingsAndWriteToJSON("TKS");
+};
+// a();
+

@@ -347,6 +347,59 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
   });
 }
 
+function fetchAvgRatingsAndWriteToJSON(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const campaigns = (
+      await JSON.parse(
+        await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
+      )
+    ).campaigns;
+    sheets.spreadsheets.values
+      .get({
+        spreadsheetId: "1iEaUSYe4BejADWpS9LgKGADknFwnvrF3Gc3PRS9ibME",
+        range: `рейт!A2:D`,
+      })
+      .then(async (res) => {
+        const rows = res.data.values;
+        for (const campaign of campaigns) {
+          data = {};
+          // console.log(rows);
+          for (const row of rows) {
+            const mask = row[0];
+            if (!mask) continue;
+
+            if (campaign == "mayusha" && !mask.match("ОТК")) continue;
+            if (campaign == "mayusha" && mask.match("ОТК_САВ")) continue;
+
+            if (
+              campaign == "delicatus" &&
+              !mask.match("DELICATUS") &&
+              !mask.match("ОТК_САВ") &&
+              (!mask.match("КПБ") || mask.match("ТКС"))
+            )
+              continue;
+
+            if (campaign == "TKS" && !mask.match("ТКС")) continue;
+
+            data[mask] = parseFloat(row[2] ? row[2].replace(",", ".") : "0");
+          }
+          // console.log(data);
+          await writeDataToFile(
+            data,
+            path.join(__dirname, `../files/${campaign}/avgRatings.json`)
+          );
+          console.log(`${campaign} avgRatings.json created`);
+        }
+        resolve();
+      });
+  }).catch((err) => {
+    console.log(`The API returned an error: ${err}`);
+    reject(err);
+  });
+}
+
 function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
   return new Promise((resolve, reject) => {
     if (campaign == "TKS") {
@@ -683,6 +736,83 @@ function updateAnalyticsOrders(auth, campaign) {
   });
 }
 
+function updateLowRatingStocksSheet(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1iEaUSYe4BejADWpS9LgKGADknFwnvrF3Gc3PRS9ibME",
+      range: `ост!2:700`,
+    });
+
+    const campaigns = (
+      await JSON.parse(
+        await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
+      )
+    ).campaigns;
+    for (const campaign of campaigns) {
+      const stocks = await JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, "../files", campaign, "stocks.json")
+        )
+      ).today;
+      const artRatings = await JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, "../files", campaign, "artRatings.json")
+        )
+      );
+      const avgRatings = await JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, "../files", campaign, "avgRatings.json")
+        )
+      );
+      const vendorCodes = await JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, "../files", campaign, "vendorCodes.json")
+        )
+      );
+      const sheet_data = Array(500);
+      const temp = [];
+      for (const [mask, rating] of Object.entries(avgRatings)) {
+        if (rating >= 4.7) continue;
+        const code = mask.split("_");
+        if (code.includes("НАМАТРАСНИК")) code.splice(1);
+        else if (code.includes("КПБ")) code.splice(3);
+        else code.splice(2);
+        let remask = code.join("_");
+        if (mask.match("_2$")) remask += "*2";
+        // console.log(remask);
+
+        for (const [art, vendorCode] of Object.entries(vendorCodes)) {
+          if (!vendorCode.match(remask)) continue;
+          temp.push([art, vendorCode, stocks[vendorCode] ?? 0, ""]);
+        }
+      }
+      temp.sort((a, b) => {
+        if (b[1] > a[1]) return -1;
+        if (b[1] < a[1]) return 1;
+        return 0;
+      });
+      const position = { mayusha: 0, delicatus: 1, TKS: 2 };
+      for (let i = 0; i < sheet_data.length; i++) {
+        sheet_data[i] = Array(4 * position[campaign]).concat(temp[i]);
+      }
+      // console.log(sheet_data);
+      const update_data = async (data) => {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: "1iEaUSYe4BejADWpS9LgKGADknFwnvrF3Gc3PRS9ibME",
+          range: `ост!2:700`,
+          valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+          resource: {
+            values: data,
+          },
+        });
+      };
+      await update_data(sheet_data);
+    }
+    resolve();
+  });
+}
+
 // Define the function to write data to a JSON file
 const writeDataToFile = (data, filename) => {
   return fs.writeFile(filename, JSON.stringify(data), (err) => {
@@ -900,6 +1030,10 @@ module.exports = {
     const auth = await authorize();
     await fetchEnteredValuesAndWriteToJSON(auth, campaign).catch(console.error);
   },
+  fetchAvgRatingsAndWriteToJSON: async () => {
+    const auth = await authorize();
+    await fetchAvgRatingsAndWriteToJSON(auth).catch(console.error);
+  },
   fetchAnalyticsLastWeekValuesAndWriteToJSON: async (campaign) => {
     const auth = await authorize();
     await fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign).catch(
@@ -917,6 +1051,10 @@ module.exports = {
   copyZakazToOtherSpreadsheet: async () => {
     const auth = await authorize();
     await copyZakazToOtherSpreadsheet(auth).catch(console.error);
+  },
+  updateLowRatingStocksSheet: async () => {
+    const auth = await authorize();
+    await updateLowRatingStocksSheet(auth).catch(console.error);
   },
   sendEmail: async (to, subject, body) => {
     const auth = await authorize();

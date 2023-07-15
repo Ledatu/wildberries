@@ -21,6 +21,8 @@ const {
   copyPricesToDataSpreadsheet,
   updateAnalyticsOrders,
   sendEmail,
+  fetchAvgRatingsAndWriteToJSON,
+  updateLowRatingStocksSheet,
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 const fs = require("fs");
@@ -145,6 +147,12 @@ const updateAdvertActivity = async () => {
   });
 };
 
+const fetchStocksForLowRatingArts = () => {
+  return new Promise((resolve, reject) => {
+    fetchAvgRatingsAndWriteToJSON().then(() => updateLowRatingStocksSheet());
+  });
+};
+
 module.exports = {
   getPrices,
   getDelivery,
@@ -152,4 +160,5 @@ module.exports = {
   updateAnalytics,
   updateAtriculesData,
   updateAdvertActivity,
+  fetchStocksForLowRatingArts,
 };

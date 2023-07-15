@@ -29,6 +29,7 @@ const {
   calcNewValues,
   updateAnalytics,
   updateAdvertActivity,
+  fetchStocksForLowRatingArts,
 } = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
@@ -160,6 +161,11 @@ app.get("/api/updateAdvertActivity", authenticateToken, (req, res) => {
 app.get("/api/analyticsRun", authenticateToken, (req, res) => {
   fetchAnalytics();
   res.send("Analytics is updating...");
+});
+
+app.get("/api/fetchStocksForLowRatingArts", authenticateToken, (req, res) => {
+  fetchStocksForLowRatingArts();
+  res.send("fetchStocksForLowRatingArts is updating...");
 });
 
 app.get("/api/updateAnalytics", authenticateToken, (req, res) => {

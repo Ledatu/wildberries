@@ -90,6 +90,21 @@ const getKTErrors = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
+const getArtRating = (authToken, params) => {
+  return axios
+    .get(
+      "https://feedbacks-api.wildberries.ru/api/v1/feedbacks/products/rating/nmid",
+      {
+        headers: {
+          Authorization: authToken,
+        },
+        params: params,
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const getInfo = (authToken) => {
   return axios
     .get("https://suppliers-api.wildberries.ru/public/api/v1/info", {
@@ -716,6 +731,32 @@ const getKTErrorsAndWriteToJson = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const fetchArtsRatings = async (campaign) => {
+  const authToken = getAuthToken("api-token", campaign);
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const data = {};
+  for (const [nmId, vendorCode] of Object.entries(vendorCodes)) {
+    if (!nmId) continue;
+    const params = { nmId: nmId };
+    await getArtRating(authToken, params).then(
+      (pr) => (data[vendorCode] = pr.data)
+    );
+    console.log(vendorCode, data[vendorCode]);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "artRatings.json"),
+      JSON.stringify(data)
+    )
+    .then(() => console.log("artRatings.json created."))
+    .catch((error) => console.error(error));
+};
+
 const fetchCardsAndWriteToJSON = (campaign) => {
   const authToken = getAuthToken("api-token", campaign);
   const params = {
@@ -936,6 +977,50 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const calcAvgRatingsAndWriteToJSON = (campaign) => {
+  const artRatings = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "artRatings.json"))
+  );
+
+  const temp = {};
+  for (const [vendorCode, data] of Object.entries(artRatings)) {
+    const code = vendorCode.split("_");
+    if (code.slice(-1) == "2") code.pop();
+    if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
+    else if (code.includes("КПБ")) code.splice(3, 1);
+    else code.splice(2, 1);
+
+    const mask = code.join("_");
+
+    if (!(mask in temp))
+      temp[mask] = { sum: 0, feedbacksCount: 0, count: 0, avg: 0 };
+
+    if (!data.valuation || !data.feedbacksCount) continue;
+
+    temp[mask].sum += parseFloat(data.valuation);
+    temp[mask].feedbacksCount += data.feedbacksCount;
+    temp[mask].count += 1;
+    temp[mask].avg = parseFloat((temp[mask].sum / temp[mask].count).toFixed(2));
+
+    if (mask == "ПР_140_ОТК")
+      console.log(vendorCode, data.valuation, temp[mask]);
+  }
+  console.log(temp);
+
+  const avgData = {};
+  for (const [mask, data] of Object.entries(temp)) {
+    avgData[mask] = data.avg;
+  }
+
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "avgRatings.json"),
+      JSON.stringify(avgData)
+    )
+    .then(() => console.log("avgRatings.json created."))
+    .catch((error) => console.error(error));
+};
+
 const calculateNewValuesAndWriteToXlsx = (campaign) => {
   const afs = require("fs");
   const enteredValues = JSON.parse(
@@ -1062,12 +1147,14 @@ module.exports = {
   fetchStocksAndWriteToJSON,
   fetchOrdersAndWriteToJSON,
   calcAvgOrdersAndWriteToJSON,
+  calcAvgRatingsAndWriteToJSON,
   calcAdvertismentAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
   fetchAdvertsAndWriteToJson,
   calculateNewValuesAndWriteToXlsx,
   updatePrices,
   getKTErrorsAndWriteToJson,
+  fetchArtsRatings,
   fetchAdvertInfosAndWriteToJson,
   updateAdvertArtActivitiesAndGenerateNotIncluded,
 };
