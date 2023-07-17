@@ -11,6 +11,7 @@ const {
   calcAvgOrdersAndWriteToJSON,
   fetchAdvertInfosAndWriteToJson,
   updateAdvertArtActivitiesAndGenerateNotIncluded,
+  fetchArtsRatings,
 } = require("./main");
 const {
   writePrices,
@@ -149,7 +150,11 @@ const updateAdvertActivity = async () => {
 
 const fetchStocksForLowRatingArts = () => {
   return new Promise((resolve, reject) => {
-    fetchAvgRatingsAndWriteToJSON().then(() =>
+    const promises = [];
+    for (const campaign of campaigns) {
+      promises.push(fetchArtsRatings(campaign));
+    }
+    Promise.all(promises).then(() =>
       updateLowRatingStocksSheet().then(() => resolve())
     );
   });

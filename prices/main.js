@@ -309,9 +309,22 @@ const writeDataToXlsx = (data, campaign) => {
 
 const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
+  const jsonDataFull = {};
   data.forEach((item) => {
     jsonData[item.nmID] = item.vendorCode.replace(/\s/g, "");
   });
+  data.forEach((item) => {
+    jsonDataFull[item.vendorCode.replace(/\s/g, "")] = {
+      object: item.object,
+      brand: item.brand,
+    };
+  });
+  fs.writeFile(
+    path.join(__dirname, "files", campaign, "vendorCodesFull.json"),
+    JSON.stringify(jsonDataFull)
+  )
+    .then(() => console.log("vendorCodesFull.json created."))
+    .catch((error) => console.error(error));
   return fs
     .writeFile(
       path.join(__dirname, "files", campaign, "vendorCodes.json"),
@@ -732,29 +745,34 @@ const getKTErrorsAndWriteToJson = (campaign) => {
 };
 
 const fetchArtsRatings = async (campaign) => {
-  const authToken = getAuthToken("api-token", campaign);
-  const vendorCodes = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "files", campaign, "vendorCodes.json")
-    )
-  );
-  const data = {};
-  for (const [nmId, vendorCode] of Object.entries(vendorCodes)) {
-    if (!nmId) continue;
-    const params = { nmId: nmId };
-    await getArtRating(authToken, params).then(
-      (pr) => (data[vendorCode] = pr.data)
+  return new Promise(async (resolve, reject) => {
+    const authToken = getAuthToken("api-token", campaign);
+    const vendorCodes = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "vendorCodes.json")
+      )
     );
-    console.log(vendorCode, data[vendorCode]);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  return fs
-    .writeFile(
-      path.join(__dirname, "files", campaign, "artRatings.json"),
-      JSON.stringify(data)
-    )
-    .then(() => console.log("artRatings.json created."))
-    .catch((error) => console.error(error));
+    const data = {};
+    for (const [nmId, vendorCode] of Object.entries(vendorCodes)) {
+      if (!nmId) continue;
+      const params = { nmId: nmId };
+      await getArtRating(authToken, params).then(
+        (pr) => (data[vendorCode] = pr.data)
+      );
+      console.log(vendorCode, data[vendorCode]);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    return fs
+      .writeFile(
+        path.join(__dirname, "files", campaign, "artRatings.json"),
+        JSON.stringify(data)
+      )
+      .then(() => {
+        console.log("artRatings.json created.");
+        resolve();
+      })
+      .catch((error) => console.error(error));
+  });
 };
 
 const fetchCardsAndWriteToJSON = (campaign) => {
@@ -997,10 +1015,10 @@ const calcAvgRatingsAndWriteToJSON = (campaign) => {
 
     if (!data.valuation || !data.feedbacksCount) continue;
 
-    temp[mask].sum += parseFloat(data.valuation);
+    temp[mask].sum += parseFloat(data.valuation) * data.feedbacksCount;
     temp[mask].feedbacksCount += data.feedbacksCount;
-    temp[mask].count += 1;
-    temp[mask].avg = parseFloat((temp[mask].sum / temp[mask].count).toFixed(2));
+    // temp[mask].count += 1;
+    temp[mask].avg = parseFloat((temp[mask].sum / temp[mask].feedbacksCount).toFixed(1));
 
     if (mask == "ПР_140_ОТК")
       console.log(vendorCode, data.valuation, temp[mask]);

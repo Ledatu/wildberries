@@ -21,6 +21,7 @@ const {
   updateAdvertArtActivitiesAndGenerateNotIncluded,
   fetchArtsRatings,
   calcAvgRatingsAndWriteToJSON,
+  fetchCardsAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -28,6 +29,7 @@ const {
   calcNewValues,
   updateAnalytics,
   updateAdvertActivity,
+  fetchStocksForLowRatingArts,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
@@ -38,7 +40,6 @@ const {
 // sendRKErrors('projecttriggers@gmail.com', 'Ошибки РК', 'Тест');
 // updateAdvertArtActivitiesAndGenerateNotIncluded('mayusha')
 // updateAdvertActivity()
-
 // updateAnalyticsOrders("TKS");
 // updateAnalyticsOrders("delicatus");
 // fetchAdvertsAndWriteToJson('TKS')
@@ -58,10 +59,15 @@ const {
 // fetchArtsRatings("mayusha");
 // fetchArtsRatings("delicatus");
 // fetchArtsRatings("TKS");
+// calcAvgRatingsAndWriteToJSON("mayusha");
 const a = async () => {
-  // calcAvgRatingsAndWriteToJSON("mayusha");
   // calcAvgRatingsAndWriteToJSON("delicatus");
   // calcAvgRatingsAndWriteToJSON("TKS");
 };
 // a();
 
+// fetchStocksForLowRatingArts()
+// fetchCardsAndWriteToJSON("mayusha");
+// fetchCardsAndWriteToJSON("delicatus");
+// fetchCardsAndWriteToJSON("TKS");
+// updateLowRatingStocksSheet()

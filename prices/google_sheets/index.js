@@ -741,23 +741,33 @@ function updateLowRatingStocksSheet(auth) {
     const sheets = google.sheets({ version: "v4", auth });
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1iEaUSYe4BejADWpS9LgKGADknFwnvrF3Gc3PRS9ibME",
-      range: `ост!2:700`,
+      range: `Данные!2:700`,
     });
-
-    const campaigns = (
-      await JSON.parse(
-        await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
-      )
-    ).campaigns;
-    for (const campaign of campaigns) {
+    const find_spp = (vendorCode, rows) => {
+      for (const row of rows) {
+        if (row[0] != vendorCode) continue;
+        return row[5];
+      }
+    };
+    const sheet_data = [];
+    const campaigns = await JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
+    );
+    for (const campaign of campaigns.campaigns) {
+      const temp = [];
       const stocks = await JSON.parse(
         await fs.readFile(
           path.join(__dirname, "../files", campaign, "stocks.json")
         )
       ).today;
-      const avgRatings = await JSON.parse(
+      const brandNames = {
+        mayusha: "Маюша",
+        delicatus: "Delicatus",
+        TKS: "ТКС",
+      };
+      const artRatings = await JSON.parse(
         await fs.readFile(
-          path.join(__dirname, "../files", campaign, "avgRatings.json")
+          path.join(__dirname, "../files", campaign, "artRatings.json")
         )
       );
       const vendorCodes = await JSON.parse(
@@ -765,21 +775,41 @@ function updateLowRatingStocksSheet(auth) {
           path.join(__dirname, "../files", campaign, "vendorCodes.json")
         )
       );
-      const sheet_data = Array(500);
-      const temp = [];
-      for (const [mask, rating] of Object.entries(avgRatings)) {
-        if (rating >= 4.7) continue;
-        const code = mask.split("_");
-        if (code.includes("НАМАТРАСНИК")) code.splice(1);
-        else if (code.includes("КПБ")) code.splice(3);
-        else code.splice(2);
-        let remask = code.join("_");
-        if (mask.match("_2$")) remask += "*2";
+      const vendorCodesFull = await JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, "../files", campaign, "vendorCodesFull.json")
+        )
+      );
+      const spp_price_sheet = xlsx.parse(
+        path.join(__dirname, "../files", campaign, "data.xlsx")
+      )[0]["data"];
+      for (const [key, data] of Object.entries(artRatings)) {
+        if (data.valuation >= 4.7) continue;
+        // const code = mask.split("_");
+        // if (code.includes("НАМАТРАСНИК")) code.splice(1);
+        // else if (code.includes("КПБ")) code.splice(3);
+        // else code.splice(2);
+        // let remask = code.join("_");
+        // if (mask.match("_2$")) remask += "*2";
         // console.log(remask);
 
         for (const [art, vendorCode] of Object.entries(vendorCodes)) {
-          if (!vendorCode.match(remask)) continue;
-          temp.push([art, vendorCode, stocks[vendorCode] ?? 0, ""]);
+          if (vendorCode != key || !stocks[vendorCode]) continue;
+          temp.push([
+            vendorCode,
+            art,
+            vendorCodesFull[vendorCode].object,
+            vendorCodesFull[vendorCode].brand,
+            data.valuation ?? "0",
+            data.feedbacksCount,
+            data.feedbacksCount
+              ? Math.ceil(
+                  (data.feedbacksCount * (4.7 - data.valuation ?? 0)) / 0.3
+                )
+              : 3,
+            stocks[vendorCode] ?? 0,
+            find_spp(vendorCode, spp_price_sheet),
+          ]);
         }
       }
       temp.sort((a, b) => {
@@ -787,23 +817,22 @@ function updateLowRatingStocksSheet(auth) {
         if (b[1] < a[1]) return 1;
         return 0;
       });
-      const position = { mayusha: 0, delicatus: 1, TKS: 2 };
-      for (let i = 0; i < sheet_data.length; i++) {
-        sheet_data[i] = Array(4 * position[campaign]).concat(temp[i]);
-      }
-      // console.log(sheet_data);
-      const update_data = async (data) => {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: "1iEaUSYe4BejADWpS9LgKGADknFwnvrF3Gc3PRS9ibME",
-          range: `ост!2:700`,
-          valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
-          resource: {
-            values: data,
-          },
-        });
-      };
-      await update_data(sheet_data);
+      for (let i = 0; i < temp.length; i++) sheet_data.push(temp[i]);
+      // console.log(temp, sheet_data);
     }
+
+    // console.log(sheet_data);
+    const update_data = async (data) => {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: "1iEaUSYe4BejADWpS9LgKGADknFwnvrF3Gc3PRS9ibME",
+        range: `Данные!2:700`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: data,
+        },
+      });
+    };
+    await update_data(sheet_data);
     resolve();
   });
 }
