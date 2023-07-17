@@ -885,37 +885,38 @@ const calcAdvertismentAndWriteToJSON = (campaign) => {
 };
 
 const calcAvgOrdersAndWriteToJSON = (campaign) => {
-  // const orders_by_day = JSON.parse(
-  //   afs.readFileSync(
-  //     path.join(__dirname, "files", campaign, "orders by day.json")
-  //   )
-  // );
+  const orders_by_day = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "orders by day.json")
+    )
+  );
   const stocks = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
   );
-  const orders_by_day = {};
-  for (let i = 0; i < 29; i++) {
-    const temp_date_for_calc = new Date();
-    temp_date_for_calc.setDate(temp_date_for_calc.getDate() - i);
-    const str_date_today = temp_date_for_calc.toISOString().slice(0, 10);
-    temp_date_for_calc.setDate(temp_date_for_calc.getDate() - 1);
-    const str_date_yesterday = temp_date_for_calc.toISOString().slice(0, 10);
+  // const orders_by_day = {};
+  // for (let i = 0; i < 29; i++) {
+  //   const temp_date_for_calc = new Date();
+  //   temp_date_for_calc.setDate(temp_date_for_calc.getDate() - i);
+  //   const str_date_today = temp_date_for_calc.toISOString().slice(0, 10);
+  //   temp_date_for_calc.setDate(temp_date_for_calc.getDate() - 1);
+  //   const str_date_yesterday = temp_date_for_calc.toISOString().slice(0, 10);
 
-    console.log(str_date_today, str_date_yesterday);
-    for (const art in stocks[str_date_today]) {
-      if (!(str_date_today in orders_by_day))
-        orders_by_day[str_date_today] = {};
-      if (!(art in orders_by_day[str_date_today]))
-        orders_by_day[str_date_today][art] = 0;
+  //   console.log(str_date_today, str_date_yesterday);
+  //   for (const art in stocks[str_date_today]) {
+  //     if (!(str_date_today in orders_by_day))
+  //       orders_by_day[str_date_today] = {};
+  //     if (!(art in orders_by_day[str_date_today]))
+  //       orders_by_day[str_date_today][art] = 0;
 
-      if (!(str_date_today in stocks)) continue;
-      if (!(str_date_yesterday in stocks)) continue;
+  //     if (!(str_date_today in stocks)) continue;
+  //     if (!(str_date_yesterday in stocks)) continue;
 
-      orders_by_day[str_date_today][art] =
-        stocks[str_date_yesterday][art] - stocks[str_date_today][art];
-    }
-  }
-  console.log(orders_by_day);
+  //     orders_by_day[str_date_today][art] =
+  //       stocks[str_date_yesterday][art] - stocks[str_date_today][art];
+  //   }
+  // }
+
+  // console.log(orders_by_day);
   const calcAvgOrders = (jsonData, date, avgs = undefined) => {
     for (const supplierArticle in orders_by_day[date]) {
       if (
