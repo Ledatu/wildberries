@@ -116,6 +116,32 @@ const getInfo = (authToken) => {
     .catch((error) => console.error(error));
 };
 
+const getWarehouses = (authToken) => {
+  return axios
+    .get("https://suppliers-api.wildberries.ru/api/v3/offices", {
+      headers: {
+        Authorization: authToken,
+      },
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const getWarehouseStocks = (authToken, warehouseId, params) => {
+  return axios
+    .post(
+      `https://suppliers-api.wildberries.ru/api/v3/stocks/${warehouseId}`,
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const getCards = (authToken, params) => {
   return axios
     .post(
@@ -307,6 +333,16 @@ const writeDataToXlsx = (data, campaign) => {
     .catch((error) => console.error(error));
 };
 
+const writeWarehousesToJson = (data, campaign) => {
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "warehouses.json"),
+      JSON.stringify(data)
+    )
+    .then(() => console.log("warehouses.json created."))
+    .catch((error) => console.error(error));
+};
+
 const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
   const jsonDataFull = {};
@@ -317,6 +353,7 @@ const writeVendorCodeToJson = (data, campaign) => {
     jsonDataFull[item.vendorCode.replace(/\s/g, "")] = {
       object: item.object,
       brand: item.brand,
+      skus: item.sizes[0].skus[0],
     };
   });
   fs.writeFile(
@@ -376,6 +413,13 @@ const writeKTErrorsToJson = (data, campaign) => {
 };
 
 const writeStocksToJson = async (data, campaign, date) => {
+  fs.writeFile(
+    path.join(__dirname, "files", campaign, "stocksFull.json"),
+    JSON.stringify(data)
+  )
+    .then(() => console.log("stocks.json created."))
+    .catch((error) => console.error(error));
+
   const stocks = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
   );
@@ -640,6 +684,60 @@ const fetchDataAndWriteToXlsx = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const fetchWarehouses = (campaign) => {
+  const authToken = getAuthToken("api-token", campaign);
+  return getWarehouses(authToken)
+    .then((data) => {
+      return writeWarehousesToJson(data, campaign);
+    })
+    .catch((error) => console.error(error));
+};
+
+const fetchStocksFromWarehouses = async (campaign) => {
+  const authToken = getAuthToken("api-token", campaign);
+  // await fetchWarehouses(campaign);
+  const vendorCodesFull = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodesFull.json")
+    )
+  );
+  const skus = [];
+  for (const [key, data] of Object.entries(vendorCodesFull)) {
+    skus.push(data.skus);
+  }
+  console.log(skus);
+  const warehouses = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "warehouses.json"))
+  );
+  const data = {};
+  for (const [index, warehouse] of Object.entries(warehouses)) {
+    // console.log(key, id);
+    // if (!warehouse.selected) continue;
+    console.log(warehouse);
+
+    await getWarehouseStocks(authToken, warehouse.id, {
+      skus: skus,
+    }).then((pr) => {
+      console.log(warehouse, pr);
+      for (const art of pr.stocks) {
+        for (const [key, data] of Object.entries(vendorCodesFull)) {
+          if (data.skus != art.sku) continue;
+          if (!(key in data)) data[key] = 0;
+          data[key] += art.amount;
+        }
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "warehouseStocks.json"),
+      JSON.stringify(data)
+    )
+    .then(() => console.log("warehouseStocks.json created."))
+    .catch((error) => console.error(error));
+};
+
 const fetchAdvertsAndWriteToJson = (campaign) => {
   const authToken = getAuthToken("api-advert-token", campaign);
   const params = {};
@@ -815,7 +913,7 @@ const fetchStocksAndWriteToJSON = (campaign) => {
   const date = dateFrom.toISOString().slice(0, 10);
   // console.log(date);
   const params = {
-    dateFrom: date,
+    dateFrom: "2019-06-20",
   };
   return getStocks(authToken, params)
     .then((data) => writeStocksToJson(data, campaign, date_today))
@@ -1019,7 +1117,9 @@ const calcAvgRatingsAndWriteToJSON = (campaign) => {
     temp[mask].sum += parseFloat(data.valuation) * data.feedbacksCount;
     temp[mask].feedbacksCount += data.feedbacksCount;
     // temp[mask].count += 1;
-    temp[mask].avg = parseFloat((temp[mask].sum / temp[mask].feedbacksCount).toFixed(1));
+    temp[mask].avg = parseFloat(
+      (temp[mask].sum / temp[mask].feedbacksCount).toFixed(1)
+    );
 
     if (mask == "ПР_140_ОТК")
       console.log(vendorCode, data.valuation, temp[mask]);
@@ -1160,6 +1260,7 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
 };
 
 module.exports = {
+  fetchStocksFromWarehouses,
   fetchDataAndWriteToXlsx,
   fetchCardsAndWriteToJSON,
   fetchCardsTempAndWriteToJSON,

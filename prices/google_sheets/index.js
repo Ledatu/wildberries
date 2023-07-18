@@ -760,11 +760,6 @@ function updateLowRatingStocksSheet(auth) {
           path.join(__dirname, "../files", campaign, "stocks.json")
         )
       ).today;
-      const brandNames = {
-        mayusha: "Маюша",
-        delicatus: "Delicatus",
-        TKS: "ТКС",
-      };
       const artRatings = await JSON.parse(
         await fs.readFile(
           path.join(__dirname, "../files", campaign, "artRatings.json")
@@ -785,14 +780,19 @@ function updateLowRatingStocksSheet(auth) {
       )[0]["data"];
       for (const [key, data] of Object.entries(artRatings)) {
         if (data.valuation >= 4.7) continue;
-        // const code = mask.split("_");
         // if (code.includes("НАМАТРАСНИК")) code.splice(1);
         // else if (code.includes("КПБ")) code.splice(3);
         // else code.splice(2);
         // let remask = code.join("_");
         // if (mask.match("_2$")) remask += "*2";
         // console.log(remask);
-
+        const code = key.split("_");
+        if (
+          code[0].match("ПР") &&
+          ["120", "140", "180"].includes(code[1]) &&
+          code.slice(-1) != "2"
+        )
+          continue;
         for (const [art, vendorCode] of Object.entries(vendorCodes)) {
           if (vendorCode != key || !stocks[vendorCode]) continue;
           temp.push([
