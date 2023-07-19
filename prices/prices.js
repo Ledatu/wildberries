@@ -123,7 +123,7 @@ const updateAdvertActivity = async () => {
   };
   campaigns.forEach(async (campaign) => {
     Promise.all([
-      await fetchAdsIdsAndWriteToJSON(campaign),
+      await fetchAdvertsAndWriteToJson(campaign),
       await fetchAdvertInfosAndWriteToJson(campaign),
       await updateAdvertArtActivitiesAndGenerateNotIncluded(campaign),
     ])

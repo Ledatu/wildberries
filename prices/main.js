@@ -389,6 +389,7 @@ const writeCardsTempToJson = (data, campaign) => {
 const writeAdvertsToJson = (data, campaign) => {
   const jsonData = {};
   data.forEach((item) => {
+    if (item.status == 7) return;
     jsonData[item.advertId] = new Date(item.createTime)
       .toISOString()
       .slice(0, 10);
@@ -408,7 +409,7 @@ const writeKTErrorsToJson = (data, campaign) => {
       path.join(__dirname, "files", campaign, "KTerrors.json"),
       JSON.stringify(data)
     )
-    .then(() => console.log("adverts.json created."))
+    .then(() => console.log("KTerrors.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -526,6 +527,46 @@ const writeOrdersToJson = (data, campaign, date) => {
     ),
   ])
     .then(() => console.log("orders by days.json created."))
+    .catch((error) => console.error(error));
+};
+
+const calcOrdersFromDetailedByPeriodAndWriteToJSON = (campaign) => {
+  const detailedByPeriodFull = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "detailedByPeriod_full.json")
+    )
+  );
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const createBlank = () => {
+    const result = {};
+    for (const [art, key] of Object.entries(vendorCodes)) {
+      result[key] = 0;
+    }
+    return result;
+  };
+  const temp = {};
+  const jsonData = {};
+  for (const [index, realization] of Object.entries(detailedByPeriodFull)) {
+    if (!(realization.rid in temp)) temp[realization.rid] = true;
+    else continue;
+    // console.log(index, realization);
+    // if (realization.doc_type_name != "Продажа") continue;
+    if (!realization.order_dt) continue;
+    const date = realization.order_dt.slice(0, 10);
+    if (!(date in jsonData)) jsonData[date] = createBlank();
+    jsonData[date][realization.sa_name] += 1;
+  }
+  console.log(jsonData, temp);
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "orders by day.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("orders by day.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -750,15 +791,15 @@ const fetchAdvertsAndWriteToJson = (campaign) => {
 
 const fetchAdvertInfosAndWriteToJson = async (campaign) => {
   const authToken = getAuthToken("api-advert-token", campaign);
-  const adsIds = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", campaign, "adsIds.json"))
+  const adverts = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "adverts.json"))
   );
   const data = {};
-  for (const [key, id] of Object.entries(adsIds)) {
+  for (const [id, create_dt] of Object.entries(adverts)) {
     // console.log(key, id);
     if (!id) continue;
     const params = { id: id };
-    await getAdvertInfo(authToken, params).then((pr) => (data[key] = pr));
+    await getAdvertInfo(authToken, params).then((pr) => (data[pr.name] = pr));
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return fs
@@ -1053,7 +1094,7 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
     const order_date = new Date(order_data_date);
     // console.log(order_date, dateFrom);
     if (
-      order_date < dateFrom ||
+      // order_date < dateFrom ||
       order_data_date == new Date().toISOString().slice(0, 10)
     ) {
       continue;
@@ -1277,6 +1318,7 @@ module.exports = {
   fetchArtsRatings,
   fetchAdvertInfosAndWriteToJson,
   updateAdvertArtActivitiesAndGenerateNotIncluded,
+  calcOrdersFromDetailedByPeriodAndWriteToJSON,
 };
 
 const indexToColumn = (index) => {

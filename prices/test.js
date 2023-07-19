@@ -22,6 +22,7 @@ const {
   fetchArtsRatings,
   calcAvgRatingsAndWriteToJSON,
   fetchCardsAndWriteToJSON,
+  calcOrdersFromDetailedByPeriodAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -53,7 +54,6 @@ const {
 // fetchStocksAndWriteToJSON("mayusha")
 // fetchStocksAndWriteToJSON("delicatus")
 // fetchStocksAndWriteToJSON("TKS")
-// calcAvgOrdersAndWriteToJSON("mayusha")
 // updateAnalytics()
 // fetchAdvertInfosAndWriteToJson("mayusha");
 // fetchArtsRatings("mayusha");
@@ -71,3 +71,7 @@ const a = async () => {
 // fetchCardsAndWriteToJSON("delicatus");
 // fetchCardsAndWriteToJSON("TKS");
 // updateLowRatingStocksSheet()
+
+// calcAvgOrdersAndWriteToJSON("mayusha");
+updateAdvertActivity()
+// calcOrdersFromDetailedByPeriodAndWriteToJSON("mayusha");
