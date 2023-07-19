@@ -935,7 +935,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
       if (row[1] > 0) {
         const array = row[0].split("_");
         if (array[0] == "ПР" || array[0] == "ПРПЭ") {
-          if (array[1] == "120" || array[1] == "140" || array[1] == "180") {
+          if (array[1] == "120" || array[1] == "140" || array[1] == "180" || array[1] == "200") {
             if (array.slice(-1)[0] != "2") return;
           }
         }
