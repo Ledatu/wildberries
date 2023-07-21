@@ -789,7 +789,7 @@ function updateLowRatingStocksSheet(auth) {
         const code = key.split("_");
         if (
           code[0].match("ПР") &&
-          ["120", "140", "180"].includes(code[1]) &&
+          ["120", "140", "180", "200"].includes(code[1]) &&
           code.slice(-1) != "2"
         )
           continue;
