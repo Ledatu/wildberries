@@ -575,7 +575,7 @@ function updateAnalyticsOrders(auth, campaign) {
               ctr: 0,
               crc: 0,
               crm: 0,
-              rashod: parseInt(String(analytics_data[9]).replace(/\s/g, "")),
+              rashod: parseInt(String(analytics_data[new Date(st) >= new Date('2023-07-14') ? 11 : 9]).replace(/\s/g, "")),
               orders: 0,
               sum_orders: 0,
               drr: 0,
@@ -845,6 +845,66 @@ const writeDataToFile = (data, filename) => {
   });
 };
 
+async function generateAdvertSpreadsheet(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sourceSpreadsheetId = "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ";
+    const destinationSpreadsheetId =
+      "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs";
+
+    const sheets = google.sheets({ version: "v4", auth });
+    const update_data = async (data) => {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: destinationSpreadsheetId,
+        range: `Данные!J2:J`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: data,
+        },
+      });
+    };
+    const prices_rows = (
+      await sheets.spreadsheets.values.get({
+        spreadsheetId: sourceSpreadsheetId,
+        range: `ЦЕНЫ+ШК!D2:F`,
+      })
+    ).data.values;
+
+    const prices = {};
+    prices_rows.forEach((row) => {
+      if (!row[0]) return;
+      prices[row[0]] = Number(row[2]);
+    });
+
+    // console.log(prices);
+
+    const data_rows = (
+      await sheets.spreadsheets.values.get({
+        spreadsheetId: destinationSpreadsheetId,
+        range: `Данные!A2:A`,
+      })
+    ).data.values;
+
+    const data = [];
+    data_rows.forEach((row) => {
+      let regex = row[0].split("_").slice(0, 2).join("_");
+      if (row[0].includes("КПБ")) {
+        if (row[0].includes("СТРАЙП")) regex += "_СТРАЙП";
+        if (row[0].includes("МОНТЕ")) regex += "_МОНТЕ";
+      }
+      if (row[0].includes("НАМАТРАСНИК")) {
+        regex += "_ОТК";
+      }
+      if (row[0].includes("ТКС")) {
+        regex += "_ТКС";
+      }
+      // console.log(regex, prices[regex]);
+      data.push([prices[regex]]);
+    });
+
+    await update_data(data).then((pr) => resolve());
+  });
+}
+
 async function copyPricesToDataSpreadsheet(auth) {
   return new Promise(async (resolve, reject) => {
     const sourceSpreadsheetId = "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ";
@@ -1067,6 +1127,10 @@ module.exports = {
   updateAnalyticsOrders: async (campaign) => {
     const auth = await authorize();
     await updateAnalyticsOrders(auth, campaign).catch(console.error);
+  },
+  generateAdvertSpreadsheet: async () => {
+    const auth = await authorize();
+    return await generateAdvertSpreadsheet(auth).catch(console.error);
   },
   copyPricesToDataSpreadsheet: async () => {
     const auth = await authorize();
