@@ -28,7 +28,7 @@ module.exports = {
         //    console.log(file, data)
         const shows = data[2];
         const clicks = data[3];
-        const rashod = data[9];
+        const rashod = data[11];
         
         resultSheet.push(to_push);
       });
