@@ -83,9 +83,9 @@ const a = async () => {
 // fetchCardsAndWriteToJSON('delicatus')
 // fetchCardsAndWriteToJSON('TKS')
 // fetchOrdersAndWriteToJSON("mayusha");
-fetchAdverts()
+// fetchAdverts()
 // fetchAdvertsAndWriteToJson("mayusha");
 // fetchAdvertInfosAndWriteToJson("mayusha");
 // fetchAdvertStatsAndWriteToJson("mayusha");
 // getAdvertStatByMaskByDayAndWriteToJSON('mayusha')
-// updatePlanFact('mayusha')
+updatePlanFact('mayusha')

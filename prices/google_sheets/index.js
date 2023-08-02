@@ -507,21 +507,22 @@ function updatePlanFact(auth, campaign) {
     const fact = fact_res.data.values;
     for (const [date, masks] of Object.entries(advertStatsByMaskByDay)) {
       if (new Date().toISOString().slice(0, 7) != date.slice(0, 7)) continue;
-      for (const [mask, maskData] of Object.entries(masks)) {
+      for (const [temp_mask, maskData] of Object.entries(masks)) {
         let sum_orders_mask = 0;
         // console.log(date, mask, maskData);
         if (!sum_orders[date]) {
-          console.log(date, mask, maskData);
+          console.log(date, temp_mask, maskData);
           continue;
         }
+        const mask_splitted = temp_mask.split("_");
+        mask_splitted.pop();
+        if (temp_mask.includes("НАМАТРАСНИК")) {
+          if (campaign == "delicatus") mask_splitted.pop();
+        }
+        const mask = mask_splitted.join("_");
+
         for (const [art, sum] of Object.entries(sum_orders[date])) {
-          const mask_splitted = mask.split("_");
-          mask_splitted.pop();
-          if (mask.includes("НАМАТРАСНИК")) {
-            if (campaign == "delicatus") mask_splitted.pop();
-            mask_splitted[0] = "НАМАТРАСНИКИ";
-          }
-          if (!art.includes(mask_splitted.join("_"))) continue;
+          if (!art.includes(mask)) continue;
           // console.log(art, sum);
           sum_orders_mask += sum;
         }
