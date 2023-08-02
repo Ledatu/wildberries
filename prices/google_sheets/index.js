@@ -514,8 +514,10 @@ function updatePlanFact(auth, campaign) {
         for (const [art, sum] of Object.entries(sum_orders[date])) {
           const mask_splitted = mask.split("_");
           mask_splitted.pop();
-          if (campaign == "delicatus" && mask.includes("НАМАТРАСНИК"))
-            mask_splitted.pop();
+          if (mask.includes("НАМАТРАСНИК")) {
+            if (campaign == "delicatus") mask_splitted.pop();
+            mask_splitted[0] = "НАМАТРАСНИКИ";
+          }
           if (!art.includes(mask_splitted.join("_"))) continue;
           // console.log(art, sum);
           sum_orders_mask += sum;
