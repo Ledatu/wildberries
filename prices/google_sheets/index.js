@@ -454,6 +454,95 @@ function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
   });
 }
 
+function updatePlanFact(auth, campaign) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const sum_orders = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "sum of orders by day.json")
+      )
+    );
+
+    const advertStatsByMaskByDay = await JSON.parse(
+      await fs.readFile(
+        path.join(
+          __dirname,
+          "../files",
+          campaign,
+          "advert stats by mask by day.json"
+        )
+      )
+    );
+
+    const spIds = {
+      mayusha: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      delicatus: "1Z5VcVioLbQiIz9yLX-jtd-tlNphqPDAEuLsosUxQZDQ",
+    };
+    if (!(campaign in spIds)) {
+      resolve();
+      return;
+    }
+    const temp_plan_res = await sheets.spreadsheets.values.get({
+      spreadsheetId: spIds[campaign],
+      range: "План!2:100",
+    });
+    const temp_plan = temp_plan_res.data.values;
+    const plan = {};
+    for (let i = 0; i < temp_plan.length; i++) {
+      const row = temp_plan[i];
+      if (!row[0]) continue;
+      plan[row[0]] = {
+        budget_day: parseInt(row[1].replace(/\s/g, "")),
+        sum_orders_day: parseInt(row[2].replace(/\s/g, "")),
+        sum_orders_month: parseInt(row[3].replace(/\s/g, "")),
+        drr: parseFloat(row[4].replace(/,/g, ".").replace(/\s/g, "")),
+      };
+    }
+
+    const fact_res = await sheets.spreadsheets.values.get({
+      spreadsheetId: spIds[campaign],
+      range: "Факт!A3:A",
+    });
+    const fact = fact_res.data.values;
+    for (const [date, masks] of Object.entries(advertStatsByMaskByDay)) {
+      if (new Date().toISOString().slice(0, 7) != date.slice(0, 7)) continue;
+      for (const [mask, maskData] of Object.entries(masks)) {
+        let sum_orders_mask = 0;
+        // console.log(date, mask, maskData);
+        if (!sum_orders[date]) continue;
+        for (const [art, sum] of Object.entries(sum_orders[date])) {
+          const mask_splitted = mask.split("_");
+          mask_splitted.pop();
+          if (campaign == "delicatus" && mask.includes("НАМАТРАСНИК"))
+            mask_splitted.pop();
+          if (!art.includes(mask_splitted.join("_"))) continue;
+          // console.log(art, sum);
+          sum_orders_mask += sum;
+        }
+
+        for (let i = 0; i < fact.length; i++) {
+          if (!mask.includes(fact[i][0])) continue;
+          const drr = maskData.sum / sum_orders_mask;
+          const to_push = [maskData.sum, sum_orders_mask, drr];
+          fact[i] = fact[i].concat(to_push);
+          // console.log(mask, fact[i], to_push);
+        }
+      }
+    }
+    sheets.spreadsheets.values
+      .update({
+        spreadsheetId: spIds[campaign],
+        range: `Факт!3:1000`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: fact,
+        },
+      })
+      .then((pr) => resolve());
+  });
+}
+
 function updateAnalyticsOrders(auth, campaign) {
   return new Promise(async (resolve, reject) => {
     const orders = await JSON.parse(
@@ -575,7 +664,13 @@ function updateAnalyticsOrders(auth, campaign) {
               ctr: 0,
               crc: 0,
               crm: 0,
-              rashod: parseInt(String(analytics_data[new Date(st) >= new Date('2023-07-14') ? 11 : 9]).replace(/\s/g, "")),
+              rashod: parseInt(
+                String(
+                  analytics_data[
+                    new Date(st) >= new Date("2023-07-14") ? 11 : 9
+                  ]
+                ).replace(/\s/g, "")
+              ),
               orders: 0,
               sum_orders: 0,
               drr: 0,
@@ -995,7 +1090,12 @@ async function copyZakazToOtherSpreadsheet(auth) {
       if (row[1] > 0) {
         const array = row[0].split("_");
         if (array[0] == "ПР" || array[0] == "ПРПЭ") {
-          if (array[1] == "120" || array[1] == "140" || array[1] == "180" || array[1] == "200") {
+          if (
+            array[1] == "120" ||
+            array[1] == "140" ||
+            array[1] == "180" ||
+            array[1] == "200"
+          ) {
             if (array.slice(-1)[0] != "2") return;
           }
         }
@@ -1127,6 +1227,10 @@ module.exports = {
   updateAnalyticsOrders: async (campaign) => {
     const auth = await authorize();
     await updateAnalyticsOrders(auth, campaign).catch(console.error);
+  },
+  updatePlanFact: async (campaign) => {
+    const auth = await authorize();
+    await updatePlanFact(auth, campaign).catch(console.error);
   },
   generateAdvertSpreadsheet: async () => {
     const auth = await authorize();

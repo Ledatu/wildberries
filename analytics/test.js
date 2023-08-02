@@ -4,7 +4,8 @@ const { parseXlsx } = require("./mp_manager/excelParser");
 const { analyticsOneTimeRun } = require("./oneTimeRun");
 
 // analyticsOneTimeRun();
-fetchAdsIdsAndWriteToJSON('mayusha')
-fetchAdsIdsAndWriteToJSON('delicatus')
-fetchAdsIdsAndWriteToJSON('tks')
+// fetchAdsIdsAndWriteToJSON('mayusha')
+// fetchAdsIdsAndWriteToJSON('delicatus')
+// fetchAdsIdsAndWriteToJSON('tks')
 // fetchAnalytics()
+parseXlsx()

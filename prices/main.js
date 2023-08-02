@@ -3,7 +3,7 @@ const axios = require("axios");
 const fs = require("fs").promises;
 const afs = require("fs");
 const path = require("path");
-const { fetchHandStocks } = require("./google_sheets");
+const { fetchHandStocks, sendEmail } = require("./google_sheets");
 
 const sortData = (data) => {
   const header = data.shift(); // Remove the header row and store it in a variable
@@ -58,6 +58,18 @@ const getAdverts = (authToken, params) => {
 const getAdvertInfo = (authToken, params) => {
   return axios
     .get("https://advert-api.wb.ru/adv/v0/advert", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const getAdvertStat = (authToken, params) => {
+  return axios
+    .get("https://advert-api.wb.ru/adv/v1/fullstat", {
       headers: {
         Authorization: authToken,
       },
@@ -388,8 +400,10 @@ const writeCardsTempToJson = (data, campaign) => {
 
 const writeAdvertsToJson = (data, campaign) => {
   const jsonData = {};
+  const two_days_ago = new Date();
+  two_days_ago.setDate(two_days_ago.getDate() - 2);
   data.forEach((item) => {
-    if (item.status == 7) return;
+    if (item.status == 7 && new Date(item.endTime) < two_days_ago) return;
     jsonData[item.advertId] = new Date(item.createTime)
       .toISOString()
       .slice(0, 10);
@@ -455,9 +469,15 @@ const writeStocksToJson = async (data, campaign, date) => {
 };
 
 const writeOrdersToJson = (data, campaign, date) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date(
+    new Date()
+      .toLocaleDateString()
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+  )
+    .toISOString()
+    .slice(0, 10);
   const dateFrom = new Date(date);
-  console.log(dateFrom);
+  console.log(today, dateFrom);
   const jsonData = {};
   const orderSumJsonData = {};
 
@@ -567,6 +587,63 @@ const calcOrdersFromDetailedByPeriodAndWriteToJSON = (campaign) => {
       JSON.stringify(jsonData)
     )
     .then(() => console.log("orders by day.json created."))
+    .catch((error) => console.error(error));
+};
+
+const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
+  const advertInfos = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advertInfos.json")
+    )
+  );
+  const advertStats = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advertStats.json")
+    )
+  );
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  let asdad = 0;
+  const jsonData = {};
+  for (const [name, rkData] of Object.entries(advertStats)) {
+    for (const [index, day] of Object.entries(rkData.days)) {
+      const date = day.date.slice(0, 10);
+      // console.log(date);
+      if (!(date in jsonData)) jsonData[date] = {};
+      for (const [index, app] of Object.entries(day.apps)) {
+        for (const [index, nm] of Object.entries(app.nm)) {
+          if (!nm.nmId) continue;
+          // console.log(nm.nmId, vendorCodes[nm.nmId]);
+          const mask = getMaskFromVendorCode(vendorCodes[nm.nmId]);
+          if (!(mask in jsonData[date]))
+            jsonData[date][mask] = { views: 0, clicks: 0, sum: 0 };
+          jsonData[date][mask].views += nm.views;
+          jsonData[date][mask].clicks += nm.clicks;
+          jsonData[date][mask].sum += nm.sum;
+          if (date == "2023-08-01") {
+            // console.log(nm.sum);
+            asdad += nm.sum;
+          }
+        }
+      }
+    }
+  }
+  // console.log(jsonData, asdad);
+
+  return fs
+    .writeFile(
+      path.join(
+        __dirname,
+        "files",
+        campaign,
+        "advert stats by mask by day.json"
+      ),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("advert stats by mask by day.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -794,20 +871,87 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
   const adverts = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "adverts.json"))
   );
-  const data = {};
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const jsonData = {};
   for (const [id, create_dt] of Object.entries(adverts)) {
     // console.log(key, id);
     if (!id) continue;
     const params = { id: id };
-    await getAdvertInfo(authToken, params).then((pr) => (data[pr.name] = pr));
+    await getAdvertInfo(authToken, params).then(
+      (pr) => (jsonData[pr.name] = pr)
+    );
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  // check that RK contains only one type of mask and send(toggleable) inform email if violated
+  const violated_rks = {};
+  for (const [name, rkData] of Object.entries(jsonData)) {
+    const type = "params" in rkData ? "standard" : "auto";
+    const nms =
+      type == "standard" ? rkData.params[0].nms : rkData.autoParams.nms;
+    const mask = getMaskFromVendorCode(
+      vendorCodes[type == "standard" ? nms[0].nm : nms[0]]
+    );
+    console.log(vendorCodes[type == "standard" ? nms[0].nm : nms[0]], mask);
+    for (const [index, nmData] of Object.entries(nms)) {
+      const nm = type == "standard" ? nmData.nm : nmData;
+      if (mask != getMaskFromVendorCode(vendorCodes[nm])) {
+        if (!(name in violated_rks)) violated_rks[name] = [];
+        violated_rks[name].push(nm);
+      }
+    }
+  }
+  // console.log(violated_rks)
+  fs.writeFile(
+    path.join(__dirname, "files", campaign, "violatedRKs.json"),
+    JSON.stringify(violated_rks)
+  )
+    .then(() => console.log("violatedRKs.json created."))
+    .catch((error) => console.error(error));
+  if (0) {
+    sendEmail(
+      "zavoronok.danila@gmail.com",
+      "violated",
+      JSON.stringify(violated_rks, null, 2)
+    );
+  }
+
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "advertInfos.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("advertInfos.json created."))
+    .catch((error) => console.error(error));
+};
+
+const fetchAdvertStatsAndWriteToJson = async (campaign) => {
+  const authToken = getAuthToken("api-advert-token", campaign);
+  const adverts = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advertInfos.json")
+    )
+  );
+  const jsonData = {};
+  for (const [key, data] of Object.entries(adverts)) {
+    if (!data.advertId) continue;
+    const params = { id: data.advertId };
+    await getAdvertStat(authToken, params).then((pr) => {
+      jsonData[key] = pr;
+      console.log(key, data.advertId);
+    });
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return fs
     .writeFile(
-      path.join(__dirname, "files", campaign, "advertInfos.json"),
-      JSON.stringify(data)
+      path.join(__dirname, "files", campaign, "advertStats.json"),
+      JSON.stringify(jsonData)
     )
-    .then(() => console.log("advertInfos.json created."))
+    .then(() => console.log("advertStats.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -1060,9 +1204,9 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
     for (const supplierArticle in orders_by_day[date]) {
       if (
         supplierArticle &&
-        stocks[date] &&
-        stocks[date][supplierArticle] && // Stocks based
-        stocks[date][supplierArticle] >= orders_by_day[date][supplierArticle] &&
+        // stocks[date] &&
+        // stocks[date][supplierArticle] && // Stocks based
+        // stocks[date][supplierArticle] >= orders_by_day[date][supplierArticle] &&
         orders_by_day[date][supplierArticle] > 0 && // orders_by_day[date][supplierArticle] > 0 // Orders based
         (avgs
           ? orders_by_day[date][supplierArticle] >= avgs[supplierArticle]
@@ -1142,14 +1286,7 @@ const calcAvgRatingsAndWriteToJSON = (campaign) => {
 
   const temp = {};
   for (const [vendorCode, data] of Object.entries(artRatings)) {
-    const code = vendorCode.split("_");
-    if (code.slice(-1) == "2") code.pop();
-    if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
-    else if (code.includes("КПБ")) code.splice(3, 1);
-    else code.splice(2, 1);
-
-    const mask = code.join("_");
-
+    const mask = getMaskFromVendorCode(vendorCode);
     if (!(mask in temp))
       temp[mask] = { sum: 0, feedbacksCount: 0, count: 0, avg: 0 };
 
@@ -1317,8 +1454,20 @@ module.exports = {
   getKTErrorsAndWriteToJson,
   fetchArtsRatings,
   fetchAdvertInfosAndWriteToJson,
+  fetchAdvertStatsAndWriteToJson,
   updateAdvertArtActivitiesAndGenerateNotIncluded,
   calcOrdersFromDetailedByPeriodAndWriteToJSON,
+  getAdvertStatByMaskByDayAndWriteToJSON,
+};
+
+const getMaskFromVendorCode = (vendorCode) => {
+  const code = vendorCode.split("_");
+  if (code.slice(-1) == "2") code.pop();
+  if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
+  else if (code.includes("КПБ")) code.splice(3, 1);
+  else code.splice(2, 1);
+
+  return code.join("_");
 };
 
 const indexToColumn = (index) => {

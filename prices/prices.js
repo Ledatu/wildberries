@@ -12,6 +12,8 @@ const {
   fetchAdvertInfosAndWriteToJson,
   updateAdvertArtActivitiesAndGenerateNotIncluded,
   fetchArtsRatings,
+  fetchAdvertStatsAndWriteToJson,
+  getAdvertStatByMaskByDayAndWriteToJSON,
 } = require("./main");
 const {
   writePrices,
@@ -24,6 +26,7 @@ const {
   sendEmail,
   fetchAvgRatingsAndWriteToJSON,
   updateLowRatingStocksSheet,
+  updatePlanFact,
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 const fs = require("fs");
@@ -115,6 +118,25 @@ const calcNewValues = async () => {
   });
 };
 
+const fetchAdverts = async () => {
+  campaigns.forEach(async (campaign) => {
+    Promise.all([
+      await fetchOrdersAndWriteToJSON(campaign),
+      await fetchAdvertsAndWriteToJson(campaign),
+      await fetchAdvertInfosAndWriteToJson(campaign),
+      await fetchAdvertStatsAndWriteToJson(campaign),
+      await getAdvertStatByMaskByDayAndWriteToJSON(campaign),
+      await updatePlanFact(campaign),
+    ])
+      .then(async () => {
+        console.log("All tasks completed successfully");
+      })
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      });
+  });
+};
+
 const updateAdvertActivity = async () => {
   const campaign_names = {
     mayusha: "Маюша",
@@ -168,4 +190,5 @@ module.exports = {
   updateAtriculesData,
   updateAdvertActivity,
   fetchStocksForLowRatingArts,
+  fetchAdverts,
 };

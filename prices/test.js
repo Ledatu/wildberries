@@ -7,6 +7,7 @@ const {
   sendEmail,
   updateLowRatingStocksSheet,
   fetchAvgRatingsAndWriteToJSON,
+  updatePlanFact,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -23,6 +24,8 @@ const {
   calcAvgRatingsAndWriteToJSON,
   fetchCardsAndWriteToJSON,
   calcOrdersFromDetailedByPeriodAndWriteToJSON,
+  fetchAdvertStatsAndWriteToJson,
+  getAdvertStatByMaskByDayAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -31,6 +34,7 @@ const {
   updateAnalytics,
   updateAdvertActivity,
   fetchStocksForLowRatingArts,
+  fetchAdverts,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
@@ -50,12 +54,10 @@ const {
 //   console.log("Prices fetched.");
 //   updatePrices("mayusha");
 // });
-// fetchOrdersAndWriteToJSON("mayusha");
 // fetchStocksAndWriteToJSON("mayusha")
 // fetchStocksAndWriteToJSON("delicatus")
 // fetchStocksAndWriteToJSON("TKS")
 // updateAnalytics()
-// fetchAdvertInfosAndWriteToJson("mayusha");
 // fetchArtsRatings("mayusha");
 // fetchArtsRatings("delicatus");
 // fetchArtsRatings("TKS");
@@ -73,5 +75,17 @@ const a = async () => {
 // updateLowRatingStocksSheet()
 
 // calcAvgOrdersAndWriteToJSON("mayusha");
-updateAdvertActivity()
+// updateAdvertActivity()
 // calcOrdersFromDetailedByPeriodAndWriteToJSON("mayusha");
+// fetchAdvertStatsAndWriteToJson("delicatus");
+// fetchAdvertStatsAndWriteToJson("TKS");
+// fetchCardsAndWriteToJSON('mayusha')
+// fetchCardsAndWriteToJSON('delicatus')
+// fetchCardsAndWriteToJSON('TKS')
+// fetchOrdersAndWriteToJSON("mayusha");
+fetchAdverts()
+// fetchAdvertsAndWriteToJson("mayusha");
+// fetchAdvertInfosAndWriteToJson("mayusha");
+// fetchAdvertStatsAndWriteToJson("mayusha");
+// getAdvertStatByMaskByDayAndWriteToJSON('mayusha')
+// updatePlanFact('mayusha')
