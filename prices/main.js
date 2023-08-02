@@ -471,7 +471,7 @@ const writeStocksToJson = async (data, campaign, date) => {
 const writeOrdersToJson = (data, campaign, date) => {
   const today = new Date(
     new Date()
-      .toLocaleDateString()
+      .toLocaleDateString("ru-RU")
       .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
   )
     .toISOString()
