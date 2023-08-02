@@ -478,6 +478,7 @@ function updatePlanFact(auth, campaign) {
     const spIds = {
       mayusha: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
       delicatus: "1Z5VcVioLbQiIz9yLX-jtd-tlNphqPDAEuLsosUxQZDQ",
+      TKS: "15-k2wUChS6twGIPLms2e-jbYQqPV8_CltyAcJcamADE",
     };
     if (!(campaign in spIds)) {
       resolve();
@@ -493,10 +494,12 @@ function updatePlanFact(auth, campaign) {
       const row = temp_plan[i];
       if (!row[0]) continue;
       plan[row[0]] = {
-        budget_day: parseInt(row[1].replace(/\s/g, "")),
-        sum_orders_day: parseInt(row[2].replace(/\s/g, "")),
-        sum_orders_month: parseInt(row[3].replace(/\s/g, "")),
-        drr: parseFloat(row[4].replace(/,/g, ".").replace(/\s/g, "")),
+        budget_day: parseInt(row[1] ? row[1].replace(/\s/g, "") : "0"),
+        sum_orders_day: parseInt(row[2] ? row[2].replace(/\s/g, "") : "0"),
+        sum_orders_month: parseInt(row[3] ? row[3].replace(/\s/g, "") : "0"),
+        drr: parseFloat(
+          row[4] ? row[4].replace(/,/g, ".").replace(/\s/g, "") : "0"
+        ),
       };
     }
 
@@ -536,6 +539,7 @@ function updatePlanFact(auth, campaign) {
         }
       }
     }
+
     sheets.spreadsheets.values
       .update({
         spreadsheetId: spIds[campaign],
@@ -1130,40 +1134,70 @@ async function copyZakazToOtherSpreadsheet(auth) {
     try {
       const title = sourceSheet.properties.title;
       if (title == "Остатки руч.") continue;
-      const oldSheet = destinationSheets.data.sheets.find(
-        (sheet) => sheet.properties.title === title
-      );
-      if (oldSheet) {
-        const oldSheetId = oldSheet.properties.sheetId;
+      const sheet_data = await get_data(title);
+      const masks = [];
+      for (let i = 0; i < sheet_data.length; i++) {
+        const row = sheet_data[i];
+        if (!row[0]) continue;
+        let mask = getMaskFromVendorCode(row[0]);
+        mask = mask.split("_");
+        if (!mask.includes("КПБ")) {
+          mask = mask.slice(0, 1);
+        } else {
+          mask = title == "delicatus" ? mask.slice(-1) : mask.slice(-2, -1);
+        }
+        mask = mask[0];
+        if (!masks.includes(mask)) masks.push(mask);
+      }
+      // console.log(masks);
+      for (let i = 0; i < masks.length; i++) {
+        const mask_title = title + " " + masks[i];
+        // console.log(mask_title);
+        const oldSheet = destinationSheets.data.sheets.find(
+          (sheet) => sheet.properties.title === mask_title
+        );
+        const mask_sheet_data = [];
+        for (let j = 0; j < sheet_data.length; j++) {
+          const row = sheet_data[j];
+          if (!row[0]) continue;
+          if (!row[0].split("_").includes(masks[i])) continue;
+
+          mask_sheet_data.push(sheet_data[j]);
+        }
+        // console.log(mask_sheet_data);
+        // continue;
+        if (oldSheet) {
+          const oldSheetId = oldSheet.properties.sheetId;
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: destinationSpreadsheetId,
+            resource: {
+              requests: [
+                {
+                  deleteSheet: {
+                    sheetId: oldSheetId,
+                  },
+                },
+              ],
+            },
+          });
+        }
+
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId: destinationSpreadsheetId,
           resource: {
             requests: [
               {
-                deleteSheet: {
-                  sheetId: oldSheetId,
+                duplicateSheet: {
+                  sourceSheetId: templateSheetId,
+                  insertSheetIndex: 1,
+                  newSheetName: mask_title,
                 },
               },
             ],
           },
         });
+        await update_data(mask_title, mask_sheet_data);
       }
-
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: destinationSpreadsheetId,
-        resource: {
-          requests: [
-            {
-              duplicateSheet: {
-                sourceSheetId: templateSheetId,
-                insertSheetIndex: 1,
-                newSheetName: title,
-              },
-            },
-          ],
-        },
-      });
-      await update_data(title, await get_data(title));
     } catch (err) {
       console.error(err);
     }
@@ -1258,4 +1292,14 @@ module.exports = {
     const auth = await authorize();
     await sendEmail(auth, to, subject, body).catch(console.error);
   },
+};
+
+const getMaskFromVendorCode = (vendorCode) => {
+  const code = vendorCode.split("_");
+  if (code.slice(-1) == "2") code.pop();
+  if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
+  else if (code.includes("КПБ")) code.splice(3, 1);
+  else code.splice(2, 1);
+
+  return code.join("_");
 };
