@@ -899,6 +899,7 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
     console.log(vendorCodes[type == "standard" ? nms[0].nm : nms[0]], mask);
     for (const [index, nmData] of Object.entries(nms)) {
       const nm = type == "standard" ? nmData.nm : nmData;
+      if (!nm || !vendorCodes[nm]) continue;
       if (mask != getMaskFromVendorCode(vendorCodes[nm])) {
         if (!(name in violated_rks)) violated_rks[name] = [];
         violated_rks[name].push(nm);
