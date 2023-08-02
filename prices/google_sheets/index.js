@@ -510,7 +510,10 @@ function updatePlanFact(auth, campaign) {
       for (const [mask, maskData] of Object.entries(masks)) {
         let sum_orders_mask = 0;
         // console.log(date, mask, maskData);
-        if (!sum_orders[date]) continue;
+        if (!sum_orders[date]) {
+          console.log(date, mask, maskData);
+          continue;
+        }
         for (const [art, sum] of Object.entries(sum_orders[date])) {
           const mask_splitted = mask.split("_");
           mask_splitted.pop();

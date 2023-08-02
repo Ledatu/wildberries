@@ -615,8 +615,11 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
       if (!(date in jsonData)) jsonData[date] = {};
       for (const [index, app] of Object.entries(day.apps)) {
         for (const [index, nm] of Object.entries(app.nm)) {
-          if (!vendorCodes[nm.nmId] || !nm.nmId) continue;
-          // console.log(nm.nmId, vendorCodes[nm.nmId]);
+          if (!vendorCodes[nm.nmId] || !nm.nmId) {
+            console.log(nm.nmId, vendorCodes[nm.nmId]);
+            continue;
+          }
+
           const mask = getMaskFromVendorCode(vendorCodes[nm.nmId]);
           if (!(mask in jsonData[date]))
             jsonData[date][mask] = { views: 0, clicks: 0, sum: 0 };
