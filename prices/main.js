@@ -400,10 +400,14 @@ const writeCardsTempToJson = (data, campaign) => {
 
 const writeAdvertsToJson = (data, campaign) => {
   const jsonData = {};
-  const two_days_ago = new Date();
-  two_days_ago.setDate(two_days_ago.getDate() - 2);
+  const this_month = new Date(
+    new Date()
+      .toLocaleDateString("ru-RU")
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+      .slice(0, 7)
+  );
   data.forEach((item) => {
-    if (item.status == 7 && new Date(item.endTime) < two_days_ago) return;
+    if (item.status == 7 && new Date(item.endTime) < this_month) return;
     jsonData[item.advertId] = new Date(item.createTime)
       .toISOString()
       .slice(0, 10);
