@@ -179,6 +179,11 @@ app.get("/api/fetchAdverts", authenticateToken, (req, res) => {
   res.send("fetchAdverts is updating...");
 });
 
+app.get("/api/fetchByNowStats", authenticateToken, (req, res) => {
+  fetchAdverts();
+  res.send("fetchByNowStats is updating...");
+});
+
 app.post("/api/autofillCurrent", authenticateToken, (req, res) => {
   const name = req.body.sheetname;
   autofillCurrent(name).then((count) => res.send({ count: count }));

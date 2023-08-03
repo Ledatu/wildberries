@@ -137,6 +137,21 @@ const fetchAdverts = async () => {
   });
 };
 
+const fetchByNowStats = async () => {
+  campaigns.forEach(async (campaign) => {
+    Promise.all([
+      await fetchOrdersAndWriteToJSON(campaign),
+      await updatePlanFact(campaign),
+    ])
+      .then(async () => {
+        console.log("All tasks completed successfully");
+      })
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      });
+  });
+};
+
 const updateAdvertActivity = async () => {
   const campaign_names = {
     mayusha: "Маюша",
@@ -191,4 +206,5 @@ module.exports = {
   updateAdvertActivity,
   fetchStocksForLowRatingArts,
   fetchAdverts,
+  fetchByNowStats,
 };

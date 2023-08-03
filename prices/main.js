@@ -469,17 +469,17 @@ const writeStocksToJson = async (data, campaign, date) => {
 };
 
 const writeOrdersToJson = (data, campaign, date) => {
-  const today = new Date(
-    new Date()
-      .toLocaleDateString("ru-RU")
-      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-  )
-    .toISOString()
-    .slice(0, 10);
+  const now = new Date(
+    // new Date()
+      // .toLocaleDateString("ru-RU")
+      // .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+  );
   const dateFrom = new Date(date);
-  console.log(today, dateFrom);
+  console.log(now, dateFrom);
   const jsonData = {};
   const orderSumJsonData = {};
+  const jsonDataByNow = { today: {}, yesterday: {} };
+  const orderSumJsonDataByNow = { today: {}, yesterday: {} };
 
   const vendorCodes = JSON.parse(
     afs.readFileSync(
@@ -500,7 +500,7 @@ const writeOrdersToJson = (data, campaign, date) => {
       return;
     }
     const order_date_string = item.date.slice(0, 10);
-    if (item.isCancel || order_date_string == today) {
+    if (item.isCancel /*|| order_date_string == today*/) {
       excluded.excluded.push({
         order_date: order_date,
         supplierArticle: supplierArticle,
@@ -531,6 +531,36 @@ const writeOrdersToJson = (data, campaign, date) => {
 
     orderSumJsonData[order_date_string][supplierArticle] +=
       item.totalPrice * (1 - item.discountPercent / 100);
+
+    // by now
+    const today_string = now.toISOString().slice(0, 10);
+
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    const yesterday_string = yesterday.toISOString().slice(0, 10);
+
+    if (order_date_string == today_string) {
+      if (!(supplierArticle in jsonDataByNow.today)) {
+        jsonDataByNow.today[supplierArticle] = 0;
+        orderSumJsonDataByNow.today[supplierArticle] = 0;
+      }
+      if (new Date(item.date) <= now) {
+        jsonDataByNow.today[supplierArticle] += 1;
+        orderSumJsonDataByNow.today[supplierArticle] +=
+          item.totalPrice * (1 - item.discountPercent / 100);
+      }
+    }
+    if (order_date_string == yesterday_string) {
+      if (!(supplierArticle in jsonDataByNow.yesterday)) {
+        jsonDataByNow.yesterday[supplierArticle] = 0;
+        orderSumJsonDataByNow.yesterday[supplierArticle] = 0;
+      }
+      if (new Date(item.date) <= yesterday) {
+        jsonDataByNow.yesterday[supplierArticle] += 1;
+        orderSumJsonDataByNow.yesterday[supplierArticle] +=
+          item.totalPrice * (1 - item.discountPercent / 100);
+      }
+    }
   });
   fs.writeFile(
     path.join(__dirname, "files", campaign, "excluded.json"),
@@ -544,6 +574,14 @@ const writeOrdersToJson = (data, campaign, date) => {
     fs.writeFile(
       path.join(__dirname, "files", campaign, "sum of orders by day.json"),
       JSON.stringify(orderSumJsonData)
+    ),
+    fs.writeFile(
+      path.join(__dirname, "files", campaign, "orders by now.json"),
+      JSON.stringify(jsonDataByNow)
+    ),
+    fs.writeFile(
+      path.join(__dirname, "files", campaign, "sum of orders by now.json"),
+      JSON.stringify(orderSumJsonDataByNow)
     ),
   ])
     .then(() => console.log("orders by days.json created."))
@@ -1204,7 +1242,19 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
   // }
 
   // console.log(orders_by_day);
+  const today = new Date(
+    new Date()
+      .toLocaleDateString("ru-RU")
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+  )
+    .toISOString()
+    .slice(0, 10);
   const calcAvgOrders = (jsonData, date, avgs = undefined) => {
+    if (today == date) {
+      // console.log(today, "==", date);
+      return;
+    }
+
     for (const supplierArticle in orders_by_day[date]) {
       if (
         supplierArticle &&
@@ -1241,12 +1291,6 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
   for (const order_data_date in orders_by_day) {
     const order_date = new Date(order_data_date);
     // console.log(order_date, dateFrom);
-    if (
-      // order_date < dateFrom ||
-      order_data_date == new Date().toISOString().slice(0, 10)
-    ) {
-      continue;
-    }
     jsonData = calcAvgOrders(jsonData, order_data_date);
   }
   const avgData = {};
