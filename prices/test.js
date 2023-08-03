@@ -35,6 +35,7 @@ const {
   updateAdvertActivity,
   fetchStocksForLowRatingArts,
   fetchAdverts,
+  fetchByNowStats,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
@@ -89,6 +90,7 @@ const a = async () => {
 // fetchAdvertStatsAndWriteToJson("mayusha");
 // getAdvertStatByMaskByDayAndWriteToJSON('mayusha')
 // updatePlanFact('mayusha')
-fetchOrdersAndWriteToJSON("delicatus");
-updatePlanFact('delicatus')
+// fetchOrdersAndWriteToJSON("delicatus");
+// updatePlanFact('delicatus')
+fetchByNowStats()
 // updatePlanFact('TKS')
