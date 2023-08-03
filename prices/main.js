@@ -575,8 +575,8 @@ const writeOrdersToJson = (data, campaign, date) => {
         orderSumJsonDataByNow.today[supplierArticle] += get_normalized_price(
           jsonDataByNow.today[supplierArticle],
           orderSumJsonDataByNow.today[supplierArticle],
-          true,
-          "today"
+          // true,
+          // "today"
         );
         jsonDataByNow.today[supplierArticle] += 1;
       }
@@ -593,8 +593,8 @@ const writeOrdersToJson = (data, campaign, date) => {
           get_normalized_price(
             jsonDataByNow.yesterday[supplierArticle],
             orderSumJsonDataByNow.yesterday[supplierArticle],
-            true,
-            "yesterday"
+            // true,
+            // "yesterday"
           );
         jsonDataByNow.yesterday[supplierArticle] += 1;
 
