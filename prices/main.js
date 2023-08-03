@@ -469,11 +469,10 @@ const writeStocksToJson = async (data, campaign, date) => {
 };
 
 const writeOrdersToJson = (data, campaign, date) => {
-  const now = new Date(
-    // new Date()
-      // .toLocaleDateString("ru-RU")
-      // .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-  );
+  const now = new Date();
+  // new Date()
+  // .toLocaleDateString("ru-RU")
+  // .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
   const dateFrom = new Date(date);
   console.log(now, dateFrom);
   const jsonData = {};
@@ -1148,23 +1147,26 @@ const fetchStocksAndWriteToJSON = (campaign) => {
 };
 
 const fetchOrdersAndWriteToJSON = (campaign) => {
-  const authToken = getAuthToken("api-statistic-token", campaign);
-  const dateFrom = new Date();
-  dateFrom.setDate(dateFrom.getDate() - 30);
-  const date = dateFrom.toISOString().slice(0, 10);
-  console.log(date);
-  const params = {
-    dateFrom: date,
-  };
-  return getOrders(authToken, params)
-    .then((data) => {
-      writeOrdersToJson(data, campaign, date);
-      fs.writeFile(
-        path.join(__dirname, "files", campaign, "orders_full.json"),
-        JSON.stringify(data)
-      );
-    })
-    .catch((error) => console.error(error));
+  return new Promise((resolve, reject) => {
+    const authToken = getAuthToken("api-statistic-token", campaign);
+    const dateFrom = new Date();
+    dateFrom.setDate(dateFrom.getDate() - 30);
+    const date = dateFrom.toISOString().slice(0, 10);
+    console.log(date);
+    const params = {
+      dateFrom: date,
+    };
+    return getOrders(authToken, params)
+      .then((data) => {
+        fs.writeFile(
+          path.join(__dirname, "files", campaign, "orders_full.json"),
+          JSON.stringify(data)
+        ).then((pr) =>
+          writeOrdersToJson(data, campaign, date).then((pr) => resolve())
+        );
+      })
+      .catch((error) => console.error(error));
+  });
 };
 
 const calcAdvertismentAndWriteToJSON = (campaign) => {
