@@ -458,6 +458,11 @@ function updatePlanFact(auth, campaign) {
   return new Promise(async (resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
 
+    const vendorCodes = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "vendorCodes.json")
+      )
+    );
     const sum_orders = await JSON.parse(
       await fs.readFile(
         path.join(__dirname, "../files", campaign, "sum of orders by day.json")
@@ -506,7 +511,7 @@ function updatePlanFact(auth, campaign) {
     };
 
     const byNow = {};
-    for (const [art, value] of Object.entries(orders_by_now.today)) {
+    for (const [id, art] of Object.entries(vendorCodes)) {
       const mask = get_proper_mask(getMaskFromVendorCode(art));
       // console.log(mask, art);
       if (!(mask in byNow))
@@ -529,7 +534,7 @@ function updatePlanFact(auth, campaign) {
       byNow[mask].sum_orders_today += sum_orders_by_now.today[art] ?? 0;
       byNow[mask].sum_orders_yesterday += sum_orders_by_now.yesterday[art] ?? 0;
     }
-    // console.log(byNow);
+    console.log(byNow);
 
     const fact_res = await sheets.spreadsheets.values.get({
       spreadsheetId: spIds[campaign],

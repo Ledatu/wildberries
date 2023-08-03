@@ -492,17 +492,29 @@ const writeOrdersToJson = (data, campaign, date) => {
 
   const excluded = { excluded: [] };
   data.forEach((item) => {
+    const supplierArticle = item.supplierArticle.replace(/\s/g, "");
     const get_item_price = () => {
       return item.totalPrice * (1 - item.discountPercent / 100);
     };
-    const get_normalized_price = (cur_count, cur_sum) => {
+    const get_normalized_price = (
+      cur_count,
+      cur_sum,
+      log = false,
+      dop = ""
+    ) => {
       const price = get_item_price();
       const res_if_violated = cur_count ? cur_sum / cur_count : 500;
+      if (log && supplierArticle.includes("ПР_90")) {
+        console.log(
+          dop,
+          supplierArticle,
+          price <= 3000 ? price : res_if_violated
+        );
+      }
       return price <= 3000 ? price : res_if_violated;
     };
 
     const order_date = new Date(item.date);
-    const supplierArticle = item.supplierArticle.replace(/\s/g, "");
     if (order_date < dateFrom) {
       excluded.excluded.push({
         order_date: order_date,
@@ -562,12 +574,14 @@ const writeOrdersToJson = (data, campaign, date) => {
       if (new Date(item.date) <= now) {
         orderSumJsonDataByNow.today[supplierArticle] += get_normalized_price(
           jsonDataByNow.today[supplierArticle],
-          orderSumJsonDataByNow.today[supplierArticle]
+          orderSumJsonDataByNow.today[supplierArticle],
+          true,
+          "today"
         );
         jsonDataByNow.today[supplierArticle] += 1;
       }
-      if (supplierArticle == "ПР_160_ФИОЛЕТОВЫЙ_ОТК")
-        console.log(item, orderSumJsonDataByNow.today[supplierArticle]);
+      // if (supplierArticle == "ПР_160_ФИОЛЕТОВЫЙ_ОТК")
+        // console.log(item, orderSumJsonDataByNow.today[supplierArticle]);
     }
     if (order_date_string == yesterday_string) {
       if (!(supplierArticle in jsonDataByNow.yesterday)) {
@@ -578,7 +592,9 @@ const writeOrdersToJson = (data, campaign, date) => {
         orderSumJsonDataByNow.yesterday[supplierArticle] +=
           get_normalized_price(
             jsonDataByNow.yesterday[supplierArticle],
-            orderSumJsonDataByNow.yesterday[supplierArticle]
+            orderSumJsonDataByNow.yesterday[supplierArticle],
+            true,
+            "yesterday"
           );
         jsonDataByNow.yesterday[supplierArticle] += 1;
 
