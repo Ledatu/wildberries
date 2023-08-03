@@ -581,7 +581,7 @@ const writeOrdersToJson = (data, campaign, date) => {
         jsonDataByNow.today[supplierArticle] += 1;
       }
       // if (supplierArticle == "ПР_160_ФИОЛЕТОВЫЙ_ОТК")
-        // console.log(item, orderSumJsonDataByNow.today[supplierArticle]);
+      // console.log(item, orderSumJsonDataByNow.today[supplierArticle]);
     }
     if (order_date_string == yesterday_string) {
       if (!(supplierArticle in jsonDataByNow.yesterday)) {
@@ -1296,7 +1296,7 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
   const calcAvgOrders = (jsonData, date, avgs = undefined) => {
     if (today == date) {
       // console.log(today, "==", date);
-      return;
+      return jsonData;
     }
 
     for (const supplierArticle in orders_by_day[date]) {
