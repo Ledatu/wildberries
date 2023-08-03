@@ -492,6 +492,15 @@ const writeOrdersToJson = (data, campaign, date) => {
 
   const excluded = { excluded: [] };
   data.forEach((item) => {
+    const get_item_price = () => {
+      return item.totalPrice * (1 - item.discountPercent / 100);
+    };
+    const get_normalized_price = (cur_count, cur_sum) => {
+      const price = get_item_price();
+      const res_if_violated = cur_count ? cur_sum / cur_count : 500;
+      return price <= 3000 ? price : res_if_violated;
+    };
+
     const order_date = new Date(item.date);
     const supplierArticle = item.supplierArticle.replace(/\s/g, "");
     if (order_date < dateFrom) {
@@ -518,9 +527,6 @@ const writeOrdersToJson = (data, campaign, date) => {
       }
       // console.log(jsonData[order_date_string]);
     }
-    if (supplierArticle in jsonData[order_date_string])
-      jsonData[order_date_string][supplierArticle] += 1;
-    else jsonData[order_date_string][supplierArticle] = 1;
 
     if (!(order_date_string in orderSumJsonData)) {
       orderSumJsonData[order_date_string] = {};
@@ -529,11 +535,17 @@ const writeOrdersToJson = (data, campaign, date) => {
       }
       // console.log(orderSumJsonData[order_date_string]);
     }
-    if (!(supplierArticle in orderSumJsonData[order_date_string]))
+    if (!(supplierArticle in jsonData[order_date_string])) {
+      jsonData[order_date_string][supplierArticle] = 0;
       orderSumJsonData[order_date_string][supplierArticle] = 0;
+    }
 
     orderSumJsonData[order_date_string][supplierArticle] +=
-      item.totalPrice * (1 - item.discountPercent / 100);
+      get_normalized_price(
+        jsonData[order_date_string][supplierArticle],
+        orderSumJsonData[order_date_string][supplierArticle]
+      );
+    jsonData[order_date_string][supplierArticle] += 1;
 
     // by now
     const today_string = now.toISOString().slice(0, 10);
@@ -548,10 +560,14 @@ const writeOrdersToJson = (data, campaign, date) => {
         orderSumJsonDataByNow.today[supplierArticle] = 0;
       }
       if (new Date(item.date) <= now) {
+        orderSumJsonDataByNow.today[supplierArticle] += get_normalized_price(
+          jsonDataByNow.today[supplierArticle],
+          orderSumJsonDataByNow.today[supplierArticle]
+        );
         jsonDataByNow.today[supplierArticle] += 1;
-        orderSumJsonDataByNow.today[supplierArticle] +=
-          item.totalPrice * (1 - item.discountPercent / 100);
       }
+      if (supplierArticle == "ПР_160_ФИОЛЕТОВЫЙ_ОТК")
+        console.log(item, orderSumJsonDataByNow.today[supplierArticle]);
     }
     if (order_date_string == yesterday_string) {
       if (!(supplierArticle in jsonDataByNow.yesterday)) {
@@ -559,9 +575,15 @@ const writeOrdersToJson = (data, campaign, date) => {
         orderSumJsonDataByNow.yesterday[supplierArticle] = 0;
       }
       if (new Date(item.date) <= yesterday) {
-        jsonDataByNow.yesterday[supplierArticle] += 1;
         orderSumJsonDataByNow.yesterday[supplierArticle] +=
-          item.totalPrice * (1 - item.discountPercent / 100);
+          get_normalized_price(
+            jsonDataByNow.yesterday[supplierArticle],
+            orderSumJsonDataByNow.yesterday[supplierArticle]
+          );
+        jsonDataByNow.yesterday[supplierArticle] += 1;
+
+        // if (supplierArticle == "ПР_160_ФИОЛЕТОВЫЙ_ОТК")
+        // console.log(item, orderSumJsonDataByNow.yesterday[supplierArticle]);
       }
     }
   });
