@@ -94,5 +94,6 @@ const a = async () => {
 // fetchOrdersAndWriteToJSON("mayusha");
 // updatePlanFact('delicatus')
 // fetchByNowStats()
+fetchOrdersAndWriteToJSON("TKS");
 // updatePlanFact('TKS')
-fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
+// fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));

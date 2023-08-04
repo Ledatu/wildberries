@@ -289,7 +289,7 @@ const buildXlsx = (data, campaign) => {
     // const ad = find_ad(); //analytics ad
     // const drr = ad / spp_price;
 
-    const ad = roz_price * (arts_data[vendorCode].ad / 100);
+    const ad = spp_price * (arts_data[vendorCode].ad / 100);
     const drr = ad / roz_price;
 
     const profit =
@@ -483,6 +483,7 @@ const writeOrdersToJson = (data, campaign, date) => {
   const orderSumJsonData = {};
   const jsonDataByNow = { today: {}, yesterday: {} };
   const orderSumJsonDataByNow = { today: {}, yesterday: {} };
+  const byDayCampaignSum = {};
 
   const vendorCodes = JSON.parse(
     afs.readFileSync(
@@ -511,7 +512,9 @@ const writeOrdersToJson = (data, campaign, date) => {
           price <= 3000 ? price : res_if_violated
         );
       }
-      return price <= 3000 ? price : res_if_violated;
+      if (price <= 3000) return price;
+      // console.log(item, price);
+      return res_if_violated;
     };
 
     const order_date = new Date(item.date);
@@ -532,6 +535,7 @@ const writeOrdersToJson = (data, campaign, date) => {
       });
       return;
     }
+
     if (!(order_date_string in jsonData)) {
       jsonData[order_date_string] = {};
       for (key in vendorCodes) {
@@ -558,6 +562,16 @@ const writeOrdersToJson = (data, campaign, date) => {
         orderSumJsonData[order_date_string][supplierArticle]
       );
     jsonData[order_date_string][supplierArticle] += 1;
+
+    // ---------------------------
+    if (!(order_date_string in byDayCampaignSum))
+      byDayCampaignSum[order_date_string] = { count: 0, sum: 0 };
+    byDayCampaignSum[order_date_string].sum += get_normalized_price(
+      jsonData[order_date_string][supplierArticle],
+      orderSumJsonData[order_date_string][supplierArticle]
+    );
+    byDayCampaignSum[order_date_string].count += 1;
+    // ---------------------------
 
     // by now
     const today_string = now
@@ -630,6 +644,10 @@ const writeOrdersToJson = (data, campaign, date) => {
     fs.writeFile(
       path.join(__dirname, "files", campaign, "sum of orders by now.json"),
       JSON.stringify(orderSumJsonDataByNow)
+    ),
+    fs.writeFile(
+      path.join(__dirname, "files", campaign, "byDayCampaignSum.json"),
+      JSON.stringify(byDayCampaignSum)
     ),
   ])
     .then(() => console.log("orders by days.json created."))
