@@ -176,8 +176,9 @@ app.get("/api/updateAnalytics", authenticateToken, (req, res) => {
 });
 
 app.get("/api/fetchAdverts", authenticateToken, (req, res) => {
-  fetchAdverts();
-  res.send("fetchAdverts is updating...");
+  fetchAdverts()
+    .then((pr) => res.send(JSON.stringify(pr)))
+    .catch((err) => res.send(err));
 });
 
 app.get("/api/fetchByNowStats", authenticateToken, (req, res) => {

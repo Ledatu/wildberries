@@ -119,21 +119,24 @@ const calcNewValues = async () => {
 };
 
 const fetchAdverts = async () => {
-  campaigns.forEach(async (campaign) => {
-    Promise.all([
-      await fetchOrdersAndWriteToJSON(campaign),
-      await fetchAdvertsAndWriteToJson(campaign),
-      await fetchAdvertInfosAndWriteToJson(campaign),
-      await fetchAdvertStatsAndWriteToJson(campaign),
-      await getAdvertStatByMaskByDayAndWriteToJSON(campaign),
-      await updatePlanFact(campaign),
-    ])
-      .then(async () => {
-        console.log("All tasks completed successfully");
-      })
-      .catch((error) => {
-        console.error("An error occurred:", error);
-      });
+  new Promise((resolve, reject) => {
+    campaigns.forEach(async (campaign) => {
+      Promise.all([
+        await fetchOrdersAndWriteToJSON(campaign),
+        await fetchAdvertsAndWriteToJson(campaign),
+        await fetchAdvertInfosAndWriteToJson(campaign),
+        await fetchAdvertStatsAndWriteToJson(campaign),
+        await getAdvertStatByMaskByDayAndWriteToJSON(campaign),
+        await updatePlanFact(campaign),
+      ])
+        .then(async () => {
+          console.log("All tasks completed successfully");
+          resolve("Updated.");
+        })
+        .catch((error) => {
+          console.error("An error occurred:", error);
+        });
+    });
   });
 };
 
