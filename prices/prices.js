@@ -119,7 +119,7 @@ const calcNewValues = async () => {
 };
 
 const fetchAdverts = async () => {
-  new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     campaigns.forEach(async (campaign) => {
       Promise.all([
         await fetchOrdersAndWriteToJSON(campaign),

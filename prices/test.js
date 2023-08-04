@@ -91,7 +91,8 @@ const a = async () => {
 // getAdvertStatByMaskByDayAndWriteToJSON('mayusha')
 // updatePlanFact('mayusha')
 // fetchOrdersAndWriteToJSON("delicatus");
-fetchOrdersAndWriteToJSON("mayusha");
+// fetchOrdersAndWriteToJSON("mayusha");
 // updatePlanFact('delicatus')
 // fetchByNowStats()
 // updatePlanFact('TKS')
+fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
