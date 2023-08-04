@@ -560,12 +560,19 @@ const writeOrdersToJson = (data, campaign, date) => {
     jsonData[order_date_string][supplierArticle] += 1;
 
     // by now
-    const today_string = now.toISOString().slice(0, 10);
+    const today_string = now
+      .toLocaleDateString("ru-RU")
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+      .slice(0, 10);
 
     const yesterday = new Date();
     yesterday.setDate(now.getDate() - 1);
-    const yesterday_string = yesterday.toISOString().slice(0, 10);
+    const yesterday_string = yesterday
+      .toLocaleDateString("ru-RU")
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+      .slice(0, 10);
 
+    console.log(now, yesterday);
     if (order_date_string == today_string) {
       if (!(supplierArticle in jsonDataByNow.today)) {
         jsonDataByNow.today[supplierArticle] = 0;
@@ -574,7 +581,7 @@ const writeOrdersToJson = (data, campaign, date) => {
       if (new Date(item.date) <= now) {
         orderSumJsonDataByNow.today[supplierArticle] += get_normalized_price(
           jsonDataByNow.today[supplierArticle],
-          orderSumJsonDataByNow.today[supplierArticle],
+          orderSumJsonDataByNow.today[supplierArticle]
           // true,
           // "today"
         );
@@ -592,7 +599,7 @@ const writeOrdersToJson = (data, campaign, date) => {
         orderSumJsonDataByNow.yesterday[supplierArticle] +=
           get_normalized_price(
             jsonDataByNow.yesterday[supplierArticle],
-            orderSumJsonDataByNow.yesterday[supplierArticle],
+            orderSumJsonDataByNow.yesterday[supplierArticle]
             // true,
             // "yesterday"
           );
