@@ -572,7 +572,7 @@ const writeOrdersToJson = (data, campaign, date) => {
       .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
       .slice(0, 10);
 
-    console.log(now, yesterday);
+    // console.log(now, yesterday);
     if (order_date_string == today_string) {
       if (!(supplierArticle in jsonDataByNow.today)) {
         jsonDataByNow.today[supplierArticle] = 0;
