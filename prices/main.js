@@ -290,7 +290,7 @@ const buildXlsx = (data, campaign) => {
     // const drr = ad / spp_price;
 
     const ad = spp_price * (arts_data[vendorCode].ad / 100);
-    const drr = ad / roz_price;
+    const drr = ad / spp_price;
 
     const profit =
       -ad - commission - delivery - tax - expences - prime_cost + roz_price;
