@@ -1487,8 +1487,8 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
       // const ad = find_ad(); //analytics ad
       // const drr = ad / spp_price;
 
-      const ad = roz_price * (arts_data[vendorCode].ad / 100);
-      const drr = ad / roz_price;
+      const ad = spp_price * (arts_data[vendorCode].ad / 100);
+      const drr = ad / spp_price;
 
       const profit =
         -ad - commission - delivery - tax - expences - prime_cost + roz_price;
