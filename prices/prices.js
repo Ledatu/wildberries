@@ -60,8 +60,8 @@ const getPrices = async () => {
         console.error("An error occurred:", error);
       });
   });
-  await new Promise((resolve) => setTimeout(resolve, 60000));
-  await updateAnalytics();
+  // await new Promise((resolve) => setTimeout(resolve, 60000));
+  // await updateAnalytics();
 };
 
 const updateAnalytics = async () => {
