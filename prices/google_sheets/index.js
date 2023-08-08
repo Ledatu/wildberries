@@ -558,7 +558,7 @@ function updatePlanFact(auth, campaign) {
           // console.log(art, mask, sum);
           sum_orders_mask += sum;
         }
-
+        console.log(mask, maskData.sum, sum_orders_mask);
         for (let i = 0; i < fact.length; i++) {
           if (!mask.includes(fact[i][0])) continue;
           const drr = maskData.sum / sum_orders_mask;

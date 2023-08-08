@@ -225,7 +225,13 @@ app.post("/api/autofillCurrent", authenticateToken, (req, res) => {
 app.get("/api/downloadAll", async (req, res) => {
   // console.log(req)
   try {
-    const arch = path.join(__dirname, "../qrGeneration/files/Поставка.zip");
+    const name = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../qrGeneration/files/supply.json"))
+    ).name;
+    const arch = path.join(
+      __dirname,
+      `../qrGeneration/files/Поставки/${name}.zip`
+    );
     exportAll().then(() => {
       res.download(arch);
     });

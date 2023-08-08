@@ -400,12 +400,14 @@ const writeCardsTempToJson = (data, campaign) => {
 
 const writeAdvertsToJson = (data, campaign) => {
   const jsonData = {};
-  const this_month = new Date(
-    new Date()
-      .toLocaleDateString("ru-RU")
-      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-      .slice(0, 7)
-  );
+  // const this_month = new Date(
+  //   new Date()
+  //     .toLocaleDateString("ru-RU")
+  //     .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+  //     .slice(0, 7)
+  // );
+  const this_month = new Date();
+  this_month.setDate(this_month.getDate() - 31);
   data.forEach((item) => {
     if (item.status == 7 && new Date(item.endTime) < this_month) return;
     jsonData[item.advertId] = new Date(item.createTime)
@@ -720,19 +722,31 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
       for (const [index, app] of Object.entries(day.apps)) {
         for (const [index, nm] of Object.entries(app.nm)) {
           if (!vendorCodes[nm.nmId] || !nm.nmId) {
-            console.log(nm.nmId, vendorCodes[nm.nmId]);
+            // console.log(nm.nmId, vendorCodes[nm.nmId]);
             continue;
           }
 
           const mask = getMaskFromVendorCode(vendorCodes[nm.nmId]);
           if (!(mask in jsonData[date]))
-            jsonData[date][mask] = { views: 0, clicks: 0, sum: 0 };
+            jsonData[date][mask] = {
+              views: 0,
+              clicks: 0,
+              unique_users: 0,
+              ctr: 0,
+              cpc: 0,
+              sum: 0,
+            };
           jsonData[date][mask].views += nm.views;
           jsonData[date][mask].clicks += nm.clicks;
+          jsonData[date][mask].unique_users += nm.unique_users;
+          jsonData[date][mask].ctr =
+            jsonData[date][mask].clicks / jsonData[date][mask].views;
           jsonData[date][mask].sum += nm.sum;
-          if (date == "2023-08-01") {
-            // console.log(nm.sum);
-            asdad += nm.sum;
+          jsonData[date][mask].cpc =
+            jsonData[date][mask].sum / jsonData[date][mask].clicks;
+          if (mask == 'ПР_160_ОТК' && nm.sum == null && date =='2023-08-03') {
+            console.log(app);
+            // asdad += nm.sum;
           }
         }
       }
@@ -997,13 +1011,28 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
   // check that RK contains only one type of mask and send(toggleable) inform email if violated
   const violated_rks = {};
   for (const [name, rkData] of Object.entries(jsonData)) {
-    const type = "params" in rkData ? "standard" : "auto";
+    // console.log(campaign, rkData);
+    const type =
+      "params" in rkData
+        ? "standard"
+        : "autoParams" in rkData
+        ? "auto"
+        : "united";
     const nms =
-      type == "standard" ? rkData.params[0].nms : rkData.autoParams.nms;
+      type == "standard"
+        ? rkData.params[0].nms
+        : type == "auto"
+        ? rkData.autoParams.nms
+        : rkData.unitedParams[0].nms;
+    // console.log(campaign, rkData, nms);
     const mask = getMaskFromVendorCode(
       vendorCodes[type == "standard" ? nms[0].nm : nms[0]]
     );
-    console.log(vendorCodes[type == "standard" ? nms[0].nm : nms[0]], mask);
+    console.log(
+      campaign, type,
+      vendorCodes[type == "standard" ? nms[0].nm : nms[0]],
+      mask
+    );
     for (const [index, nmData] of Object.entries(nms)) {
       const nm = type == "standard" ? nmData.nm : nmData;
       if (!nm || !vendorCodes[nm]) continue;

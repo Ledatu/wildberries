@@ -3,6 +3,7 @@ const {
   fetchTagsAndWriteToJSON,
   writeCurrent,
   fetchNewTagsAndWriteToXLSX,
+  fetchCurrentZakazAndWriteToXLSX,
 } = require("./google_sheets/index");
 const {
   main,
@@ -41,6 +42,7 @@ const autofillCurrent = (name) => {
   return new Promise(async (resolve, reject) => {
     await updateAtriculesData(); //prices
     await fetchTagsAndWriteToJSON(name);
+    await fetchCurrentZakazAndWriteToXLSX(name)
     autofillAndWriteToXlsx().then(async (count) => {
       await writeCurrent();
       resolve(count);
@@ -51,8 +53,11 @@ const autofillCurrent = (name) => {
 const exportAll = () => {
   return new Promise(async (resolve, reject) => {
     await qrGeneration().then(() => tagsGeneration());
+    const name = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../qrGeneration/files/supply.json"))
+    ).name;
     const arch = path.join(__dirname, "../qrGeneration/files/Поставка");
-    return zipDirectory(arch, arch + ".zip").then(() => {
+    return zipDirectory(arch, path.join(__dirname, `../qrGeneration/files/Поставки/${name}.zip`)).then(() => {
       console.log("Zipping complete.");
       resolve();
     });
