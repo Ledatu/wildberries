@@ -210,11 +210,11 @@ async function fetchCurrentZakazAndWriteToXLSX(auth, sheet_name) {
     xlsxSheets.push({ name: sheet_name, data: rows });
 
     const buffer = xlsx.build(xlsxSheets);
-    afs.writeFileSync(
+    await afs.writeFileSync(
       path.join(__dirname, "../files/Поставка", `${sheet_name}.xlsx`),
       buffer
     );
-    afs.writeFileSync(
+    await afs.writeFileSync(
       path.join(__dirname, "../files/supply.json"),
       JSON.stringify({ name: sheet_name })
     );

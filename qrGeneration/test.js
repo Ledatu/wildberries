@@ -1,6 +1,7 @@
 const {
   fetchQrCodesAndWriteToJSON,
   exportTZToXlsx,
+  fetchCurrentZakazAndWriteToXLSX,
 } = require("./google_sheets/index");
 const { generateNewTags } = require("./main");
 const {
@@ -16,4 +17,5 @@ const {
 // autofillCurrent().then(count => console.log(count))
 // exportTZToXlsx()
 // exportAll()
-newTagsGeneration();
+// newTagsGeneration();
+fetchCurrentZakazAndWriteToXLSX("delicatus ПР 06 МК ТУЛА");
