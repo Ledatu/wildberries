@@ -45,7 +45,9 @@ const autofillCurrent = (name) => {
     await fetchTagsAndWriteToJSON(name);
     autofillAndWriteToXlsx().then(async (count) => {
       await writeCurrent();
-      await fetchCurrentZakazAndWriteToXLSX(name);
+      await qrGeneration().then(() =>
+        tagsGeneration().then(() => fetchCurrentZakazAndWriteToXLSX(name))
+      );
       resolve(count);
     });
   });
@@ -53,7 +55,6 @@ const autofillCurrent = (name) => {
 
 const exportAll = () => {
   return new Promise(async (resolve, reject) => {
-    await qrGeneration().then(() => tagsGeneration());
     const name = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../qrGeneration/files/supply.json"))
     ).name;

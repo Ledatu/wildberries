@@ -19,3 +19,4 @@ const {
 // exportAll()
 // newTagsGeneration();
 autofillCurrent("delicatus ПР 06 МК ТУЛА");
+// exportAll()
