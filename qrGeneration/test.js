@@ -18,4 +18,4 @@ const {
 // exportTZToXlsx()
 // exportAll()
 // newTagsGeneration();
-fetchCurrentZakazAndWriteToXLSX("delicatus ПР 06 МК ТУЛА");
+autofillCurrent("delicatus ПР 06 МК ТУЛА");

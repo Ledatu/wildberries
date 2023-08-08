@@ -14,7 +14,7 @@ const {
 } = require("./main");
 const { updateAtriculesData } = require("../prices/prices");
 const path = require("path");
-const fs = require('fs');
+const fs = require("fs");
 
 const qrGeneration = () => {
   return new Promise(async (resolve, reject) => {
@@ -43,9 +43,9 @@ const autofillCurrent = (name) => {
   return new Promise(async (resolve, reject) => {
     await updateAtriculesData(); //prices
     await fetchTagsAndWriteToJSON(name);
-    await fetchCurrentZakazAndWriteToXLSX(name)
     autofillAndWriteToXlsx().then(async (count) => {
       await writeCurrent();
+      await fetchCurrentZakazAndWriteToXLSX(name);
       resolve(count);
     });
   });
@@ -58,7 +58,10 @@ const exportAll = () => {
       fs.readFileSync(path.join(__dirname, "../qrGeneration/files/supply.json"))
     ).name;
     const arch = path.join(__dirname, "../qrGeneration/files/Поставка");
-    return zipDirectory(arch, path.join(__dirname, `../qrGeneration/files/Поставки/${name}.zip`)).then(() => {
+    return zipDirectory(
+      arch,
+      path.join(__dirname, `../qrGeneration/files/Поставки/${name}.zip`)
+    ).then(() => {
       console.log("Zipping complete.");
       resolve();
     });
