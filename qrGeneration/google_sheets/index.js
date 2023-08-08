@@ -212,7 +212,7 @@ async function fetchCurrentZakazAndWriteToXLSX(auth, sheet_name) {
       if (!rows[i][0]) continue;
       filled_rows.push(rows[i]);
     }
-    xlsxSheets.push({ name: sheet_name, data: rows });
+    xlsxSheets.push({ name: sheet_name, data: filled_rows });
 
     const buffer = xlsx.build(xlsxSheets);
     await afs.writeFileSync(
