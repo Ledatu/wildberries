@@ -14,6 +14,7 @@ const {
 } = require("./main");
 const { updateAtriculesData } = require("../prices/prices");
 const path = require("path");
+const fs = require('fs');
 
 const qrGeneration = () => {
   return new Promise(async (resolve, reject) => {
