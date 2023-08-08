@@ -208,8 +208,10 @@ async function fetchCurrentZakazAndWriteToXLSX(auth, sheet_name) {
     // Parse the values into a JSON object
     const rows = res.data.values;
     const filled_rows = [];
-    for (let i = 0; i < rows.length; i++)
-      if (rows[i][0] != "") filled_rows.push(rows[i]);
+    for (let i = 0; i < rows.length; i++) {
+      if (!rows[i][0]) continue;
+      filled_rows.push(rows[i]);
+    }
     xlsxSheets.push({ name: sheet_name, data: rows });
 
     const buffer = xlsx.build(xlsxSheets);
