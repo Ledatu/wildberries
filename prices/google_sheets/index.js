@@ -587,22 +587,22 @@ function updatePlanFact(auth, campaign) {
     if (all_masks[0] == "НАМАТРАСНИК") all_masks.push(all_masks.shift());
     console.log(all_masks);
     for (let i = 0; i < all_masks.length; i++) {
-      for (const [temp_mask, dates] of Object.entries(advertStatsByMaskByDay)) {
-        sheet_data[1] = sheet_data[1].concat(unique_params);
-        //// formulas
-        const formulas_to_concat = [];
-        for (let j = 0; j < unique_params.length; j++) {
-          const index_of_column = i * unique_params.length + j + 2;
-          const column_name = indexToColumn(index_of_column);
-          formulas_to_concat.push(
-            `=${
-              param_map[unique_params[j]].formula
-            }(${column_name}4:${column_name})`
-          );
-        }
-        sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
+      sheet_data[1] = sheet_data[1].concat(unique_params);
+      //// formulas
+      const formulas_to_concat = [];
+      for (let j = 0; j < unique_params.length; j++) {
+        const index_of_column = i * unique_params.length + j + 2;
+        const column_name = indexToColumn(index_of_column);
+        formulas_to_concat.push(
+          `=${
+            param_map[unique_params[j]].formula
+          }(${column_name}4:${column_name})`
+        );
+      }
+      sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
+      if (all_masks[i] == campaign) continue;
 
-        if (all_masks[i] == campaign) continue;
+      for (const [temp_mask, dates] of Object.entries(advertStatsByMaskByDay)) {
         const mask = get_proper_mask(temp_mask);
         if (mask != all_masks[i]) continue;
         sheet_data[0] = sheet_data[0].concat(
