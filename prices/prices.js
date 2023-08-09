@@ -122,11 +122,11 @@ const fetchAdverts = async () => {
   return new Promise((resolve, reject) => {
     campaigns.forEach(async (campaign) => {
       Promise.all([
-        // await fetchOrdersAndWriteToJSON(campaign),
-        // await fetchAdvertsAndWriteToJson(campaign),
-        // await fetchAdvertInfosAndWriteToJson(campaign),
-        // await fetchAdvertStatsAndWriteToJson(campaign),
-        // await getAdvertStatByMaskByDayAndWriteToJSON(campaign),
+        await fetchOrdersAndWriteToJSON(campaign),
+        await fetchAdvertsAndWriteToJson(campaign),
+        await fetchAdvertInfosAndWriteToJson(campaign),
+        await fetchAdvertStatsAndWriteToJson(campaign),
+        await getAdvertStatByMaskByDayAndWriteToJSON(campaign),
         await updatePlanFact(campaign),
       ])
         .then(async () => {
