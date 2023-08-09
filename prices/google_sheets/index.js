@@ -468,6 +468,16 @@ function updatePlanFact(auth, campaign) {
         path.join(__dirname, "../files", campaign, "sum of orders by day.json")
       )
     );
+    const orders = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "orders by day.json")
+      )
+    );
+    const byDayCampaignSum = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "byDayCampaignSum.json")
+      )
+    );
 
     const advertStatsByMaskByDay = await JSON.parse(
       await fs.readFile(
@@ -481,9 +491,9 @@ function updatePlanFact(auth, campaign) {
     );
 
     const spIds = {
-      mayusha: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      delicatus: "1Z5VcVioLbQiIz9yLX-jtd-tlNphqPDAEuLsosUxQZDQ",
-      TKS: "15-k2wUChS6twGIPLms2e-jbYQqPV8_CltyAcJcamADE",
+      mayusha: "Факт Маюша",
+      delicatus: "Факт Delicatus",
+      TKS: "Факт TKS",
     };
     if (!(campaign in spIds)) {
       resolve();
@@ -535,90 +545,201 @@ function updatePlanFact(auth, campaign) {
       byNow[mask].sum_orders_yesterday += sum_orders_by_now.yesterday[art] ?? 0;
     }
     console.log(byNow);
-
-    const fact_res = await sheets.spreadsheets.values.get({
-      spreadsheetId: spIds[campaign],
-      range: "Факт!A3:A",
+    // const fact_res = await sheets.spreadsheets.values.get({
+    // spreadsheetId: spIds[campaign],
+    // range: "Факт!A3:A",
+    // });
+    // const fact = fact_res.data.values;
+    const unique_params_res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `${spIds[campaign]}!2:2`,
     });
-    const fact = fact_res.data.values;
-    for (const [date, masks] of Object.entries(advertStatsByMaskByDay)) {
-      if (new Date().toISOString().slice(0, 7) != date.slice(0, 7)) continue;
-      for (const [temp_mask, maskData] of Object.entries(masks)) {
-        let sum_orders_mask = 0;
+    const unique_params_temp = unique_params_res.data.values[0];
+    const unique_params = [];
+    for (let i = 1; i < unique_params_temp.length; i++)
+      if (!unique_params.includes(unique_params_temp[i]))
+        unique_params.push(unique_params_temp[i]);
+    const param_map = {
+      Показы: { name: "views", formula: "СУММ" },
+      Клики: { name: "clicks", formula: "СУММ" },
+      CTR: { name: "ctr", formula: "СРЗНАЧ" },
+      СРС: { name: "cpc", formula: "СРЗНАЧ" },
+      СРМ: { name: "cpm", formula: "СРЗНАЧ" },
+      Расход: { name: "sum", formula: "СУММ" },
+      "Заказы/шт": { name: "orders", formula: "СУММ" },
+      "Заказы/Р": { name: "sum_orders", formula: "СУММ" },
+      "ДРР%": { name: "drr", formula: "СРЗНАЧ" },
+    };
 
-        // console.log(date, mask, maskData);
-        if (!sum_orders[date]) {
-          // console.log(date, temp_mask, maskData);
-          continue;
-        }
+    const sheet_data = [
+      ["ДАТА"].concat(Array(unique_params.length)),
+      [""],
+      ["саммари"],
+    ];
+    const dates_datas = {};
+    const all_masks = [];
+    for (const [id, art] of Object.entries(vendorCodes)) {
+      const mask = get_proper_mask(getMaskFromVendorCode(art));
+      if (all_masks.includes(mask)) continue;
+      all_masks.push(mask);
+    }
+    all_masks.sort();
+    if (all_masks[0] == "НАМАТРАСНИК") all_masks.push(all_masks.shift());
+    console.log(all_masks);
+    for (let i = 0; i < all_masks.length + 1; i++) {
+      sheet_data[1] = sheet_data[1].concat(unique_params);
+      //// formulas
+      const formulas_to_concat = [];
+      for (let j = 0; j < unique_params.length; j++) {
+        const index_of_column = i * unique_params.length + j + 2;
+        const column_name = indexToColumn(index_of_column);
+        formulas_to_concat.push(
+          `=${
+            param_map[unique_params[j]].formula
+          }(${column_name}4:${column_name})`
+        );
+      }
+      sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
+
+      for (const [temp_mask, dates] of Object.entries(advertStatsByMaskByDay)) {
         const mask = get_proper_mask(temp_mask);
+        if (mask != all_masks[i]) continue;
+        sheet_data[0] = sheet_data[0].concat(
+          [mask].concat(Array(unique_params.length - 1))
+        );
 
-        for (const [art, sum] of Object.entries(sum_orders[date])) {
-          if (!art.includes(mask)) continue;
-          // console.log(art, mask, sum);
-          sum_orders_mask += sum;
-        }
-        console.log(mask, maskData.sum, sum_orders_mask);
-        for (let i = 0; i < fact.length; i++) {
-          if (!mask.includes(fact[i][0])) continue;
-          const drr = maskData.sum / sum_orders_mask;
-          const to_push = [maskData.sum, sum_orders_mask, drr];
-          fact[i] = fact[i].concat(to_push);
+        // sheet_data[0].concat(new Array(8));
+
+        // continue;
+        for (const [date, dateData] of Object.entries(dates)) {
+          if (new Date().getDate() - 31 > new Date(date).getDate()) continue;
+          dateData.sum_orders = 0;
+          dateData.orders = 0;
+          // console.log(date, mask, dateData);
+          if (!sum_orders[date]) {
+            // console.log(date, temp_mask, dateData);
+            continue;
+          }
+          const mask = get_proper_mask(temp_mask);
+
+          if (!(date in dates_datas))
+            dates_datas[date] = [date].concat(Array(unique_params.length));
+
+          for (const [art, sum] of Object.entries(sum_orders[date])) {
+            if (!art.includes(mask)) continue;
+            // console.log(art, mask, sum);
+            dateData.sum_orders += sum;
+          }
+          for (const [art, count] of Object.entries(orders[date])) {
+            if (!art.includes(mask)) continue;
+            // console.log(art, mask, sum);
+            dateData.orders += count;
+          }
+          dateData.drr = dateData.sum / dateData.sum_orders;
+
+          const to_push = [];
+          for (let j = 0; j < unique_params.length; j++) {
+            to_push.push(dateData[param_map[unique_params[j]].name]);
+          }
+          dates_datas[date] = dates_datas[date].concat(to_push);
           // console.log(mask, fact[i], to_push);
         }
       }
     }
 
-    const dynamic_res = await sheets.spreadsheets.values.get({
-      spreadsheetId: spIds[campaign],
-      range: "Динамика заказов!A2:A",
-    });
-    const dynamic = dynamic_res.data.values;
-    for (const [mask, maskData] of Object.entries(byNow)) {
-      for (let i = 0; i < dynamic.length; i++) {
-        if (!mask.includes(fact[i][0])) continue;
-        const to_push = [
-          maskData.orders_today,
-          maskData.sum_orders_today,
-          maskData.orders_yesterday,
-          maskData.sum_orders_yesterday,
-          maskData.orders_today - maskData.orders_yesterday,
-          maskData.sum_orders_today - maskData.sum_orders_yesterday,
-        ];
-        dynamic[i] = dynamic[i].concat(to_push);
-        // console.log(mask, fact[i], to_push);
-      }
-    }
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: spIds[campaign],
-      range: `Динамика заказов!2:1000`,
-      valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
-      resource: {
-        values: dynamic,
-      },
-    });
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: spIds[campaign],
-      range: `Динамика заказов!I2`,
-      valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
-      resource: {
-        values: [
-          [
-            `ДАТА И ВРЕМЯ ОБНОВЛЕНИЯ ДАННЫХ:\n${new Date()
-              .toLocaleString("ru-RU")
-              .slice(0, 17)}`,
-          ],
-        ],
-      },
-    });
+    const cur_date = new Date();
+    cur_date.setDate(cur_date.getDate() + 1);
+    for (let i = 0; i < 31; i++) {
+      cur_date.setDate(cur_date.getDate() - 1);
+      const str_date = cur_date
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10);
+      // console.log(str_date);
 
+      sheet_data.push(dates_datas[str_date]);
+    }
+    // console.log(sheet_data);
+    const campaign_summary = [];
+    for (let i = 3; i < sheet_data.length; i++) {
+      if (!sheet_data[i]) continue;
+      const str_date = sheet_data[i][0];
+      advertStatsByMaskByDay[campaign][str_date].orders =
+        byDayCampaignSum[str_date].count;
+      advertStatsByMaskByDay[campaign][str_date].sum_orders =
+        byDayCampaignSum[str_date].sum;
+      advertStatsByMaskByDay[campaign][str_date].drr =
+        advertStatsByMaskByDay[campaign][str_date].sum /
+        advertStatsByMaskByDay[campaign][str_date].sum_orders;
+
+      const to_push = [];
+      for (let j = 0; j < unique_params.length; j++) {
+        to_push.push(
+          advertStatsByMaskByDay[campaign][str_date][
+            param_map[unique_params[j]].name
+          ]
+        );
+      }
+      campaign_summary.push([""].concat(to_push));
+    }
+    // const dynamic_res = await sheets.spreadsheets.values.get({
+    //   spreadsheetId: spIds[campaign],
+    //   range: "Динамика заказов!A2:A",
+    // });
+    // const dynamic = dynamic_res.data.values;
+    // for (const [mask, maskData] of Object.entries(byNow)) {
+    //   for (let i = 0; i < dynamic.length; i++) {
+    //     if (!mask.includes(fact[i][0])) continue;
+    //     const to_push = [
+    //       maskData.orders_today,
+    //       maskData.sum_orders_today,
+    //       maskData.orders_yesterday,
+    //       maskData.sum_orders_yesterday,
+    //       maskData.orders_today - maskData.orders_yesterday,
+    //       maskData.sum_orders_today - maskData.sum_orders_yesterday,
+    //     ];
+    //     dynamic[i] = dynamic[i].concat(to_push);
+    //     // console.log(mask, fact[i], to_push);
+    //   }
+    // }
+    // await sheets.spreadsheets.values.update({
+    //   spreadsheetId: spIds[campaign],
+    //   range: `Динамика заказов!2:1000`,
+    //   valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+    //   resource: {
+    //     values: dynamic,
+    //   },
+    // });
+    // await sheets.spreadsheets.values.update({
+    //   spreadsheetId: spIds[campaign],
+    //   range: `Динамика заказов!I2`,
+    //   valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+    //   resource: {
+    //     values: [
+    //       [
+    //         `ДАТА И ВРЕМЯ ОБНОВЛЕНИЯ ДАННЫХ:\n${new Date()
+    //           .toLocaleString("ru-RU")
+    //           .slice(0, 17)}`,
+    //       ],
+    //     ],
+    //   },
+    // });
+
+    sheets.spreadsheets.values.update({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `${spIds[campaign]}!4:1000`,
+      valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+      resource: {
+        values: campaign_summary,
+      },
+    });
     sheets.spreadsheets.values
       .update({
-        spreadsheetId: spIds[campaign],
-        range: `Факт!3:1000`,
+        spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+        range: `${spIds[campaign]}!1:1000`,
         valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
         resource: {
-          values: fact,
+          values: sheet_data,
         },
       })
       .then((pr) => resolve());
@@ -1374,4 +1495,25 @@ const getMaskFromVendorCode = (vendorCode) => {
   else code.splice(2, 1);
 
   return code.join("_");
+};
+
+const indexToColumn = (index) => {
+  // Validate index size
+  const maxIndex = 18278;
+  if (index > maxIndex) {
+    return "";
+  }
+
+  // Get column from index
+  const l = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  if (index > 26) {
+    const letterA = indexToColumn(Math.floor((index - 1) / 26));
+    const letterB = indexToColumn(index % 26);
+    return letterA + letterB;
+  } else {
+    if (index == 0) {
+      index = 26;
+    }
+    return l[index - 1];
+  }
 };

@@ -714,11 +714,11 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
   );
   let asdad = 0;
   const jsonData = {};
+  jsonData[campaign] = {};
   for (const [name, rkData] of Object.entries(advertStats)) {
     for (const [index, day] of Object.entries(rkData.days)) {
       const date = day.date.slice(0, 10);
       // console.log(date);
-      if (!(date in jsonData)) jsonData[date] = {};
       for (const [index, app] of Object.entries(day.apps)) {
         for (const [index, nm] of Object.entries(app.nm)) {
           if (!vendorCodes[nm.nmId] || !nm.nmId) {
@@ -727,27 +727,57 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
           }
 
           const mask = getMaskFromVendorCode(vendorCodes[nm.nmId]);
-          if (!(mask in jsonData[date]))
-            jsonData[date][mask] = {
+          if (!(mask in jsonData)) jsonData[mask] = {};
+
+          if (!(date in jsonData[mask]))
+            jsonData[mask][date] = {
               views: 0,
               clicks: 0,
               unique_users: 0,
-              ctr: 0,
-              cpc: 0,
               sum: 0,
+              ctr: 0,
+              cpm: 0,
+              cpc: 0,
             };
-          jsonData[date][mask].views += nm.views;
-          jsonData[date][mask].clicks += nm.clicks;
-          jsonData[date][mask].unique_users += nm.unique_users;
-          jsonData[date][mask].ctr =
-            jsonData[date][mask].clicks / jsonData[date][mask].views;
-          jsonData[date][mask].sum += nm.sum;
-          jsonData[date][mask].cpc =
-            jsonData[date][mask].sum / jsonData[date][mask].clicks;
-          if (mask == 'ПР_160_ОТК' && nm.sum == null && date =='2023-08-03') {
-            console.log(app);
-            // asdad += nm.sum;
-          }
+          jsonData[mask][date].views += nm.views ?? 0;
+          jsonData[mask][date].clicks += nm.clicks ?? 0;
+          jsonData[mask][date].unique_users += nm.unique_users ?? 0;
+          jsonData[mask][date].sum += nm.sum ?? 0;
+          if (jsonData[mask][date].views)
+            jsonData[mask][date].ctr =
+              jsonData[mask][date].clicks / jsonData[mask][date].views;
+          if (jsonData[mask][date].views)
+            jsonData[mask][date].cpm =
+              jsonData[mask][date].sum / (jsonData[mask][date].views / 1000);
+          if (jsonData[mask][date].clicks)
+            jsonData[mask][date].cpc =
+              jsonData[mask][date].sum / jsonData[mask][date].clicks;
+
+          /////// full campaign sums
+          if (!(date in jsonData[campaign]))
+            jsonData[campaign][date] = {
+              views: 0,
+              clicks: 0,
+              unique_users: 0,
+              sum: 0,
+              ctr: 0,
+              cpm: 0,
+              cpc: 0,
+            };
+          jsonData[campaign][date].views += nm.views ?? 0;
+          jsonData[campaign][date].clicks += nm.clicks ?? 0;
+          jsonData[campaign][date].unique_users += nm.unique_users ?? 0;
+          jsonData[campaign][date].sum += nm.sum ?? 0;
+          if (jsonData[campaign][date].views)
+            jsonData[campaign][date].ctr =
+              jsonData[campaign][date].clicks / jsonData[campaign][date].views;
+          if (jsonData[campaign][date].views)
+            jsonData[campaign][date].cpm =
+              jsonData[campaign][date].sum /
+              (jsonData[campaign][date].views / 1000);
+          if (jsonData[campaign][date].clicks)
+            jsonData[campaign][date].cpc =
+              jsonData[campaign][date].sum / jsonData[campaign][date].clicks;
         }
       }
     }
@@ -1018,18 +1048,19 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
         : "autoParams" in rkData
         ? "auto"
         : "united";
+        console.log(campaign, rkData);
     const nms =
       type == "standard"
         ? rkData.params[0].nms
         : type == "auto"
         ? rkData.autoParams.nms
         : rkData.unitedParams[0].nms;
-    // console.log(campaign, rkData, nms);
     const mask = getMaskFromVendorCode(
       vendorCodes[type == "standard" ? nms[0].nm : nms[0]]
     );
     console.log(
-      campaign, type,
+      campaign,
+      type,
       vendorCodes[type == "standard" ? nms[0].nm : nms[0]],
       mask
     );
@@ -1614,25 +1645,4 @@ const getMaskFromVendorCode = (vendorCode) => {
   else code.splice(2, 1);
 
   return code.join("_");
-};
-
-const indexToColumn = (index) => {
-  // Validate index size
-  const maxIndex = 18278;
-  if (index > maxIndex) {
-    return "";
-  }
-
-  // Get column from index
-  const l = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  if (index > 26) {
-    const letterA = indexToColumn(Math.floor((index - 1) / 26));
-    const letterB = indexToColumn(index % 26);
-    return letterA + letterB;
-  } else {
-    if (index == 0) {
-      index = 26;
-    }
-    return l[index - 1];
-  }
 };
