@@ -577,7 +577,7 @@ function updatePlanFact(auth, campaign) {
       ["саммари"],
     ];
     const dates_datas = {};
-    const all_masks = [];
+    const all_masks = [campaign];
     for (const [id, art] of Object.entries(vendorCodes)) {
       const mask = get_proper_mask(getMaskFromVendorCode(art));
       if (all_masks.includes(mask)) continue;
@@ -586,30 +586,29 @@ function updatePlanFact(auth, campaign) {
     all_masks.sort();
     if (all_masks[0] == "НАМАТРАСНИК") all_masks.push(all_masks.shift());
     console.log(all_masks);
-    for (let i = 0; i < all_masks.length + 1; i++) {
-      sheet_data[1] = sheet_data[1].concat(unique_params);
-      //// formulas
-      const formulas_to_concat = [];
-      for (let j = 0; j < unique_params.length; j++) {
-        const index_of_column = i * unique_params.length + j + 2;
-        const column_name = indexToColumn(index_of_column);
-        formulas_to_concat.push(
-          `=${
-            param_map[unique_params[j]].formula
-          }(${column_name}4:${column_name})`
-        );
-      }
-      sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
-
+    for (let i = 0; i < all_masks.length; i++) {
       for (const [temp_mask, dates] of Object.entries(advertStatsByMaskByDay)) {
+        sheet_data[1] = sheet_data[1].concat(unique_params);
+        //// formulas
+        const formulas_to_concat = [];
+        for (let j = 0; j < unique_params.length; j++) {
+          const index_of_column = i * unique_params.length + j + 2;
+          const column_name = indexToColumn(index_of_column);
+          formulas_to_concat.push(
+            `=${
+              param_map[unique_params[j]].formula
+            }(${column_name}4:${column_name})`
+          );
+        }
+        sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
+
+        if (all_masks[i] == campaign) continue;
         const mask = get_proper_mask(temp_mask);
         if (mask != all_masks[i]) continue;
         sheet_data[0] = sheet_data[0].concat(
           [mask].concat(Array(unique_params.length - 1))
         );
-
         // sheet_data[0].concat(new Array(8));
-
         // continue;
         for (const [date, dateData] of Object.entries(dates)) {
           if (new Date().getDate() - 31 > new Date(date).getDate()) continue;
