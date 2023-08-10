@@ -36,6 +36,7 @@ const {
   fetchStocksForLowRatingArts,
   fetchAdverts,
   fetchByNowStats,
+  updateAutoAdverts,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
@@ -83,7 +84,8 @@ const a = async () => {
 // fetchCardsAndWriteToJSON('delicatus')
 // fetchCardsAndWriteToJSON('TKS')
 // calcAvgOrdersAndWriteToJSON("mayusha");
-fetchAdverts()
+// fetchAdverts()
+updateAutoAdverts()
 // copyZakazToOtherSpreadsheet()
 // fetchAdvertsAndWriteToJson("mayusha");
 // fetchAdvertInfosAndWriteToJson("mayusha");

@@ -1,5 +1,6 @@
 const xlsx = require("node-xlsx");
 const axios = require("axios");
+const querystring = require("querystring");
 const fs = require("fs").promises;
 const afs = require("fs");
 const path = require("path");
@@ -86,6 +87,35 @@ const updateAdvertArtActivities = (authToken, params) => {
         Authorization: authToken,
       },
     })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const updateArtsInAutoRK = (authToken, queryParams, params) => {
+  return axios
+    .post(
+      "https://advert-api.wb.ru/adv/v1/auto/updatenm" + "?" + queryParams,
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+const updatePlacementsInAutoRK = (authToken, queryParams, params) => {
+  return axios
+    .post(
+      "https://advert-api.wb.ru/adv/v1/auto/active" + "?" + queryParams,
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
     .then((response) => response.data)
     .catch((error) => console.error(error));
 };
@@ -1048,7 +1078,7 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
         : "autoParams" in rkData
         ? "auto"
         : "united";
-        console.log(campaign, rkData);
+    console.log(campaign, rkData);
     const nms =
       type == "standard"
         ? rkData.params[0].nms
@@ -1143,36 +1173,46 @@ const updateAdvertArtActivitiesAndGenerateNotIncluded = async (campaign) => {
 
   const notIncluded = {};
   for (const [key, data] of Object.entries(advertInfos)) {
+    if (data.status == 7) continue;
+    const type =
+      "params" in data ? "standard" : "autoParams" in data ? "auto" : "united";
     // console.log(key, id);
-    const nms_temp = data.params[0].nms;
+    const nms_temp =
+      type == "standard"
+        ? data.params[0].nms
+        : type == "auto"
+        ? data.autoParams.nms
+        : data.unitedParams[0].nms;
     // console.log(key, data, nms_temp);
-    const nms = [];
-    for (let i = 0; i < nms_temp.length; i++) {
-      nms.push(String(nms_temp[i].nm));
-    }
-    for (const [id, art] of Object.entries(vendorCodes)) {
-      if (art.match(key)) {
-        if (!nms.includes(id) && stocks[art]) {
-          // console.log(stocks[art], art);
-          if (!(key in notIncluded)) notIncluded[key] = [];
-          // notIncluded[key].push({ nm: id, vendorCode: art });
-          notIncluded[key].push(id);
+    if (type == "standard") {
+      const nms = [];
+      for (let i = 0; i < nms_temp.length; i++) {
+        nms.push(String(nms_temp[i].nm));
+      }
+      for (const [id, art] of Object.entries(vendorCodes)) {
+        if (art.match(key)) {
+          if (!nms.includes(id) && stocks[art]) {
+            // console.log(stocks[art], art);
+            if (!(key in notIncluded)) notIncluded[key] = [];
+            // notIncluded[key].push({ nm: id, vendorCode: art });
+            notIncluded[key].push(id);
+          }
         }
       }
+      const nms_to_update = [];
+      for (const obj of nms_temp) {
+        obj.active = stocks[vendorCodes[obj.nm]] > 0;
+        nms_to_update.push(obj);
+      }
+      const params = {
+        advertId: data.advertId,
+        active: nms_to_update,
+        param: data.params[0].subjectId ?? data.params[0].setId,
+      };
+      // if (key != "ПР_120") continue;
+      console.log(campaign, key, params);
+      await updateAdvertArtActivities(authToken, params);
     }
-    const nms_to_update = [];
-    for (const obj of nms_temp) {
-      obj.active = stocks[vendorCodes[obj.nm]] > 0;
-      nms_to_update.push(obj);
-    }
-    const params = {
-      advertId: data.advertId,
-      active: nms_to_update,
-      param: data.params[0].subjectId ?? data.params[0].setId,
-    };
-    // if (key != "ПР_120") continue;
-    console.log(campaign, key, params);
-    await updateAdvertArtActivities(authToken, params);
   }
   // console.log(notIncluded);
   // return;
@@ -1183,6 +1223,70 @@ const updateAdvertArtActivitiesAndGenerateNotIncluded = async (campaign) => {
     )
     .then(() => console.log("notIncludedNMs.json created."))
     .catch((error) => console.error(error));
+};
+
+const updateAutoAdvertsInCampaign = async (campaign) => {
+  const authToken = getAuthToken("api-advert-token", campaign);
+  const advertInfos = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advertInfos.json")
+    )
+  );
+
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const artsData = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", "data.json"))
+  );
+
+  for (const [key, data] of Object.entries(advertInfos)) {
+    if (data.status == 7) continue;
+    const type =
+      "params" in data ? "standard" : "autoParams" in data ? "auto" : "united";
+    // console.log(key, id);
+    const nms_temp =
+      type == "standard"
+        ? data.params[0].nms
+        : type == "auto"
+        ? data.autoParams.nms
+        : data.unitedParams[0].nms;
+    if (type == "auto") {
+      if (!artsData[key]) continue;
+      console.log(key, data, nms_temp);
+      const nms_to_delete = [];
+      for (let i = 0; i < nms_temp.length; i++) {
+        const id = nms_temp[i];
+        if (vendorCodes[id] != key) nms_to_delete.push(id);
+      }
+      if (nms_temp.length == nms_to_delete.length) {
+        console.log(key, "nothing to leave in this RK.");
+        continue;
+      }
+      const params = {
+        delete: nms_to_delete,
+      };
+      console.log(campaign, key, params);
+      if (nms_to_delete.length) {
+        await updateArtsInAutoRK(
+          authToken,
+          querystring.stringify({ id: data.advertId }),
+          params
+        );
+      }
+      await updatePlacementsInAutoRK(
+        authToken,
+        querystring.stringify({ id: data.advertId }),
+        {
+          recom: false,
+          booster: true,
+          carousel: false,
+        }
+      );
+    }
+  }
 };
 
 const getKTErrorsAndWriteToJson = (campaign) => {
@@ -1635,6 +1739,7 @@ module.exports = {
   updateAdvertArtActivitiesAndGenerateNotIncluded,
   calcOrdersFromDetailedByPeriodAndWriteToJSON,
   getAdvertStatByMaskByDayAndWriteToJSON,
+  updateAutoAdvertsInCampaign,
 };
 
 const getMaskFromVendorCode = (vendorCode) => {

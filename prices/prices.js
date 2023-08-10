@@ -14,6 +14,7 @@ const {
   fetchArtsRatings,
   fetchAdvertStatsAndWriteToJson,
   getAdvertStatByMaskByDayAndWriteToJSON,
+  updateAutoAdvertsInCampaign,
 } = require("./main");
 const {
   writePrices,
@@ -163,6 +164,7 @@ const updateAdvertActivity = async () => {
   };
   campaigns.forEach(async (campaign) => {
     Promise.all([
+      await fetchStocksAndWriteToJSON(campaign),
       await fetchAdvertsAndWriteToJson(campaign),
       await fetchAdvertInfosAndWriteToJson(campaign),
       await updateAdvertArtActivitiesAndGenerateNotIncluded(campaign),
@@ -188,6 +190,18 @@ const updateAdvertActivity = async () => {
   });
 };
 
+const updateAutoAdverts = async () => {
+  campaigns.forEach(async (campaign) => {
+    Promise.all([
+      await fetchAdvertsAndWriteToJson(campaign),
+      await fetchAdvertInfosAndWriteToJson(campaign),
+      await updateAutoAdvertsInCampaign(campaign),
+    ]).catch((error) => {
+      console.error("An error occurred:", error);
+    });
+  });
+};
+
 const fetchStocksForLowRatingArts = () => {
   return new Promise((resolve, reject) => {
     const promises = [];
@@ -207,6 +221,7 @@ module.exports = {
   updateAnalytics,
   updateAtriculesData,
   updateAdvertActivity,
+  updateAutoAdverts,
   fetchStocksForLowRatingArts,
   fetchAdverts,
   fetchByNowStats,

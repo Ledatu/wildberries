@@ -32,6 +32,7 @@ const {
   fetchStocksForLowRatingArts,
   fetchAdverts,
   fetchByNowStats,
+  updateAutoAdverts,
 } = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
@@ -173,6 +174,11 @@ app.get("/api/fetchStocksForLowRatingArts", authenticateToken, (req, res) => {
 app.get("/api/updateAnalytics", authenticateToken, (req, res) => {
   updateAnalytics();
   res.send("Analytics is updating...");
+});
+
+app.get("/api/updateAutoAdverts", authenticateToken, (req, res) => {
+  updateAutoAdverts();
+  res.send("updateAutoAdverts is updating...");
 });
 
 app.get("/api/fetchAdverts", authenticateToken, (req, res) => {
