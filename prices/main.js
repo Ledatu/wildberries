@@ -1090,6 +1090,7 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
     );
     if (mask == "NO_SUCH_MASK_AVAILABLE") {
       console.log('NO_SUCH_MASK_AVAILABLE', name, rkData)
+      continue
     }
     console.log(
       campaign,
