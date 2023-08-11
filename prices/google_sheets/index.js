@@ -612,11 +612,20 @@ function updatePlanFact(auth, campaign) {
       // continue;
 
       if (!dates) {
-        console.log(mask);
-        for (const [date, row] of Object.entries(dates_datas))
-          dates_datas[date] = dates_datas[date].concat(
+        const cur_date = new Date();
+        cur_date.setDate(cur_date.getDate() + 1);
+        for (let i = 0; i < 31; i++) {
+          cur_date.setDate(cur_date.getDate() - 1);
+          const str_date = cur_date
+            .toLocaleDateString("ru-RU")
+            .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+            .slice(0, 10);
+          // console.log(str_date);
+          if (!(str_date in dates_datas)) dates_datas[str_date] = [str_date];
+          dates_datas[str_date] = dates_datas[str_date].concat(
             Array(unique_params.length)
           );
+        }
         continue;
       }
 
@@ -673,10 +682,29 @@ function updatePlanFact(auth, campaign) {
     for (let i = 3; i < sheet_data.length; i++) {
       if (!sheet_data[i]) continue;
       const str_date = sheet_data[i][0];
-      advertStatsByMaskByDay[campaign][str_date].orders =
-        byDayCampaignSum[str_date].count;
-      advertStatsByMaskByDay[campaign][str_date].sum_orders =
-        byDayCampaignSum[str_date].sum;
+      if (!(str_date in advertStatsByMaskByDay[campaign]))
+        advertStatsByMaskByDay[campaign][str_date] = {
+          views: 0,
+          clicks: 0,
+          unique_users: 0,
+          sum: 0,
+          ctr: 0,
+          cpm: 0,
+          cpc: 0,
+          orders: 0,
+          sum_orders: 0,
+          drr: 0,
+        };
+      advertStatsByMaskByDay[campaign][str_date].orders = byDayCampaignSum[
+        str_date
+      ]
+        ? byDayCampaignSum[str_date].count
+        : 0;
+      advertStatsByMaskByDay[campaign][str_date].sum_orders = byDayCampaignSum[
+        str_date
+      ]
+        ? byDayCampaignSum[str_date].sum
+        : 0;
       advertStatsByMaskByDay[campaign][str_date].drr =
         advertStatsByMaskByDay[campaign][str_date].sum /
         advertStatsByMaskByDay[campaign][str_date].sum_orders;
@@ -735,7 +763,7 @@ function updatePlanFact(auth, campaign) {
     // });
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      range: `${spIds[campaign]}!4:1000`,
+      range: `${spIds[campaign]}!4:100`,
     });
     await sheets.spreadsheets.values.update({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
