@@ -1088,6 +1088,9 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
     const mask = getMaskFromVendorCode(
       vendorCodes[type == "standard" ? nms[0].nm : nms[0]]
     );
+    if (mask == "NO_SUCH_MASK_AVAILABLE") {
+      console.log('NO_SUCH_MASK_AVAILABLE', name, rkData)
+    }
     console.log(
       campaign,
       type,
@@ -1743,6 +1746,7 @@ module.exports = {
 };
 
 const getMaskFromVendorCode = (vendorCode) => {
+  if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE"
   const code = vendorCode.split("_");
   if (code.slice(-1) == "2") code.pop();
   if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
