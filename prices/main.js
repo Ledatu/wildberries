@@ -743,6 +743,15 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
     )
   );
   let asdad = 0;
+  const get_proper_mask = (temp_mask) => {
+    const mask_splitted = temp_mask.split("_");
+    if (campaign != "delicatus" || !temp_mask.includes("КПБ"))
+      mask_splitted.pop();
+    if (temp_mask.includes("НАМАТРАСНИК")) {
+      if (campaign == "delicatus") mask_splitted.pop();
+    }
+    return mask_splitted.join("_");
+  };
   const jsonData = {};
   jsonData[campaign] = {};
   for (const [name, rkData] of Object.entries(advertStats)) {
@@ -756,7 +765,7 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
             continue;
           }
 
-          const mask = getMaskFromVendorCode(vendorCodes[nm.nmId]);
+          const mask = get_proper_mask(getMaskFromVendorCode(vendorCodes[nm.nmId]));
           if (!(mask in jsonData)) jsonData[mask] = {};
 
           if (!(date in jsonData[mask]))

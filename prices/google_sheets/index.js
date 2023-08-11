@@ -584,7 +584,7 @@ function updatePlanFact(auth, campaign) {
       all_masks.push(mask);
     }
     all_masks.sort();
-    if (all_masks[0] == "НАМАТРАСНИК") all_masks.push(all_masks.shift());
+    // if (all_masks[0] == "НАМАТРАСНИК") all_masks.push(all_masks.shift());
     console.log(all_masks);
     for (let i = 0; i < all_masks.length; i++) {
       sheet_data[1] = sheet_data[1].concat(unique_params);
@@ -602,50 +602,60 @@ function updatePlanFact(auth, campaign) {
       sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
       if (all_masks[i] == campaign) continue;
 
-      for (const [temp_mask, dates] of Object.entries(advertStatsByMaskByDay)) {
-        const mask = get_proper_mask(temp_mask);
-        if (mask != all_masks[i]) continue;
-        sheet_data[0] = sheet_data[0].concat(
-          [mask].concat(Array(unique_params.length - 1))
-        );
-        // sheet_data[0].concat(new Array(8));
-        // continue;
-        for (const [date, dateData] of Object.entries(dates)) {
-          if (new Date().getDate() - 31 > new Date(date).getDate()) continue;
-          dateData.sum_orders = 0;
-          dateData.orders = 0;
-          // console.log(date, mask, dateData);
-          if (!sum_orders[date]) {
-            // console.log(date, temp_mask, dateData);
-            continue;
-          }
-          const mask = get_proper_mask(temp_mask);
+      const mask = all_masks[i];
+      const dates = advertStatsByMaskByDay[mask];
+      if (mask != all_masks[i]) continue;
+      sheet_data[0] = sheet_data[0].concat(
+        [mask].concat(Array(unique_params.length - 1))
+      );
+      // sheet_data[0].concat(new Array(8));
+      // continue;
 
-          if (!(date in dates_datas))
-            dates_datas[date] = [date].concat(Array(unique_params.length));
+      if (!dates) {
+        console.log(mask);
+        for (const [date, row] of Object.entries(dates_datas))
+          dates_datas[date] = dates_datas[date].concat(
+            Array(unique_params.length)
+          );
+        continue;
+      }
 
-          for (const [art, sum] of Object.entries(sum_orders[date])) {
-            if (!art.includes(mask)) continue;
-            // console.log(art, mask, sum);
-            dateData.sum_orders += sum;
-          }
-          for (const [art, count] of Object.entries(orders[date])) {
-            if (!art.includes(mask)) continue;
-            // console.log(art, mask, sum);
-            dateData.orders += count;
-          }
-          dateData.drr = dateData.sum / dateData.sum_orders;
-
-          const to_push = [];
-          for (let j = 0; j < unique_params.length; j++) {
-            to_push.push(dateData[param_map[unique_params[j]].name]);
-          }
-          dates_datas[date] = dates_datas[date].concat(to_push);
-          // console.log(mask, fact[i], to_push);
+      for (const [date, dateData] of Object.entries(dates)) {
+        if (new Date().getDate() - 31 > new Date(date).getDate()) continue;
+        dateData.sum_orders = 0;
+        dateData.orders = 0;
+        // console.log(date, mask, dateData);
+        if (!sum_orders[date]) {
+          // console.log(date, temp_mask, dateData);
+          dates_datas[date] = [date].concat(Array(unique_params.length));
+          continue;
         }
+
+        if (!(date in dates_datas))
+          dates_datas[date] = [date].concat(Array(unique_params.length));
+
+        for (const [art, sum] of Object.entries(sum_orders[date])) {
+          if (!art.includes(mask)) continue;
+          // console.log(art, mask, sum);
+          dateData.sum_orders += sum;
+        }
+        for (const [art, count] of Object.entries(orders[date])) {
+          if (!art.includes(mask)) continue;
+          // console.log(art, mask, sum);
+          dateData.orders += count;
+        }
+        dateData.drr = dateData.sum / dateData.sum_orders;
+
+        const to_push = Array(unique_params.length);
+        for (let j = 0; j < unique_params.length; j++) {
+          to_push[j] = dateData[param_map[unique_params[j]].name];
+        }
+        if (date == "2023-08-10") console.log(mask, to_push);
+        dates_datas[date] = dates_datas[date].concat(to_push);
+        // console.log(mask, fact[i], to_push);
       }
     }
-
+    console.log(dates_datas);
     const cur_date = new Date();
     cur_date.setDate(cur_date.getDate() + 1);
     for (let i = 0; i < 31; i++) {
@@ -676,7 +686,7 @@ function updatePlanFact(auth, campaign) {
         to_push.push(
           advertStatsByMaskByDay[campaign][str_date][
             param_map[unique_params[j]].name
-          ]
+          ] ?? 0
         );
       }
       campaign_summary.push([""].concat(to_push));
@@ -723,8 +733,11 @@ function updatePlanFact(auth, campaign) {
     //     ],
     //   },
     // });
-
-    sheets.spreadsheets.values.update({
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `${spIds[campaign]}!4:1000`,
+    });
+    await sheets.spreadsheets.values.update({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
       range: `${spIds[campaign]}!4:1000`,
       valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
