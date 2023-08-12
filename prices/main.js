@@ -1275,7 +1275,7 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
   );
   const backVendorCodes = {};
   for (const [id, art] of Object.entries(vendorCodes))
-    backVendorCodes[art] = id;
+    backVendorCodes[art] = parseInt(id);
   const artsData = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", "data.json"))
   );
