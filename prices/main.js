@@ -76,8 +76,8 @@ const getAdvertStat = (authToken, params) => {
       },
       params: params,
     })
-    .then((response) => response.data)
-    // .catch((error) => console.error(error));
+    .then((response) => response.data);
+  // .catch((error) => console.error(error));
 };
 
 const updateAdvertArtActivities = (authToken, params) => {
@@ -439,6 +439,7 @@ const writeAdvertsToJson = (data, campaign) => {
   const this_month = new Date();
   this_month.setDate(this_month.getDate() - 31);
   data.forEach((item) => {
+    if (item.status == 4) return;
     if (item.status == 7 && new Date(item.endTime) < this_month) return;
     jsonData[item.advertId] = new Date(item.createTime)
       .toISOString()
@@ -1158,7 +1159,8 @@ const fetchAdvertStatsAndWriteToJson = async (campaign) => {
       .then((pr) => {
         jsonData[key] = pr;
         console.log(campaign, key, data.advertId);
-      }).catch((er) => retry_query.push(params));
+      })
+      .catch((er) => retry_query.push(params));
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   while (retry_query.length) {
@@ -1172,7 +1174,10 @@ const fetchAdvertStatsAndWriteToJson = async (campaign) => {
           jsonData[key] = pr;
           console.log(key, data.advertId);
           retry_query[index] = 0;
-        }).catch(er => console.log(campaign, params, er.response ? er.response.data : er))
+        })
+        .catch((er) =>
+          console.log(campaign, params, er.response ? er.response.data : er)
+        );
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
     retry_query.filter((a) => {
