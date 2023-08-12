@@ -77,7 +77,7 @@ const getAdvertStat = (authToken, params) => {
       params: params,
     })
     .then((response) => response.data)
-    .catch((error) => console.error(error));
+    // .catch((error) => console.error(error));
 };
 
 const updateAdvertArtActivities = (authToken, params) => {
@@ -102,7 +102,7 @@ const updateArtsInAutoRK = (authToken, queryParams, params) => {
         },
       }
     )
-    .then((response) => response.data)
+    .then((response) => console.log(response.data))
     .catch((error) => console.error(error));
 };
 const updatePlacementsInAutoRK = (authToken, queryParams, params) => {
@@ -765,7 +765,9 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
             continue;
           }
 
-          const mask = get_proper_mask(getMaskFromVendorCode(vendorCodes[nm.nmId]));
+          const mask = get_proper_mask(
+            getMaskFromVendorCode(vendorCodes[nm.nmId])
+          );
           if (!(mask in jsonData)) jsonData[mask] = {};
 
           if (!(date in jsonData[mask]))
@@ -1098,8 +1100,8 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
       vendorCodes[type == "standard" ? nms[0].nm : nms[0]]
     );
     if (mask == "NO_SUCH_MASK_AVAILABLE") {
-      console.log('NO_SUCH_MASK_AVAILABLE', name, rkData)
-      continue
+      console.log("NO_SUCH_MASK_AVAILABLE", name, rkData);
+      continue;
     }
     console.log(
       campaign,
@@ -1147,15 +1149,35 @@ const fetchAdvertStatsAndWriteToJson = async (campaign) => {
       path.join(__dirname, "files", campaign, "advertInfos.json")
     )
   );
+  const retry_query = [];
   const jsonData = {};
   for (const [key, data] of Object.entries(adverts)) {
     if (!data.advertId) continue;
     const params = { id: data.advertId };
-    await getAdvertStat(authToken, params).then((pr) => {
-      jsonData[key] = pr;
-      console.log(key, data.advertId);
-    });
+    await getAdvertStat(authToken, params)
+      .then((pr) => {
+        jsonData[key] = pr;
+        console.log(campaign, key, data.advertId);
+      }).catch((er) => retry_query.push(params));
     await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  while (retry_query.length) {
+    console.log(campaign, "TO RETRY:", retry_query);
+    await new Promise((resolve) => setTimeout(resolve, 5 * 60 * 1000));
+
+    for (const [index, params] of Object.entries(retry_query)) {
+      // console.log(campaign, 'trying:', params);
+      await getAdvertStat(authToken, params)
+        .then((pr) => {
+          jsonData[key] = pr;
+          console.log(key, data.advertId);
+          retry_query[index] = 0;
+        }).catch(er => console.log(campaign, params, er.response ? er.response.data : er))
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    retry_query.filter((a) => {
+      if (a != 0) return 1;
+    });
   }
   return fs
     .writeFile(
@@ -1251,12 +1273,17 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
       path.join(__dirname, "files", campaign, "vendorCodes.json")
     )
   );
+  const backVendorCodes = {};
+  for (const [id, art] of Object.entries(vendorCodes))
+    backVendorCodes[art] = id;
   const artsData = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", "data.json"))
   );
 
-  for (const [key, data] of Object.entries(advertInfos)) {
+  for (const [first_name, data] of Object.entries(advertInfos)) {
     if (data.status == 7) continue;
+    const key = data.name;
+    console.log(key);
     const type =
       "params" in data ? "standard" : "autoParams" in data ? "auto" : "united";
     // console.log(key, id);
@@ -1276,6 +1303,11 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
       }
       if (nms_temp.length == nms_to_delete.length) {
         console.log(key, "nothing to leave in this RK.");
+        await updateArtsInAutoRK(
+          authToken,
+          querystring.stringify({ id: data.advertId }),
+          { add: [backVendorCodes[key]] }
+        );
         continue;
       }
       const params = {
@@ -1289,6 +1321,7 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
           params
         );
       }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       await updatePlacementsInAutoRK(
         authToken,
         querystring.stringify({ id: data.advertId }),
@@ -1756,7 +1789,7 @@ module.exports = {
 };
 
 const getMaskFromVendorCode = (vendorCode) => {
-  if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE"
+  if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE";
   const code = vendorCode.split("_");
   if (code.slice(-1) == "2") code.pop();
   if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);

@@ -621,10 +621,8 @@ function updatePlanFact(auth, campaign) {
             .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
             .slice(0, 10);
           // console.log(str_date);
-          if (!(str_date in dates_datas)) dates_datas[str_date] = [str_date];
-          dates_datas[str_date] = dates_datas[str_date].concat(
-            Array(unique_params.length)
-          );
+          if (!(str_date in dates_datas)) dates_datas[str_date] = {};
+          dates_datas[str_date][mask] = Array(unique_params.length);
         }
         continue;
       }
@@ -635,13 +633,12 @@ function updatePlanFact(auth, campaign) {
         dateData.orders = 0;
         // console.log(date, mask, dateData);
         if (!sum_orders[date]) {
-          // console.log(date, temp_mask, dateData);
-          dates_datas[date] = [date].concat(Array(unique_params.length));
+          // dates_datas[date] = {};
           continue;
         }
 
         if (!(date in dates_datas))
-          dates_datas[date] = [date].concat(Array(unique_params.length));
+          dates_datas[date] = {};
 
         for (const [art, sum] of Object.entries(sum_orders[date])) {
           if (!art.includes(mask)) continue;
@@ -659,8 +656,8 @@ function updatePlanFact(auth, campaign) {
         for (let j = 0; j < unique_params.length; j++) {
           to_push[j] = dateData[param_map[unique_params[j]].name];
         }
-        if (date == "2023-08-10") console.log(mask, to_push);
-        dates_datas[date] = dates_datas[date].concat(to_push);
+        if (mask == "КПБ_2_СТРАЙП") console.log(mask, to_push);
+        dates_datas[date][mask] = to_push;
         // console.log(mask, fact[i], to_push);
       }
     }
@@ -675,7 +672,11 @@ function updatePlanFact(auth, campaign) {
         .slice(0, 10);
       // console.log(str_date);
 
-      sheet_data.push(dates_datas[str_date]);
+      sheet_data.push([str_date]);
+      for (let j = 0; j < all_masks.length; j++) {
+        if (all_masks[j] == 'ПРПЭ_200') console.log(str_date, dates_datas[str_date][all_masks[j]]);
+        sheet_data[sheet_data.length-1] = sheet_data[sheet_data.length-1].concat(dates_datas[str_date][all_masks[j]] ?? Array(unique_params.length))
+      }
     }
     // console.log(sheet_data);
     const campaign_summary = [];
@@ -763,7 +764,7 @@ function updatePlanFact(auth, campaign) {
     // });
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      range: `${spIds[campaign]}!4:100`,
+      range: `${spIds[campaign]}!4:1000`,
     });
     await sheets.spreadsheets.values.update({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",

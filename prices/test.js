@@ -26,6 +26,7 @@ const {
   calcOrdersFromDetailedByPeriodAndWriteToJSON,
   fetchAdvertStatsAndWriteToJson,
   getAdvertStatByMaskByDayAndWriteToJSON,
+  updateAutoAdvertsInCampaign,
 } = require("./main");
 const {
   getPrices,
@@ -84,7 +85,7 @@ const a = async () => {
 // fetchCardsAndWriteToJSON('delicatus')
 // fetchCardsAndWriteToJSON('TKS')
 // calcAvgOrdersAndWriteToJSON("mayusha");
-// fetchAdverts()
+fetchAdverts()
 // updateAutoAdverts()
 // copyZakazToOtherSpreadsheet()
 // fetchAdvertsAndWriteToJson("mayusha");
@@ -97,5 +98,7 @@ const a = async () => {
 // updatePlanFact('delicatus')
 // fetchByNowStats()
 // fetchOrdersAndWriteToJSON("TKS");
-updatePlanFact('TKS')
+// updateAutoAdvertsInCampaign('delicatus')
+// updatePlanFact('TKS')
+// updateAutoAdverts()
 // fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
