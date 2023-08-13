@@ -1163,7 +1163,7 @@ const fetchAdvertStatsAndWriteToJson = async (campaign) => {
       .catch((er) => retry_query.push(params));
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  while (retry_query.length) {
+  if (retry_query.length) {
     console.log(campaign, "TO RETRY:", retry_query);
     await new Promise((resolve) => setTimeout(resolve, 5 * 60 * 1000));
 
@@ -1180,9 +1180,6 @@ const fetchAdvertStatsAndWriteToJson = async (campaign) => {
         );
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
-    retry_query.filter((a) => {
-      if (a != 0) return 1;
-    });
   }
   return fs
     .writeFile(
