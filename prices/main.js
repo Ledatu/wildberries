@@ -859,7 +859,7 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
         )
           return;
 
-        const type = item.sa_name.split("_").slice(0, 2).join("_");
+        const type = getMaskFromVendorCode(item.sa_name)
         if (!(type in jsonData)) {
           jsonData[type] = { buyout: 0, delivery: 0 };
         }

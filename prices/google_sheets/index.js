@@ -148,8 +148,8 @@ async function writeDetailedByPeriod(auth, campaign) {
 
       if (row[4] != seller_ids[campaign]) continue;
 
-      const type = row[0].split("_").slice(0, 2).join("_");
-      // console.log(type);
+      const type = getMaskFromVendorCode(row[0]);
+       // console.log(type);
       data[i][0] = `${
         delivery[type] ? delivery[type].average_delivery : data[i][0]
       }`.replace(".", ",");
@@ -637,8 +637,7 @@ function updatePlanFact(auth, campaign) {
           continue;
         }
 
-        if (!(date in dates_datas))
-          dates_datas[date] = {};
+        if (!(date in dates_datas)) dates_datas[date] = {};
 
         for (const [art, sum] of Object.entries(sum_orders[date])) {
           if (!art.includes(mask)) continue;
@@ -674,8 +673,13 @@ function updatePlanFact(auth, campaign) {
 
       sheet_data.push([str_date]);
       for (let j = 0; j < all_masks.length; j++) {
-        if (all_masks[j] == 'ПРПЭ_200') console.log(str_date, dates_datas[str_date][all_masks[j]]);
-        sheet_data[sheet_data.length-1] = sheet_data[sheet_data.length-1].concat(dates_datas[str_date][all_masks[j]] ?? Array(unique_params.length))
+        if (all_masks[j] == "ПРПЭ_200")
+          console.log(str_date, dates_datas[str_date][all_masks[j]]);
+        sheet_data[sheet_data.length - 1] = sheet_data[
+          sheet_data.length - 1
+        ].concat(
+          dates_datas[str_date][all_masks[j]] ?? Array(unique_params.length)
+        );
       }
     }
     // console.log(sheet_data);
