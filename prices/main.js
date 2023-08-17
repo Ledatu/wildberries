@@ -1742,6 +1742,7 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
   dateFrom.setDate(dateFrom.getDate() - 8);
   for (const order_data_date in orders_by_day) {
     const order_date = new Date(order_data_date);
+    if (dateFrom > new Date(order_data_date))continue
     // console.log(order_date, dateFrom);
     jsonData = calcAvgOrders(jsonData, order_data_date);
   }
