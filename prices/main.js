@@ -91,6 +91,67 @@ const updateAdvertArtActivities = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
+const fetchRKsBudget = (authToken, params) => {
+  return axios
+    .get("https://advert-api.wb.ru/adv/v1/budget", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+const updateRKsBudget = (authToken, queryParams, params) => {
+  return axios
+    .post(
+      "https://advert-api.wb.ru/adv/v1/budget/deposit" + "?" + queryParams,
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => console.log(response.data))
+    .catch((error) => console.error(error));
+};
+const startRK = (authToken, params) => {
+  return axios
+    .get("https://advert-api.wb.ru/adv/v0/start", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+const updatePlusPhrasesActivity = (authToken, params) => {
+  return axios
+    .get("https://advert-api.wb.ru/adv/v1/search/set-plus", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+const updatePlusPhrasesInRK = (authToken, queryParams, params) => {
+  return axios
+    .post(
+      "https://advert-api.wb.ru/adv/v1/search/set-plus" + "?" + queryParams,
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => console.log(response.data))
+    .catch((error) => console.error(error));
+};
 const updateArtsInAutoRK = (authToken, queryParams, params) => {
   return axios
     .post(
@@ -439,7 +500,6 @@ const writeAdvertsToJson = (data, campaign) => {
   const this_month = new Date();
   this_month.setDate(this_month.getDate() - 31);
   data.forEach((item) => {
-    if (item.status == 4) return;
     if (item.status == 7 && new Date(item.endTime) < this_month) return;
     jsonData[item.advertId] = new Date(item.createTime)
       .toISOString()
@@ -859,7 +919,7 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
         )
           return;
 
-        const type = getMaskFromVendorCode(item.sa_name)
+        const type = getMaskFromVendorCode(item.sa_name);
         if (!(type in jsonData)) {
           jsonData[type] = { buyout: 0, delivery: 0 };
         }
@@ -1083,6 +1143,7 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
   // check that RK contains only one type of mask and send(toggleable) inform email if violated
   const violated_rks = {};
   for (const [name, rkData] of Object.entries(jsonData)) {
+    if (rkData.status == 4) continue;
     // console.log(campaign, rkData);
     const type =
       "params" in rkData
@@ -1140,6 +1201,116 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
       JSON.stringify(jsonData)
     )
     .then(() => console.log("advertInfos.json created."))
+    .catch((error) => console.error(error));
+};
+
+const setFixedPhrasesForCreatedRKs = async (campaign) => {
+  const authToken = getAuthToken("api-advert-token", campaign);
+  const advertInfos = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advertInfos.json")
+    )
+  );
+  const RKsToCreate = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files/RKsToCreate.json"))
+  );
+
+  for (const [name, rk_data] of Object.entries(advertInfos)) {
+    if (rk_data.status != 4) continue;
+    let to_create_params = {};
+    for (let i = 0; i < RKsToCreate.length; i++)
+      if (RKsToCreate[i].art == name) to_create_params = RKsToCreate[i];
+    if (!Object.entries(to_create_params)) continue;
+    console.log(name, to_create_params);
+    // continue;
+
+    console.log(
+      campaign,
+      "Setting fixed phrases:",
+      to_create_params.phrase,
+      "for",
+      name,
+      rk_data.advertId
+    );
+    // continue;
+    const rk_id = rk_data.advertId;
+    console.log(
+      querystring.stringify({
+        id: rk_id,
+      }),
+      to_create_params.budget
+    );
+    // continue
+
+    // await updateRKsBudget(
+    //   authToken,
+    //   querystring.stringify({
+    //     id: rk_id,
+    //   }),
+    //   {
+    //     sum: parseInt(String(to_create_params.budget).replace(/\s/g, "")),
+    //     type: 1,
+    //   }
+    // );
+    await startRK(authToken, {
+      id: rk_id,
+    });
+    // await updatePlusPhrasesActivity(authToken, {
+    //   id: rk_id,
+    //   fixed: true,
+    // });
+    // await updatePlusPhrasesInRK(
+    //   authToken,
+    //   querystring.stringify({
+    //     id: rk_id,
+    //   }),
+    //   { pluse: [to_create_params.phrase] }
+    // );
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    continue;
+  }
+};
+
+const fetchRksBudgetsAndWriteToJSON = async (campaign) => {
+  const authToken = getAuthToken("api-advert-token", campaign);
+  const RKsToCreate = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files/RKsToCreate.json"))
+  );
+  for (const [key, data] of Object.entries(RKsToCreate)) {
+    if (!data.advertId) continue;
+    const params = { id: data.advertId };
+    await getAdvertStat(authToken, params)
+      .then((pr) => {
+        jsonData[key] = pr;
+        console.log(campaign, key, data.advertId);
+      })
+      .catch((er) => retry_query.push(params));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  if (retry_query.length) {
+    console.log(campaign, "TO RETRY:", retry_query);
+    await new Promise((resolve) => setTimeout(resolve, 5 * 60 * 1000));
+
+    for (const [index, params] of Object.entries(retry_query)) {
+      // console.log(campaign, 'trying:', params);
+      await getAdvertStat(authToken, params)
+        .then((pr) => {
+          jsonData[key] = pr;
+          console.log(key, data.advertId);
+          retry_query[index] = 0;
+        })
+        .catch((er) =>
+          console.log(campaign, params, er.response ? er.response.data : er)
+        );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "advertStats.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("advertStats.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -1568,7 +1739,7 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
 
   let jsonData = {};
   const dateFrom = new Date(new Date().toISOString().slice(0, 10));
-  dateFrom.setDate(dateFrom.getDate() - 30);
+  dateFrom.setDate(dateFrom.getDate() - 8);
   for (const order_data_date in orders_by_day) {
     const order_date = new Date(order_data_date);
     // console.log(order_date, dateFrom);
@@ -1788,6 +1959,7 @@ module.exports = {
   calcOrdersFromDetailedByPeriodAndWriteToJSON,
   getAdvertStatByMaskByDayAndWriteToJSON,
   updateAutoAdvertsInCampaign,
+  setFixedPhrasesForCreatedRKs,
 };
 
 const getMaskFromVendorCode = (vendorCode) => {

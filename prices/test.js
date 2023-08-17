@@ -8,6 +8,7 @@ const {
   updateLowRatingStocksSheet,
   fetchAvgRatingsAndWriteToJSON,
   updatePlanFact,
+  fetchNewRKsToCreate,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -27,6 +28,7 @@ const {
   fetchAdvertStatsAndWriteToJson,
   getAdvertStatByMaskByDayAndWriteToJSON,
   updateAutoAdvertsInCampaign,
+  setFixedPhrasesForCreatedRKs,
 } = require("./main");
 const {
   getPrices,
@@ -43,7 +45,7 @@ const {
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
 // getDelivery().then((pr) => console.log(pr));
 // fetchDataAndWriteToJSON()
-// getPrices();
+getPrices();
 // updateAnalyticsOrders("mayusha");
 // sendRKErrors('projecttriggers@gmail.com', 'Ошибки РК', 'Тест');
 // updateAdvertArtActivitiesAndGenerateNotIncluded('mayusha')
@@ -86,7 +88,7 @@ const a = async () => {
 // fetchCardsAndWriteToJSON('TKS')
 // calcAvgOrdersAndWriteToJSON("mayusha");
 // fetchAdverts()
-updateAutoAdverts()
+// updateAutoAdverts()
 // copyZakazToOtherSpreadsheet()
 // fetchAdvertsAndWriteToJson("mayusha");
 // fetchAdvertInfosAndWriteToJson("mayusha");
@@ -102,3 +104,6 @@ updateAutoAdverts()
 // updatePlanFact('TKS')
 // updateAutoAdverts()
 // fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
+// fetchNewRKsToCreate();
+// setFixedPhrasesForCreatedRKs("mayusha");
+

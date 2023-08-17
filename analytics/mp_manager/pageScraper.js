@@ -12,21 +12,32 @@ function getRandomArbitrary(min, max) {
 }
 
 const scraperObject = {
-  async scraper(browser, adsIds) {
+  async scraper(browser, campaign) {
     const context = await browser.newContext();
-    context.addCookies(cookies[adsIds.campaign]);
     // for (let id = 0; id < adsIds.data.length; id++) {
+    const RKsToCreate = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, "../../prices/files/RKsToCreate.json")
+      )
+    );
+    const artsData = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../../prices/files/data.json"))
+    );
+    const seller_ids = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../../prices/files/campaigns.json"))
+    ).seller_ids;
+    const reverse_seller_ids = {};
+    for (const [campaign, id] of Object.entries(seller_ids))
+      reverse_seller_ids[id] = campaign;
 
-    const download = async (id) =>
+    const createRK = async (rk_name, id, subject, rk_type) =>
       new Promise(async (resolve, reject) => {
-        const adId = adsIds.data[id];
-        console.log(`${parseInt(id) + 1}/${adsIds.data.length}`, adId);
-        if (!adId.id) {
-          resolve();
-          return;
-        }
         const page = await context.newPage();
-        const url = `https://cmp.wildberries.ru/statistics/${adId.id}`;
+        const urls = {
+          Поиск: "https://cmp.wildberries.ru/campaigns/create/search",
+        };
+
+        const url = urls[rk_type];
         //		context.setDefaultTimeout(60000*3)
         // await page.setViewportSize({ width: 1600, height: 30000 });
         console.log(`Navigating to ${url}...`);
@@ -35,80 +46,92 @@ const scraperObject = {
         await page.waitForLoadState();
         await page.goto(url);
         await page.waitForLoadState();
-        await page.waitForTimeout(getRandomArbitrary(10000, 15000));
+        await page.waitForTimeout(getRandomArbitrary(2000, 4000));
 
         // return
         // Wait for the required DOM to be rendered
-        await page.waitForSelector(
-          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > input"
-        );
+        await page.waitForSelector("#campaignName");
         // await page.waitForTimeout(10000);
 
-        const fromDate = new Date();
-        for (let i = 1; i < 2; i++) {
-          // for (let i = 1; i < 4; i++) {
-          await page.$eval(
-            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > input",
-            async (el) => await el.click()
-          );
-          await page.waitForTimeout(getRandomArbitrary(4000, 5000));
+        // for (let i = 1; i < 4; i++) {
 
-          const date = new Date();
-          date.setDate(fromDate.getDate() - i);
-          const str_date = date
-            .toISOString()
-            .slice(0, 10)
-            .replace(/(\d{4})-(\d{2})-(\d{2})/, "$3.$2.$1");
-          await page.fill(
-            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > input:nth-child(3)",
-            str_date
-          );
-          await page.waitForTimeout(getRandomArbitrary(500, 2000));
-          await page.fill(
-            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > input:nth-child(5)",
-            str_date
-          );
-          await page.waitForTimeout(getRandomArbitrary(500, 2000));
-          await page.click(
-            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div.period > app-date-picker > div > div.date-picker__wrap-calendar.date-picker__wrap-calendar--period.ng-star-inserted > div.date-picker__period-calendar.ng-star-inserted > button"
-          );
-          await page.waitForTimeout(getRandomArbitrary(3000, 7000));
-          const downloadPromise = page.waitForEvent("download");
-          await page.click(
-            "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-advert > div > div.campaign-data.ng-star-inserted > div.campaign-data__filters > div.campaign-data__filters__left > div:nth-child(3) > div > button"
-          );
+        // await page.$eval(
+        //   "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-campaigns-list > app-create-campaign-modal > app-modal > div.modal > div > div.modal__dialog__body > div > div.campaign-type > div:nth-child(5)",
+        //   async (el) => await el.click()
+        // );
+        // await page.waitForTimeout(getRandomArbitrary(4000, 5000));
 
-          const mainDlDir = path.join(
-            __dirname,
-            "../files",
-            adsIds.campaign,
-            adId.title
-          );
-          if (!fs.existsSync(mainDlDir)) {
-            // fs.rmSync(mainQrDir, { recursive: true, force: true }, (err) => {
-            //   if (err) reject(err);
-            // });
-            fs.mkdir(mainDlDir, (err) => {
-              if (err) reject(err);
-            });
-          }
+        await page.fill("#campaignName", rk_name);
+        await page.waitForTimeout(getRandomArbitrary(500, 2000));
+        await page.click(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-create > div > div.m-t-32 > app-auction-campaign > form > div > div.panel--bordered.m-b-16 > div > div:nth-child(1) > div.flex.m-t-48.m-b-6 > button"
+        );
+        await page.waitForTimeout(getRandomArbitrary(3000, 7000));
+        // const downloadPromise = page.waitForEvent("download");
+        await page.click(
+          "#subjectsList > div > div.combobox__label.form__input"
+        );
+        const type = { Наматрасники: 2, Простыни: 3, "Простыни натяжные": 4 };
+        await page.waitForTimeout(getRandomArbitrary(500, 2000));
+        await page.click(
+          `#subjectsList > div > div.combobox__list.combobox__list--active > div > div:nth-child(${type[subject]})`
+        );
+        await page.waitForTimeout(getRandomArbitrary(500, 2000));
+        await page.click(
+          "#subjectsList > div > div.combobox__label.form__input"
+        );
+        await page.waitForTimeout(getRandomArbitrary(500, 2000));
+        await page.click(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-create > div > div.m-t-32 > app-auction-campaign > form > div > div.panel--bordered.m-b-16 > div:nth-child(5) > div > div.form__control > div > app-search-select > div > div.combobox__label.form__input"
+        );
+        await page.waitForTimeout(getRandomArbitrary(500, 2000));
+        await page.fill(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-create > div > div.m-t-32 > app-auction-campaign > form > div > div.panel--bordered.m-b-16 > div:nth-child(5) > div > div.form__control > div > app-search-select > div > div.combobox__list.combobox__list--active > div.combobox__label.form__input.searchbox.ng-star-inserted > input",
+          id
+        );
+        await page.waitForTimeout(getRandomArbitrary(2000, 3000));
+        await page.click(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-create > div > div.m-t-32 > app-auction-campaign > form > div > div.panel--bordered.m-b-16 > div:nth-child(5) > div > div.form__control > div > app-search-select > div > div.combobox__list.combobox__list--active > div.combobox__rows.show-search > div > div"
+        );
+        await page.waitForTimeout(getRandomArbitrary(500, 2000));
+        await page.click(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-create > div > div.m-t-32 > app-auction-campaign > form > div > div:nth-child(2) > div > button"
+        );
+        await page.waitForTimeout(getRandomArbitrary(5000, 7000));
+        await page.click(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-create > div > div.m-t-32 > app-auction-campaign > form > div > div:nth-child(2) > div > button"
+        );
+        await page.waitForTimeout(getRandomArbitrary(5000, 7000));
+        // const download = await downloadPromise;
+        // const path_to_file = path.join(mainDlDir, `${str_date}.xlsx`);
+        // await download.saveAs(path_to_file);
+        // await page.waitForTimeout(getRandomArbitrary(50000, 100000));
 
-          const download = await downloadPromise;
-          const path_to_file = path.join(mainDlDir, `${str_date}.xlsx`);
-          await download.saveAs(path_to_file);
-          await page.waitForTimeout(getRandomArbitrary(5000, 10000));
-        }
         page.close();
         resolve();
       });
+
     const promises = [];
-    for (const id in adsIds.data) {
-      promises.push(await download(id));
-      // await new Promise((resolve) => setTimeout(resolve, 30000));
+    for (let i = 0; i < RKsToCreate.length; i++) {
+      const rk_data = RKsToCreate[i];
+      console.log(rk_data);
+      const campaign = reverse_seller_ids[artsData[rk_data.art].seller_id];
+      console.log(campaign);
+
+      await context.addCookies(cookies[campaign]);
+      promises.push(
+        await createRK(
+          rk_data.art,
+          rk_data.id,
+          rk_data.subjects,
+          rk_data.rk_type
+        )
+      );
+      await context.clearCookies();
+      // await new Promise((resolve) => setTimeout(resolve, 10 * 60 * 1000));
     }
     Promise.all(promises);
-
-    await updateAnalyticsOrders(adsIds.campaign);
+    // await updateAnalyticsOrders(adsIds.campaign);
     return; // await page.waitForTimeout(5000);
     let urls = await page.$$eval("a", (links) => {
       // Extract the links from the data

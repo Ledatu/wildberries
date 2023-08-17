@@ -15,17 +15,11 @@ const campaigns = require(path.join(
 
 const fetchAnalytics = async () => {
   for (const campaign of campaigns) {
-    // if (campaign == "delicatus") continue;
-    await Promise.all([await fetchAdsIdsAndWriteToJSON(campaign)])
+    if (campaign != "mayusha") continue;
+    await Promise.all([]) // await fetchAdsIdsAndWriteToJSON(campaign)
       .then(async () => {
         console.log("All tasks completed successfully");
-        const adsIds = JSON.parse(
-          fs.readFileSync(
-            path.join(__dirname, "files", campaign, "adsIds.json")
-          )
-        );
-        console.log(adsIds);
-        await createXlsx(adsIds);
+        await createXlsx('mayusha');
       })
       .catch((error) => {
         console.error("An error occurred:", error);

@@ -149,9 +149,9 @@ async function writeDetailedByPeriod(auth, campaign) {
       if (row[4] != seller_ids[campaign]) continue;
 
       const type = getMaskFromVendorCode(row[0]);
-       // console.log(type);
+      // console.log(type);
       data[i][0] = `${
-        delivery[type] ? delivery[type].average_delivery : data[i][0]
+        delivery[type] ? delivery[type].average_delivery : "50"
       }`.replace(".", ",");
       // console.log(campaign, type, data[i]);
     }
@@ -788,6 +788,52 @@ function updatePlanFact(auth, campaign) {
         },
       })
       .then((pr) => resolve());
+  });
+}
+
+function fetchNewRKsToCreate(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+    const unique_params_res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `Запуск РК!1:1`,
+    });
+    const unique_params_temp = unique_params_res.data.values[0];
+    const unique_params = [];
+    for (let i = 0; i < unique_params_temp.length; i++)
+      if (!unique_params.includes(unique_params_temp[i]))
+        unique_params.push(unique_params_temp[i]);
+    const param_map = {
+      "Группы предметов": "subjects",
+      "Артикул WB": "id",
+      "Артикул поставщика": "art",
+      "ТИП РК": "rk_type",
+      ФРАЗА: "phrase",
+      СТАВКА: "bid",
+      БЮДЖЕТ: "budget",
+      "ID РК": "rk_id",
+      СТАТУС: "status",
+    };
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `Запуск РК!2:1000`,
+    });
+    const rows = res.data.values;
+    const new_rks_data = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row[0]) continue;
+      new_rks_data.push({});
+      for (let j = 0; j < unique_params.length; j++) {
+        new_rks_data[i][param_map[unique_params[j]]] = row[j];
+      }
+    }
+    // console.log(new_rks_data);
+    writeDataToFile(
+      new_rks_data,
+      path.join(__dirname, `../files/RKsToCreate.json`)
+    ).then((pr) => resolve());
   });
 }
 
@@ -1505,6 +1551,10 @@ module.exports = {
   updateAnalyticsOrders: async (campaign) => {
     const auth = await authorize();
     await updateAnalyticsOrders(auth, campaign).catch(console.error);
+  },
+  fetchNewRKsToCreate: async () => {
+    const auth = await authorize();
+    await fetchNewRKsToCreate(auth).catch(console.error);
   },
   updatePlanFact: async (campaign) => {
     const auth = await authorize();
