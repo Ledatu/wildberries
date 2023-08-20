@@ -1287,7 +1287,7 @@ const fetchRksBudgetsAndWriteToJSON = async (campaign) => {
         console.log(campaign, key, data.advertId);
       })
       .catch((er) => retry_query.push(params));
-    await new Promise((resolve) => setTimeout(resolve, 20*1000));
+    await new Promise((resolve) => setTimeout(resolve, 20 * 1000));
   }
   if (retry_query.length) {
     console.log(campaign, "TO RETRY:", retry_query);
@@ -1478,12 +1478,20 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
       }
       if (nms_temp.length == nms_to_delete.length) {
         console.log(key, "nothing to leave in this RK.");
+
+        await updateArtsInAutoRK(
+          authToken,
+          querystring.stringify({ id: data.advertId }),
+          { delete: [nms_to_delete[0]] }
+        );
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+
         await updateArtsInAutoRK(
           authToken,
           querystring.stringify({ id: data.advertId }),
           { add: [backVendorCodes[key]] }
         );
-        continue;
+        await new Promise((resolve) => setTimeout(resolve, 10000));
       }
       const params = {
         delete: nms_to_delete,
