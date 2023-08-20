@@ -1460,7 +1460,10 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
     const key = data.name;
     console.log(key);
     const type =
-      "params" in data ? "standard" : "autoParams" in data ? "auto" : "united";
+    "params" in data ? "standard" : "autoParams" in data ? "auto" : "united";
+    
+    if (type != "auto") continue;
+
     // console.log(key, id);
     const nms_temp =
       type == "standard"
