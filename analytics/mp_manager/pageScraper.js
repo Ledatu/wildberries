@@ -30,6 +30,37 @@ const scraperObject = {
     for (const [campaign, id] of Object.entries(seller_ids))
       reverse_seller_ids[id] = campaign;
 
+    const activateRK = async (rk_id) =>
+      new Promise(async (resolve, reject) => {
+        const page = await context.newPage();
+        const urls = {
+          Поиск: "https://cmp.wildberries.ru/campaigns/list/all/edit/search/",
+          Авто: "https://cmp.wildberries.ru/campaigns/list/all/edit/auto/",
+        };
+
+        const url = urls[rk_type] + rk_id;
+        //		context.setDefaultTimeout(60000*3)
+        // await page.setViewportSize({ width: 1600, height: 30000 });
+        console.log(`Navigating to ${url}...`);
+        // Navigate to the selected page
+        await page.goto(url);
+        await page.waitForLoadState();
+        await page.goto(url);
+        await page.waitForLoadState();
+        await page.waitForTimeout(getRandomArbitrary(2000, 4000));
+
+        await page.waitForSelector(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-edit-auction-campaign > div > form > div:nth-child(7) > div > button.btn.btn--orange.p-l-50.p-r-50.btn--medium.ng-star-inserted"
+        );
+        await page.click(
+          "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-edit-auction-campaign > div > form > div:nth-child(7) > div > button.btn.btn--orange.p-l-50.p-r-50.btn--medium.ng-star-inserted"
+        );
+        await page.waitForTimeout(getRandomArbitrary(2000, 4000));
+        
+        page.close();
+        resolve();
+      });
+
     const createRK = async (rk_name, id, subject, rk_type) =>
       new Promise(async (resolve, reject) => {
         const page = await context.newPage();

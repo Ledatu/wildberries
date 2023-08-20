@@ -76,8 +76,8 @@ const getAdvertStat = (authToken, params) => {
       },
       params: params,
     })
-    .then((response) => response.data);
-  // .catch((error) => console.error(error));
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
 };
 
 const updateAdvertArtActivities = (authToken, params) => {
@@ -826,9 +826,11 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
             continue;
           }
 
-          const mask = get_proper_mask(
-            getMaskFromVendorCode(vendorCodes[nm.nmId])
-          );
+          // const mask = get_proper_mask(
+          //   getMaskFromVendorCode(vendorCodes[nm.nmId])
+          // );
+          const mask = getMaskFromVendorCode(vendorCodes[nm.nmId]);
+
           if (!(mask in jsonData)) jsonData[mask] = {};
 
           if (!(date in jsonData[mask]))
@@ -1141,59 +1143,59 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
   }
 
   // check that RK contains only one type of mask and send(toggleable) inform email if violated
-  const violated_rks = {};
-  for (const [name, rkData] of Object.entries(jsonData)) {
-    if (rkData.status == 4) continue;
-    // console.log(campaign, rkData);
-    const type =
-      "params" in rkData
-        ? "standard"
-        : "autoParams" in rkData
-        ? "auto"
-        : "united";
-    console.log(campaign, rkData);
-    const nms =
-      type == "standard"
-        ? rkData.params[0].nms
-        : type == "auto"
-        ? rkData.autoParams.nms
-        : rkData.unitedParams[0].nms;
-    const mask = getMaskFromVendorCode(
-      vendorCodes[type == "standard" ? nms[0].nm : nms[0]]
-    );
-    if (mask == "NO_SUCH_MASK_AVAILABLE") {
-      console.log("NO_SUCH_MASK_AVAILABLE", name, rkData);
-      continue;
-    }
-    console.log(
-      campaign,
-      type,
-      vendorCodes[type == "standard" ? nms[0].nm : nms[0]],
-      mask
-    );
-    for (const [index, nmData] of Object.entries(nms)) {
-      const nm = type == "standard" ? nmData.nm : nmData;
-      if (!nm || !vendorCodes[nm]) continue;
-      if (mask != getMaskFromVendorCode(vendorCodes[nm])) {
-        if (!(name in violated_rks)) violated_rks[name] = [];
-        violated_rks[name].push(nm);
-      }
-    }
-  }
-  // console.log(violated_rks)
-  fs.writeFile(
-    path.join(__dirname, "files", campaign, "violatedRKs.json"),
-    JSON.stringify(violated_rks)
-  )
-    .then(() => console.log("violatedRKs.json created."))
-    .catch((error) => console.error(error));
-  if (0) {
-    sendEmail(
-      "zavoronok.danila@gmail.com",
-      "violated",
-      JSON.stringify(violated_rks, null, 2)
-    );
-  }
+  // const violated_rks = {};
+  // for (const [name, rkData] of Object.entries(jsonData)) {
+  //   if (rkData.status == 4) continue;
+  //   // console.log(campaign, rkData);
+  //   const type =
+  //     "params" in rkData
+  //       ? "standard"
+  //       : "autoParams" in rkData
+  //       ? "auto"
+  //       : "united";
+  //   console.log(campaign, rkData);
+  //   const nms =
+  //     type == "standard"
+  //       ? rkData.params[0].nms
+  //       : type == "auto"
+  //       ? rkData.autoParams.nms
+  //       : rkData.unitedParams[0].nms;
+  //   const mask = getMaskFromVendorCode(
+  //     vendorCodes[type == "standard" ? nms[0].nm : nms[0]]
+  //   );
+  //   if (mask == "NO_SUCH_MASK_AVAILABLE") {
+  //     console.log("NO_SUCH_MASK_AVAILABLE", name, rkData);
+  //     continue;
+  //   }
+  //   console.log(
+  //     campaign,
+  //     type,
+  //     vendorCodes[type == "standard" ? nms[0].nm : nms[0]],
+  //     mask
+  //   );
+  //   for (const [index, nmData] of Object.entries(nms)) {
+  //     const nm = type == "standard" ? nmData.nm : nmData;
+  //     if (!nm || !vendorCodes[nm]) continue;
+  //     if (mask != getMaskFromVendorCode(vendorCodes[nm])) {
+  //       if (!(name in violated_rks)) violated_rks[name] = [];
+  //       violated_rks[name].push(nm);
+  //     }
+  //   }
+  // }
+  // // console.log(violated_rks)
+  // fs.writeFile(
+  //   path.join(__dirname, "files", campaign, "violatedRKs.json"),
+  //   JSON.stringify(violated_rks)
+  // )
+  //   .then(() => console.log("violatedRKs.json created."))
+  //   .catch((error) => console.error(error));
+  // if (0) {
+  //   sendEmail(
+  //     "zavoronok.danila@gmail.com",
+  //     "violated",
+  //     JSON.stringify(violated_rks, null, 2)
+  //   );
+  // }
 
   return fs
     .writeFile(
@@ -1285,7 +1287,7 @@ const fetchRksBudgetsAndWriteToJSON = async (campaign) => {
         console.log(campaign, key, data.advertId);
       })
       .catch((er) => retry_query.push(params));
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 20*1000));
   }
   if (retry_query.length) {
     console.log(campaign, "TO RETRY:", retry_query);
@@ -1332,7 +1334,7 @@ const fetchAdvertStatsAndWriteToJson = async (campaign) => {
         console.log(campaign, key, data.advertId);
       })
       .catch((er) => retry_query.push(params));
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 5000));
   }
   if (retry_query.length) {
     console.log(campaign, "TO RETRY:", retry_query);
@@ -1742,7 +1744,7 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
   dateFrom.setDate(dateFrom.getDate() - 8);
   for (const order_data_date in orders_by_day) {
     const order_date = new Date(order_data_date);
-    if (dateFrom > new Date(order_data_date))continue
+    if (dateFrom > new Date(order_data_date)) continue;
     // console.log(order_date, dateFrom);
     jsonData = calcAvgOrders(jsonData, order_data_date);
   }

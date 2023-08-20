@@ -9,6 +9,7 @@ const {
   fetchAvgRatingsAndWriteToJSON,
   updatePlanFact,
   fetchNewRKsToCreate,
+  pivotOrders,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -86,7 +87,7 @@ const a = async () => {
 // fetchCardsAndWriteToJSON('mayusha')
 // fetchCardsAndWriteToJSON('delicatus')
 // fetchCardsAndWriteToJSON('TKS')
-calcAvgOrdersAndWriteToJSON("delicatus");
+// calcAvgOrdersAndWriteToJSON("delicatus");
 // fetchAdverts()
 // updateAutoAdverts()
 // copyZakazToOtherSpreadsheet()
@@ -99,9 +100,12 @@ calcAvgOrdersAndWriteToJSON("delicatus");
 // fetchOrdersAndWriteToJSON("mayusha");
 // updatePlanFact('delicatus')
 // fetchByNowStats()
-// fetchOrdersAndWriteToJSON("TKS");
 // updateAutoAdvertsInCampaign('delicatus')
 // updatePlanFact('TKS')
+// updatePlanFact('mayusha')
+// fetchOrdersAndWriteToJSON("mayusha");
+pivotOrders('mayusha')
+// updatePlanFact('delicatus')
 // updateAutoAdverts()
 // fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
 // fetchNewRKsToCreate();

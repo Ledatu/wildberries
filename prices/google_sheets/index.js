@@ -130,12 +130,17 @@ async function writeDetailedByPeriod(auth, campaign) {
         path.join(__dirname, `../files/${campaign}/detailedByPeriod.json`)
       )
     );
+    const drr = JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, `../files/${campaign}/avgDrrByMask.json`)
+      )
+    );
     // console.log(data);
     const sheets = google.sheets({ version: "v4", auth });
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-      range: "Данные!A2:K",
+      range: "Данные!A2:L",
     });
 
     // Parse the values into a JSON object
@@ -158,6 +163,64 @@ async function writeDetailedByPeriod(auth, campaign) {
 
     await update_data(data).then((pr) => resolve());
     console.log(`Delivery data written to the google sheets.`);
+  });
+}
+
+async function pivotOrders(auth, campaign) {
+  return new Promise(async (resolve, reject) => {
+    // console.log(campaign);
+
+    const update_data = async (data) => {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+        range: `Заказы Маюша!3:1000`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: data,
+        },
+      });
+    };
+
+    const vendorCodes = JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, `../files/${campaign}/vendorCodes.json`)
+      )
+    );
+    const orders = JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, `../files/${campaign}/orders by day.json`)
+      )
+    );
+    const sum_orders = JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, `../files/${campaign}/sum of orders by day.json`)
+      )
+    );
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const codes = [];
+    for (const [id, art] of Object.entries(vendorCodes)) {
+      codes.push(art);
+    }
+    codes.sort();
+    const sheet_data = [];
+    for (const [id, art] of Object.entries(codes)) {
+      const to_push = [art];
+      const cur_date = new Date();
+      cur_date.setDate(cur_date.getDate() + 1);
+      for (let i = 0; i < 31; i++) {
+        cur_date.setDate(cur_date.getDate() - 1);
+        const str_date = cur_date
+          .toLocaleDateString("ru-RU")
+          .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+          .slice(0, 10);
+        // to_push.push(sum_orders[str_date][art]);
+        to_push.push(orders[str_date][art]);
+      }
+      sheet_data.push(to_push);
+    }
+
+    await update_data(sheet_data).then((pr) => resolve());
   });
 }
 
@@ -579,7 +642,8 @@ function updatePlanFact(auth, campaign) {
     const dates_datas = {};
     const all_masks = [campaign];
     for (const [id, art] of Object.entries(vendorCodes)) {
-      const mask = get_proper_mask(getMaskFromVendorCode(art));
+      // const mask = get_proper_mask(getMaskFromVendorCode(art));
+      const mask = getMaskFromVendorCode(art);
       if (all_masks.includes(mask)) continue;
       all_masks.push(mask);
     }
@@ -640,12 +704,12 @@ function updatePlanFact(auth, campaign) {
         if (!(date in dates_datas)) dates_datas[date] = {};
 
         for (const [art, sum] of Object.entries(sum_orders[date])) {
-          if (!art.includes(mask)) continue;
+          if (!art.includes(get_proper_mask(mask))) continue;
           // console.log(art, mask, sum);
           dateData.sum_orders += sum;
         }
         for (const [art, count] of Object.entries(orders[date])) {
-          if (!art.includes(mask)) continue;
+          if (!art.includes(get_proper_mask(mask))) continue;
           // console.log(art, mask, sum);
           dateData.orders += count;
         }
@@ -655,12 +719,15 @@ function updatePlanFact(auth, campaign) {
         for (let j = 0; j < unique_params.length; j++) {
           to_push[j] = dateData[param_map[unique_params[j]].name];
         }
-        if (mask == "КПБ_2_СТРАЙП") console.log(mask, to_push);
+        // if (mask == "КПБ_2_СТРАЙП") console.log(mask, to_push);
         dates_datas[date][mask] = to_push;
         // console.log(mask, fact[i], to_push);
       }
     }
     console.log(dates_datas);
+
+    const avg_drr_by_mask = {};
+
     const cur_date = new Date();
     cur_date.setDate(cur_date.getDate() + 1);
     for (let i = 0; i < 31; i++) {
@@ -673,8 +740,18 @@ function updatePlanFact(auth, campaign) {
 
       sheet_data.push([str_date]);
       for (let j = 0; j < all_masks.length; j++) {
-        if (all_masks[j] == "ПРПЭ_200")
-          console.log(str_date, dates_datas[str_date][all_masks[j]]);
+        if (!dates_datas[str_date]) continue;
+        // save avg_drr
+        if (!(all_masks[j] in avg_drr_by_mask))
+          avg_drr_by_mask[all_masks[j]] = 0;
+        if (1 <= i && i < 8) {
+          if (all_masks[j] == "ПР_90_ОТК")
+            console.log(str_date, dates_datas[str_date][all_masks[j]][8]);
+          avg_drr_by_mask[all_masks[j]] += dates_datas[str_date][all_masks[j]]
+            ? dates_datas[str_date][all_masks[j]][unique_params.indexOf("ДРР%")]
+            : 0;
+        }
+
         sheet_data[sheet_data.length - 1] = sheet_data[
           sheet_data.length - 1
         ].concat(
@@ -682,7 +759,13 @@ function updatePlanFact(auth, campaign) {
         );
       }
     }
-    // console.log(sheet_data);
+
+    for (let j = 0; j < all_masks.length; j++) {
+      // console.log(avg_drr_by_mask[all_masks[j]]);
+      avg_drr_by_mask[all_masks[j]] /= 7;
+    }
+
+    console.log(avg_drr_by_mask);
     const campaign_summary = [];
     for (let i = 3; i < sheet_data.length; i++) {
       if (!sheet_data[i]) continue;
@@ -766,6 +849,12 @@ function updatePlanFact(auth, campaign) {
     //     ],
     //   },
     // });
+    await writeDataToFile(
+      avg_drr_by_mask,
+      path.join(__dirname, "../files", campaign, "avgDrrByMask.json")
+    );
+    resolve();
+    return;
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
       range: `${spIds[campaign]}!4:1000`,
@@ -1579,6 +1668,10 @@ module.exports = {
   sendEmail: async (to, subject, body) => {
     const auth = await authorize();
     await sendEmail(auth, to, subject, body).catch(console.error);
+  },
+  pivotOrders: async (campaign) => {
+    const auth = await authorize();
+    await pivotOrders(auth, campaign).catch(console.error);
   },
 };
 
