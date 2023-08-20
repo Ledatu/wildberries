@@ -1334,7 +1334,7 @@ const fetchAdvertStatsAndWriteToJson = async (campaign) => {
         console.log(campaign, key, data.advertId);
       })
       .catch((er) => retry_query.push(params));
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await new Promise((resolve) => setTimeout(resolve, 20 * 1000));
   }
   if (retry_query.length) {
     console.log(campaign, "TO RETRY:", retry_query);
