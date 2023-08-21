@@ -15,6 +15,8 @@ const {
   fetchAdvertStatsAndWriteToJson,
   getAdvertStatByMaskByDayAndWriteToJSON,
   updateAutoAdvertsInCampaign,
+  fetchAdvertStatsAndWriteToJsonMpManager,
+  getAdvertStatByMaskByDayAndWriteToJSONMpManager,
 } = require("./main");
 const {
   writePrices,
@@ -124,10 +126,10 @@ const fetchAdverts = async () => {
     campaigns.forEach(async (campaign) => {
       Promise.all([
         await fetchOrdersAndWriteToJSON(campaign),
-        // await fetchAdvertsAndWriteToJson(campaign),
-        // await fetchAdvertInfosAndWriteToJson(campaign),
-        await fetchAdvertStatsAndWriteToJson(campaign),
-        await getAdvertStatByMaskByDayAndWriteToJSON(campaign),
+        await fetchAdvertsAndWriteToJson(campaign),
+        await fetchAdvertInfosAndWriteToJson(campaign),
+        await fetchAdvertStatsAndWriteToJsonMpManager(campaign),
+        await getAdvertStatByMaskByDayAndWriteToJSONMpManager(campaign),
         await updatePlanFact(campaign),
       ])
         .then(async () => {

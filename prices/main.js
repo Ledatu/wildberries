@@ -29,6 +29,19 @@ const getAuthToken = (type, campaign) => {
   }
 };
 
+const getAuthTokenMpManager = (type, campaign) => {
+  try {
+    const secret = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "../secrets/mp_manager", `${campaign}.json`)
+      )
+    );
+    return secret[type];
+  } catch (error) {
+    console.error(error);
+  }
+};
+
 const getDetailedByPeriod = (authToken, params) => {
   return axios
     .get(
@@ -76,6 +89,26 @@ const getAdvertStat = (authToken, params) => {
       },
       params: params,
     })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const getAdvertStatMpManager = (
+  authToken,
+  params,
+  organizationId,
+  externalId
+) => {
+  return axios
+    .get(
+      `https://api.mpmgr.ru/v3/organizations/${organizationId}/campaigns/${externalId}/full-stats`,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+        params: params,
+      }
+    )
     .then((response) => response.data)
     .catch((error) => console.error(error));
 };
@@ -902,6 +935,101 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const getAdvertStatByMaskByDayAndWriteToJSONMpManager = async (campaign) => {
+  const advertStats = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advertStatsMpManager.json")
+    )
+  );
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const jsonData = {};
+  let a = 0;
+  jsonData[campaign] = {};
+  for (const [name, rkData] of Object.entries(advertStats)) {
+    for (const [index, artData] of Object.entries(rkData)) {
+      const date = artData.createdAt.slice(0, 10);
+      const art_id = artData.vendorCode;
+
+      // const mask = get_proper_mask(
+      //   getMaskFromVendorCode(vendorCodes[nm.nmId])
+      // );
+
+      if (!(date in jsonData[campaign]))
+        jsonData[campaign][date] = {
+          views: 0,
+          clicks: 0,
+          unique_users: 0,
+          sum: 0,
+          ctr: 0,
+          cpm: 0,
+          cpc: 0,
+        };
+      jsonData[campaign][date].views += artData.views ?? 0;
+      jsonData[campaign][date].clicks += artData.clicks ?? 0;
+      jsonData[campaign][date].sum += artData.cost ?? 0;
+      if (jsonData[campaign][date].views)
+        jsonData[campaign][date].ctr =
+          jsonData[campaign][date].clicks / jsonData[campaign][date].views;
+      if (jsonData[campaign][date].views)
+        jsonData[campaign][date].cpm =
+          jsonData[campaign][date].sum /
+          (jsonData[campaign][date].views / 1000);
+      if (jsonData[campaign][date].clicks)
+        jsonData[campaign][date].cpc =
+          jsonData[campaign][date].sum / jsonData[campaign][date].clicks;
+
+      /////// full campaign sums
+
+      if (!vendorCodes[art_id] || !art_id) {
+        console.log(art_id, date);
+        continue;
+      }
+      const mask = getMaskFromVendorCode(vendorCodes[art_id]);
+
+      if (!(mask in jsonData)) jsonData[mask] = {};
+
+      if (!(date in jsonData[mask]))
+        jsonData[mask][date] = {
+          views: 0,
+          clicks: 0,
+          sum: 0,
+          ctr: 0,
+          cpm: 0,
+          cpc: 0,
+        };
+      jsonData[mask][date].views += artData.views ?? 0;
+      jsonData[mask][date].clicks += artData.clicks ?? 0;
+      jsonData[mask][date].sum += artData.cost ?? 0;
+      if (jsonData[mask][date].views)
+        jsonData[mask][date].ctr =
+          jsonData[mask][date].clicks / jsonData[mask][date].views;
+      if (jsonData[mask][date].views)
+        jsonData[mask][date].cpm =
+          jsonData[mask][date].sum / (jsonData[mask][date].views / 1000);
+      if (jsonData[mask][date].clicks)
+        jsonData[mask][date].cpc =
+          jsonData[mask][date].sum / jsonData[mask][date].clicks;
+    }
+  }
+
+  return fs
+    .writeFile(
+      path.join(
+        __dirname,
+        "files",
+        campaign,
+        "advert stats by mask by day.json"
+      ),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("advert stats by mask by day.json created."))
+    .catch((error) => console.error(error));
+};
+
 const writeDetailedByPeriodToJson = (data, campaign) =>
   new Promise((resolve, reject) => {
     const jsonData = {};
@@ -1363,6 +1491,53 @@ const fetchAdvertStatsAndWriteToJson = async (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const fetchAdvertStatsAndWriteToJsonMpManager = async (campaign) => {
+  const authToken = getAuthTokenMpManager("api-token", campaign);
+  const adverts = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "adverts.json"))
+  );
+  const mp_manager_data = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "../secrets/mp_manager", `${campaign}.json`)
+    )
+  );
+
+  const jsonData = {};
+  const dateTo = new Date();
+  const dateFrom = new Date();
+  dateFrom.setDate(dateFrom.getDate() - 31);
+  for (const [advertId, unused] of Object.entries(adverts)) {
+    if (!advertId) continue;
+    const params = {
+      from: dateFrom
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10),
+      to: dateTo
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10),
+    };
+    await getAdvertStatMpManager(
+      authToken,
+      params,
+      mp_manager_data.organizationId,
+      advertId
+    ).then((pr) => {
+      jsonData[advertId] = pr;
+      console.log(campaign, advertId);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1 * 300));
+  }
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "advertStatsMpManager.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("advertStats.json created."))
+    .catch((error) => console.error(error));
+};
+
 const updateAdvertArtActivitiesAndGenerateNotIncluded = async (campaign) => {
   const authToken = getAuthToken("api-advert-token", campaign);
   const advertInfos = JSON.parse(
@@ -1460,8 +1635,8 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
     const key = data.name;
     console.log(key);
     const type =
-    "params" in data ? "standard" : "autoParams" in data ? "auto" : "united";
-    
+      "params" in data ? "standard" : "autoParams" in data ? "auto" : "united";
+
     if (type != "auto") continue;
 
     // console.log(key, id);
@@ -1963,6 +2138,8 @@ module.exports = {
   calcAdvertismentAndWriteToJSON,
   fetchDetailedByPeriodAndWriteToJSON,
   fetchAdvertsAndWriteToJson,
+  fetchAdvertStatsAndWriteToJsonMpManager,
+  getAdvertStatByMaskByDayAndWriteToJSONMpManager,
   calculateNewValuesAndWriteToXlsx,
   updatePrices,
   getKTErrorsAndWriteToJson,

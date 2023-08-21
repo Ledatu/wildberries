@@ -746,7 +746,7 @@ function updatePlanFact(auth, campaign) {
           avg_drr_by_mask[all_masks[j]] = 0;
         if (1 <= i && i < 8) {
           if (all_masks[j] == "ПР_90_ОТК")
-            console.log(str_date, dates_datas[str_date][all_masks[j]][8]);
+            console.log(str_date, dates_datas[str_date][all_masks[j]]);
           avg_drr_by_mask[all_masks[j]] += dates_datas[str_date][all_masks[j]]
             ? dates_datas[str_date][all_masks[j]][unique_params.indexOf("ДРР%")]
             : 0;
@@ -853,8 +853,6 @@ function updatePlanFact(auth, campaign) {
       avg_drr_by_mask,
       path.join(__dirname, "../files", campaign, "avgDrrByMask.json")
     );
-    resolve();
-    return;
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
       range: `${spIds[campaign]}!4:1000`,

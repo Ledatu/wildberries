@@ -30,6 +30,8 @@ const {
   getAdvertStatByMaskByDayAndWriteToJSON,
   updateAutoAdvertsInCampaign,
   setFixedPhrasesForCreatedRKs,
+  fetchAdvertStatsAndWriteToJsonMpManager,
+  getAdvertStatByMaskByDayAndWriteToJSONMpManager,
 } = require("./main");
 const {
   getPrices,
@@ -104,10 +106,18 @@ const a = async () => {
 // updatePlanFact('TKS')
 // updatePlanFact('mayusha')
 // fetchOrdersAndWriteToJSON("mayusha");
-pivotOrders('mayusha')
+// pivotOrders('mayusha')
 // updatePlanFact('delicatus')
 // updateAutoAdverts()
 // fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
 // fetchNewRKsToCreate();
 // setFixedPhrasesForCreatedRKs("mayusha");
-
+// fetchOrdersAndWriteToJSON("mayusha").then(() =>
+fetchAdvertStatsAndWriteToJsonMpManager("mayusha").then(() =>
+  getAdvertStatByMaskByDayAndWriteToJSONMpManager("mayusha").then(() =>
+    updatePlanFact("mayusha")
+  )
+);
+// );
+//
+// fetchAdvertsAndWriteToJson("mayusha");
