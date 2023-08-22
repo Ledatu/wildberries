@@ -15,6 +15,7 @@ const {
 const {
   copyZakazToOtherSpreadsheet,
   fetchNewPricesAndWriteToJSON,
+  writeDrrToDataSpreadsheet,
 } = require("../prices/google_sheets/index");
 const {
   qrGeneration,
@@ -144,6 +145,11 @@ app.post("/api/getDelivery", authenticateToken, (req, res) => {
 app.get("/api/copyZakaz", authenticateToken, (req, res) => {
   copyZakazToOtherSpreadsheet();
   res.send("Zakaz copying started!");
+});
+
+app.get("/api/writeDrr", authenticateToken, (req, res) => {
+  writeDrrToDataSpreadsheet();
+  res.send("Drr writing started!");
 });
 
 app.get("/api/generateQRs", authenticateToken, (req, res) => {

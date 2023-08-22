@@ -166,6 +166,62 @@ async function writeDetailedByPeriod(auth, campaign) {
   });
 }
 
+async function writeDrrToDataSpreadsheet(auth) {
+  return new Promise(async (resolve, reject) => {
+    const seller_ids = (
+      await JSON.parse(
+        await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
+      )
+    ).seller_ids;
+
+    const update_data = async (data) => {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+        range: `Данные!L2:L`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: data,
+        },
+      });
+    };
+
+    // console.log(data);
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Данные!A2:L",
+    });
+
+    // Parse the values into a JSON object
+    const rows = res.data.values;
+    // console.log(rows);
+    const data = [];
+    for (const [campaign, seller_id] of Object.entries(seller_ids)) {
+      const drr = JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, `../files/${campaign}/avgDrrByMask.json`)
+        )
+      );
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        data.push([row[11]]);
+
+        if (row[4] != seller_ids[campaign]) continue;
+
+        const type = getMaskFromVendorCode(row[0]);
+        // console.log(type);
+        data[i][0] = drr[type] ?? 0;
+        // console.log(campaign, type, data[i]);
+      }
+    }
+
+    await update_data(data).then((pr) => resolve());
+    console.log(`Drr data written to the google sheets.`);
+  });
+}
+
 async function pivotOrders(auth, campaign) {
   return new Promise(async (resolve, reject) => {
     // console.log(campaign);
@@ -745,11 +801,15 @@ function updatePlanFact(auth, campaign) {
         if (!(all_masks[j] in avg_drr_by_mask))
           avg_drr_by_mask[all_masks[j]] = 0;
         if (1 <= i && i < 8) {
-          if (all_masks[j] == "ПР_90_ОТК")
+          if (all_masks[j] == "ПРПЭ_120_DELICATUS")
             console.log(str_date, dates_datas[str_date][all_masks[j]]);
-          avg_drr_by_mask[all_masks[j]] += dates_datas[str_date][all_masks[j]]
-            ? dates_datas[str_date][all_masks[j]][unique_params.indexOf("ДРР%")]
-            : 0;
+          if (dates_datas[str_date][all_masks[j]]) {
+            const date_drr =
+              dates_datas[str_date][all_masks[j]][
+                unique_params.indexOf("ДРР%")
+              ];
+            avg_drr_by_mask[all_masks[j]] += isFinite(date_drr) ? date_drr : 0;
+          }
         }
 
         sheet_data[sheet_data.length - 1] = sheet_data[
@@ -1422,19 +1482,8 @@ async function copyPricesToDataSpreadsheet(auth) {
 
     const data = [];
     data_rows.forEach((row) => {
-      let regex = row[0].split("_").slice(0, 2).join("_");
-      if (row[0].includes("КПБ")) {
-        if (row[0].includes("СТРАЙП")) regex += "_СТРАЙП";
-        if (row[0].includes("МОНТЕ")) regex += "_МОНТЕ";
-      }
-      if (row[0].includes("НАМАТРАСНИК")) {
-        regex += "_ОТК";
-      }
-      if (row[0].includes("ТКС")) {
-        regex += "_ТКС";
-      }
-      // console.log(regex, prices[regex]);
-      data.push([prices[regex]]);
+      const mask = getMaskFromVendorCode(row[0]);
+      data.push([prices[mask]]);
     });
 
     await update_data(data).then((pr) => resolve());
@@ -1670,6 +1719,10 @@ module.exports = {
   pivotOrders: async (campaign) => {
     const auth = await authorize();
     await pivotOrders(auth, campaign).catch(console.error);
+  },
+  writeDrrToDataSpreadsheet: async () => {
+    const auth = await authorize();
+    await writeDrrToDataSpreadsheet(auth).catch(console.error);
   },
 };
 

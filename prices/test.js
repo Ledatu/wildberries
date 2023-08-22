@@ -10,6 +10,7 @@ const {
   updatePlanFact,
   fetchNewRKsToCreate,
   pivotOrders,
+  writeDrrToDataSpreadsheet,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -113,11 +114,12 @@ const a = async () => {
 // fetchNewRKsToCreate();
 // setFixedPhrasesForCreatedRKs("mayusha");
 // fetchOrdersAndWriteToJSON("mayusha").then(() =>
-fetchAdvertStatsAndWriteToJsonMpManager("mayusha").then(() =>
-  getAdvertStatByMaskByDayAndWriteToJSONMpManager("mayusha").then(() =>
-    updatePlanFact("mayusha")
-  )
-);
+// fetchAdvertStatsAndWriteToJsonMpManager("mayusha").then(() =>
+//   getAdvertStatByMaskByDayAndWriteToJSONMpManager("mayusha").then(() =>
+    // updatePlanFact()
+//   )
+// );
 // );
 //
 // fetchAdvertsAndWriteToJson("mayusha");
+writeDrrToDataSpreadsheet();
