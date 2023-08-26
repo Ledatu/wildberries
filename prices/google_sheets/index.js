@@ -1173,7 +1173,7 @@ function updateFactStatsByRK(auth, campaign) {
 
     for (let i = 0; i < sheet_data_temp.length; i++) {
       sheet_data.push(sheet_data_temp[i]);
-      console.log(sheet_data_temp[i].length);
+      // console.log(sheet_data_temp[i].length);
     }
     // return;
     await sheets.spreadsheets.values.clear({
