@@ -164,6 +164,7 @@ const fetchByNowStats = async () => {
     Promise.all([
       await fetchOrdersAndWriteToJSON(campaign),
       await updatePlanFact(campaign),
+      await updateFactStatsByRK(campaign),
     ])
       .then(async () => {
         console.log("All tasks completed successfully");

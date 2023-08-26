@@ -1097,11 +1097,12 @@ function updateFactStatsByRK(auth, campaign) {
         if (result.clicks) result.cpc = result.sum / result.clicks;
         // console.log(result);
       }
-      result.drr = result.sum_orders ? result.sum / result.sum_orders : 0;
+      result.drr = result.sum / result.sum_orders;
+      // result.drr = result.sum_orders ? result.sum / result.sum_orders : 0;
       // console.log(result);
       return result;
     };
-    const sheet_data = [Array(4), Array(4), Array(4)];
+    const sheet_data = [Array(4), Array(4)];
     const stat_date_ranges = [
       // days before today
       { from: 0, to: 0 },
@@ -1109,21 +1110,21 @@ function updateFactStatsByRK(auth, campaign) {
       { from: 8, to: 2 },
     ];
 
-    const formulas_to_concat = [];
+    // const formulas_to_concat = [];
     const sheet_data_temp = [];
-    for (let i = 0; i < stat_date_ranges.length; i++) {
-      for (let j = 0; j < unique_params.length; j++) {
-        const index_of_column = i * unique_params.length + j + 5;
-        const column_name = indexToColumn(index_of_column);
-        formulas_to_concat.push(
-          `=${
-            param_map[unique_params[j]].formula
-          }(${column_name}4:${column_name})`
-        );
-      }
-      sheet_data[1] = sheet_data[1].concat(unique_params);
-    }
-    sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
+    // for (let i = 0; i < stat_date_ranges.length; i++) {
+    //   for (let j = 0; j < unique_params.length; j++) {
+    //     const index_of_column = i * unique_params.length + j + 5;
+    //     const column_name = indexToColumn(index_of_column);
+    //     formulas_to_concat.push(
+    //       `=${
+    //         param_map[unique_params[j]].formula
+    //       }(${column_name}4:${column_name})`
+    //     );
+    //   }
+    //   sheet_data[1] = sheet_data[1].concat(unique_params);
+    // }
+    // sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
 
     for (const [unused, rkData] of Object.entries(advertInfos)) {
       //// formulas

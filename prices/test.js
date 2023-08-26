@@ -97,7 +97,7 @@ const a = async () => {
 // fetchCardsAndWriteToJSON('delicatus')
 // fetchCardsAndWriteToJSON('TKS')
 // calcAvgOrdersAndWriteToJSON("delicatus");
-fetchAdverts()
+// fetchAdverts()
 // updateAutoAdverts()
 // copyZakazToOtherSpreadsheet()
 // fetchAdvertsAndWriteToJson("mayusha");
@@ -133,6 +133,6 @@ fetchAdverts()
 // createNewAdverts();
 // getAdvertStatByDayAndWriteToJSONMpManager("TKS").then(() =>
 //   fetchRksBudgetsAndWriteToJSON("TKS").then(() =>
-//     updateFactStatsByRK("TKS")
+    updateFactStatsByRK("mayusha")
 //   )
 // );
