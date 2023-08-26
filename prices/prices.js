@@ -17,6 +17,10 @@ const {
   updateAutoAdvertsInCampaign,
   fetchAdvertStatsAndWriteToJsonMpManager,
   getAdvertStatByMaskByDayAndWriteToJSONMpManager,
+  fetchSubjectDictionaryAndWriteToJSON,
+  createNewRKs,
+  getAdvertStatByDayAndWriteToJSONMpManager,
+  fetchRksBudgetsAndWriteToJSON,
 } = require("./main");
 const {
   writePrices,
@@ -30,6 +34,8 @@ const {
   fetchAvgRatingsAndWriteToJSON,
   updateLowRatingStocksSheet,
   updatePlanFact,
+  fetchNewRKsToCreate,
+  updateFactStatsByRK,
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 const fs = require("fs");
@@ -40,6 +46,13 @@ const updateAtriculesData = async () => {
     async (pr) => await fetchDataAndWriteToJSON()
   );
 };
+
+const createNewAdverts = async () =>
+  new Promise((resolve, reject) => {
+    fetchSubjectDictionaryAndWriteToJSON().then(async () =>
+      fetchNewRKsToCreate().then(() => createNewRKs().then(() => resolve()))
+    );
+  });
 
 const getPrices = async () => {
   await updateAtriculesData();
@@ -129,8 +142,11 @@ const fetchAdverts = async () => {
         await fetchAdvertsAndWriteToJson(campaign),
         await fetchAdvertInfosAndWriteToJson(campaign),
         await fetchAdvertStatsAndWriteToJsonMpManager(campaign),
+        await fetchRksBudgetsAndWriteToJSON(campaign),
         await getAdvertStatByMaskByDayAndWriteToJSONMpManager(campaign),
+        await getAdvertStatByDayAndWriteToJSONMpManager(campaign),
         await updatePlanFact(campaign),
+        await updateFactStatsByRK(campaign),
       ])
         .then(async () => {
           console.log("All tasks completed successfully");
@@ -226,5 +242,6 @@ module.exports = {
   updateAutoAdverts,
   fetchStocksForLowRatingArts,
   fetchAdverts,
+  createNewAdverts,
   fetchByNowStats,
 };

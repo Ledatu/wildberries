@@ -11,6 +11,7 @@ const {
   fetchNewRKsToCreate,
   pivotOrders,
   writeDrrToDataSpreadsheet,
+  updateFactStatsByRK,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -33,6 +34,10 @@ const {
   setFixedPhrasesForCreatedRKs,
   fetchAdvertStatsAndWriteToJsonMpManager,
   getAdvertStatByMaskByDayAndWriteToJSONMpManager,
+  fetchSubjectDictionaryAndWriteToJSON,
+  createNewRKs,
+  getAdvertStatByDayAndWriteToJSONMpManager,
+  fetchRksBudgetsAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -44,6 +49,7 @@ const {
   fetchAdverts,
   fetchByNowStats,
   updateAutoAdverts,
+  createNewAdverts,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
@@ -91,7 +97,7 @@ const a = async () => {
 // fetchCardsAndWriteToJSON('delicatus')
 // fetchCardsAndWriteToJSON('TKS')
 // calcAvgOrdersAndWriteToJSON("delicatus");
-// fetchAdverts()
+fetchAdverts()
 // updateAutoAdverts()
 // copyZakazToOtherSpreadsheet()
 // fetchAdvertsAndWriteToJson("mayusha");
@@ -116,10 +122,17 @@ const a = async () => {
 // fetchOrdersAndWriteToJSON("mayusha").then(() =>
 // fetchAdvertStatsAndWriteToJsonMpManager("mayusha").then(() =>
 //   getAdvertStatByMaskByDayAndWriteToJSONMpManager("mayusha").then(() =>
-    // updatePlanFact()
+// updatePlanFact('delicatus')
 //   )
 // );
 // );
 //
 // fetchAdvertsAndWriteToJson("mayusha");
-writeDrrToDataSpreadsheet();
+// writeDrrToDataSpreadsheet();
+// fetchSubjectDictionaryAndWriteToJSON()
+// createNewAdverts();
+// getAdvertStatByDayAndWriteToJSONMpManager("TKS").then(() =>
+//   fetchRksBudgetsAndWriteToJSON("TKS").then(() =>
+//     updateFactStatsByRK("TKS")
+//   )
+// );

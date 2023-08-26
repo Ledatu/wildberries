@@ -149,6 +149,16 @@ const updateRKsBudget = (authToken, queryParams, params) => {
     .then((response) => console.log(response.data))
     .catch((error) => console.error(error));
 };
+const createRK = (authToken, params) => {
+  return axios
+    .post("https://advert-api.wb.ru/adv/v1/save-ad", params, {
+      headers: {
+        Authorization: authToken,
+      },
+    })
+    .then((response) => console.log(response.data))
+    .catch((error) => console.error(error));
+};
 const startRK = (authToken, params) => {
   return axios
     .get("https://advert-api.wb.ru/adv/v0/start", {
@@ -160,6 +170,18 @@ const startRK = (authToken, params) => {
     .then((response) => response.data)
     .catch((error) => console.error(error));
 };
+
+const getSubjectsDictionary = (authToken) => {
+  return axios
+    .get("https://advert-api.wb.ru/adv/v0/params/subject", {
+      headers: {
+        Authorization: authToken,
+      },
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const updatePlusPhrasesActivity = (authToken, params) => {
   return axios
     .get("https://advert-api.wb.ru/adv/v1/search/set-plus", {
@@ -1030,6 +1052,57 @@ const getAdvertStatByMaskByDayAndWriteToJSONMpManager = async (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const getAdvertStatByDayAndWriteToJSONMpManager = async (campaign) => {
+  const advertStats = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advertStatsMpManager.json")
+    )
+  );
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const jsonData = {};
+  jsonData[campaign] = {};
+  for (const [rk_name, rkData] of Object.entries(advertStats)) {
+    for (const [index, artData] of Object.entries(rkData)) {
+      const date = artData.createdAt.slice(0, 10);
+      if (!(rk_name in jsonData)) jsonData[rk_name] = {};
+
+      if (!(date in jsonData[rk_name]))
+        jsonData[rk_name][date] = {
+          views: 0,
+          clicks: 0,
+          sum: 0,
+          ctr: 0,
+          cpm: 0,
+          cpc: 0,
+        };
+      jsonData[rk_name][date].views += artData.views ?? 0;
+      jsonData[rk_name][date].clicks += artData.clicks ?? 0;
+      jsonData[rk_name][date].sum += artData.cost ?? 0;
+      if (jsonData[rk_name][date].views)
+        jsonData[rk_name][date].ctr =
+          jsonData[rk_name][date].clicks / jsonData[rk_name][date].views;
+      if (jsonData[rk_name][date].views)
+        jsonData[rk_name][date].cpm =
+          jsonData[rk_name][date].sum / (jsonData[rk_name][date].views / 1000);
+      if (jsonData[rk_name][date].clicks)
+        jsonData[rk_name][date].cpc =
+          jsonData[rk_name][date].sum / jsonData[rk_name][date].clicks;
+    }
+  }
+
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "advert stats by day.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("advert stats by day.json created."))
+    .catch((error) => console.error(error));
+};
+
 const writeDetailedByPeriodToJson = (data, campaign) =>
   new Promise((resolve, reject) => {
     const jsonData = {};
@@ -1194,6 +1267,24 @@ const fetchWarehouses = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const fetchSubjectDictionaryAndWriteToJSON = () => {
+  const authToken = getAuthToken("api-advert-token", "mayusha");
+  return getSubjectsDictionary(authToken)
+    .then((data) => {
+      const jsonData = {};
+      for (const [index, subject] of Object.entries(data))
+        jsonData[subject.name] = subject.id;
+      return fs
+        .writeFile(
+          path.join(__dirname, "files", "subjects.json"),
+          JSON.stringify(jsonData)
+        )
+        .then(() => console.log("subjects.json created."))
+        .catch((error) => console.error(error));
+    })
+    .catch((error) => console.error(error));
+};
+
 const fetchStocksFromWarehouses = async (campaign) => {
   const authToken = getAuthToken("api-token", campaign);
   // await fetchWarehouses(campaign);
@@ -1334,6 +1425,49 @@ const fetchAdvertInfosAndWriteToJson = async (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const createNewRKs = async () => {
+  return new Promise(async (resolve, reject) => {
+    const artsData = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files", "data.json"))
+    );
+    const subjects = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files", "subjects.json"))
+    );
+    const temp_seller_ids = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files", "campaigns.json"))
+    ).seller_ids;
+    const seller_ids = {};
+    for (const [campaign, seller_id] of Object.entries(temp_seller_ids))
+      seller_ids[seller_id] = campaign;
+
+    const RKsToCreate = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files/RKsToCreate.json"))
+    );
+
+    const rk_types = { Авто: 8 };
+    for (const [index, rk_data] of Object.entries(RKsToCreate)) {
+      const campaign = seller_ids[artsData[rk_data.art].seller_id];
+      if (!campaign) continue;
+
+      const authToken = getAuthToken("api-advert-token", campaign);
+      if (rk_data.rk_type == "Авто") {
+        console.log(campaign, "Creating", rk_data);
+        // continue;
+
+        await createRK(authToken, {
+          type: rk_types[rk_data.rk_type],
+          name: rk_data.art,
+          subjectId: subjects[rk_data.subjects],
+          sum: rk_data.budget,
+          btype: 1,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+    resolve();
+  });
+};
+
 const setFixedPhrasesForCreatedRKs = async (campaign) => {
   const authToken = getAuthToken("api-advert-token", campaign);
   const advertInfos = JSON.parse(
@@ -1403,44 +1537,24 @@ const setFixedPhrasesForCreatedRKs = async (campaign) => {
 
 const fetchRksBudgetsAndWriteToJSON = async (campaign) => {
   const authToken = getAuthToken("api-advert-token", campaign);
-  const RKsToCreate = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files/RKsToCreate.json"))
+  const adverts = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", campaign, "adverts.json"))
   );
-  for (const [key, data] of Object.entries(RKsToCreate)) {
-    if (!data.advertId) continue;
-    const params = { id: data.advertId };
-    await getAdvertStat(authToken, params)
-      .then((pr) => {
-        jsonData[key] = pr;
-        console.log(campaign, key, data.advertId);
-      })
-      .catch((er) => retry_query.push(params));
-    await new Promise((resolve) => setTimeout(resolve, 20 * 1000));
-  }
-  if (retry_query.length) {
-    console.log(campaign, "TO RETRY:", retry_query);
-    await new Promise((resolve) => setTimeout(resolve, 5 * 60 * 1000));
-
-    for (const [index, params] of Object.entries(retry_query)) {
-      // console.log(campaign, 'trying:', params);
-      await getAdvertStat(authToken, params)
-        .then((pr) => {
-          jsonData[key] = pr;
-          console.log(key, data.advertId);
-          retry_query[index] = 0;
-        })
-        .catch((er) =>
-          console.log(campaign, params, er.response ? er.response.data : er)
-        );
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
+  const jsonData = {};
+  for (const [advertId, unused] of Object.entries(adverts)) {
+    if (!advertId) continue;
+    const params = { id: advertId };
+    await fetchRKsBudget(authToken, params).then((pr) => {
+      jsonData[advertId] = pr;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return fs
     .writeFile(
-      path.join(__dirname, "files", campaign, "advertStats.json"),
+      path.join(__dirname, "files", campaign, "advertBudgets.json"),
       JSON.stringify(jsonData)
     )
-    .then(() => console.log("advertStats.json created."))
+    .then(() => console.log("advertBudgets.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -2151,6 +2265,10 @@ module.exports = {
   getAdvertStatByMaskByDayAndWriteToJSON,
   updateAutoAdvertsInCampaign,
   setFixedPhrasesForCreatedRKs,
+  fetchSubjectDictionaryAndWriteToJSON,
+  createNewRKs,
+  getAdvertStatByDayAndWriteToJSONMpManager,
+  fetchRksBudgetsAndWriteToJSON,
 };
 
 const getMaskFromVendorCode = (vendorCode) => {

@@ -35,7 +35,7 @@ const {
   fetchByNowStats,
   updateAutoAdverts,
 } = require("../prices/prices");
-const { updatePrices } = require("../prices/main");
+const { updatePrices, createNewRKs } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
 
@@ -145,6 +145,11 @@ app.post("/api/getDelivery", authenticateToken, (req, res) => {
 app.get("/api/copyZakaz", authenticateToken, (req, res) => {
   copyZakazToOtherSpreadsheet();
   res.send("Zakaz copying started!");
+});
+
+app.get("/api/createNewRKs", authenticateToken, (req, res) => {
+  createNewRKs();
+  res.send("RKs creating started!");
 });
 
 app.get("/api/writeDrr", authenticateToken, (req, res) => {

@@ -5,6 +5,7 @@ const { authenticate } = require("@google-cloud/local-auth");
 const { google } = require("googleapis");
 const console = require("console");
 const { analytics } = require("googleapis/build/src/apis/analytics");
+const { kMaxLength } = require("buffer");
 const xlsx = require("node-xlsx").default;
 
 // If modifying these scopes, delete token.json.
@@ -676,7 +677,10 @@ function updatePlanFact(auth, campaign) {
     const unique_params_temp = unique_params_res.data.values[0];
     const unique_params = [];
     for (let i = 1; i < unique_params_temp.length; i++)
-      if (!unique_params.includes(unique_params_temp[i]))
+      if (
+        !unique_params.includes(unique_params_temp[i]) &&
+        unique_params_temp[i]
+      )
         unique_params.push(unique_params_temp[i]);
     const param_map = {
       Показы: { name: "views", formula: "СУММ" },
@@ -938,6 +942,256 @@ function updatePlanFact(auth, campaign) {
   });
 }
 
+function updateFactStatsByRK(auth, campaign) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const vendorCodes = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "vendorCodes.json")
+      )
+    );
+    const artsData = await JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files", "data.json"))
+    );
+    const sum_orders = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "sum of orders by day.json")
+      )
+    );
+    const orders = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "orders by day.json")
+      )
+    );
+
+    const advertBudgets = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "advertBudgets.json")
+      )
+    );
+    const advertInfos = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "advertInfos.json")
+      )
+    );
+    const advertNames = {};
+    for (const [unused, rkData] of Object.entries(advertInfos))
+      advertNames[rkData.advertId] = rkData.name;
+    const advertStatsMpManager = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "advertStatsMpManager.json")
+      )
+    );
+    const advertStatsByDay = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "advert stats by day.json")
+      )
+    );
+
+    const spIds = {
+      mayusha: "РК Маюша",
+      delicatus: "РК Delicatus",
+      TKS: "РК TKS",
+    };
+    if (!(campaign in spIds)) {
+      resolve();
+      return;
+    }
+
+    const advert_infos_columns_res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `${spIds[campaign]}!A1:D1`,
+    });
+    const advert_infos_columns = advert_infos_columns_res.data.values[0];
+    const infos_columns_map = {
+      "ID РК": "advertId",
+      СТАТУС: "status",
+      "ТИП РК": "type",
+      "ИМЯ РК": "name",
+    };
+
+    const unique_params_res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `${spIds[campaign]}!2:2`,
+    });
+    const unique_params_temp = unique_params_res.data.values[0];
+    const unique_params = [];
+    for (let i = 1; i < unique_params_temp.length; i++)
+      if (
+        !unique_params.includes(unique_params_temp[i]) &&
+        unique_params_temp[i]
+      )
+        unique_params.push(unique_params_temp[i]);
+
+    const param_map = {
+      Показы: { name: "views", formula: "СУММ" },
+      Клики: { name: "clicks", formula: "СУММ" },
+      CTR: { name: "ctr", formula: "СРЗНАЧ" },
+      СРС: { name: "cpc", formula: "СРЗНАЧ" },
+      СРМ: { name: "cpm", formula: "СРЗНАЧ" },
+      Расход: { name: "sum", formula: "СУММ" },
+      "Заказы/шт": { name: "orders", formula: "СУММ" },
+      "Заказы/Р": { name: "sum_orders", formula: "СУММ" },
+      "ДРР%": { name: "drr", formula: "СРЗНАЧ" },
+    };
+
+    const calc_adv_stats_in_date_range = (advertId, date_range) => {
+      const result = {
+        views: 0,
+        clicks: 0,
+        sum: 0,
+        ctr: 0,
+        cpm: 0,
+        cpc: 0,
+        orders: 0,
+        sum_orders: 0,
+        drr: 0,
+      };
+      const rkData = advertStatsByDay[advertId];
+      if (!rkData) return result;
+      const today_date = new Date();
+      for (let i = date_range.to; i <= date_range.from; i++) {
+        const cur_date = new Date();
+        cur_date.setDate(today_date.getDate() - i);
+        const str_date = cur_date
+          .toLocaleDateString("ru-RU")
+          .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+          .slice(0, 10);
+
+        const nms_to_sum_orders = [];
+        if (!artsData[advertNames[advertId]]) {
+          const rkStat = advertStatsMpManager[advertId];
+          for (const [index, artData] of Object.entries(rkStat)) {
+            const vendorCode = vendorCodes[artData.vendorCode];
+            if (!vendorCode) continue;
+            const stat_date = artData.createdAt.slice(0, 10);
+            if (stat_date != str_date) continue;
+            // console.log(vendorCode, artData.vendorCode);
+            if (!nms_to_sum_orders.includes(vendorCode))
+              nms_to_sum_orders.push(vendorCode);
+          }
+        } else {
+          nms_to_sum_orders.push(advertNames[advertId]);
+        }
+
+        // console.log(nms_to_sum_orders);
+        if (!orders[str_date]) continue;
+        for (const [art, value] of Object.entries(orders[str_date])) {
+          if (!nms_to_sum_orders.includes(art)) continue;
+          result.orders += value;
+        }
+        for (const [art, value] of Object.entries(sum_orders[str_date])) {
+          if (!nms_to_sum_orders.includes(art)) continue;
+          result.sum_orders += value;
+        }
+
+        if (!rkData[str_date]) continue;
+        // console.log(str_date);
+
+        result.views += rkData[str_date].views ?? 0;
+        result.clicks += rkData[str_date].clicks ?? 0;
+        result.sum += rkData[str_date].sum ?? 0;
+        if (result.views) result.ctr = result.clicks / result.views;
+        if (result.views) result.cpm = result.sum / (result.views / 1000);
+        if (result.clicks) result.cpc = result.sum / result.clicks;
+        // console.log(result);
+      }
+      result.drr = result.sum_orders ? result.sum / result.sum_orders : 0;
+      // console.log(result);
+      return result;
+    };
+    const sheet_data = [Array(4), Array(4), Array(4)];
+    const stat_date_ranges = [
+      // days before today
+      { from: 0, to: 0 },
+      { from: 1, to: 1 },
+      { from: 8, to: 2 },
+    ];
+
+    const formulas_to_concat = [];
+    const sheet_data_temp = [];
+    for (let i = 0; i < stat_date_ranges.length; i++) {
+      for (let j = 0; j < unique_params.length; j++) {
+        const index_of_column = i * unique_params.length + j + 5;
+        const column_name = indexToColumn(index_of_column);
+        formulas_to_concat.push(
+          `=${
+            param_map[unique_params[j]].formula
+          }(${column_name}4:${column_name})`
+        );
+      }
+      sheet_data[1] = sheet_data[1].concat(unique_params);
+    }
+    sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
+
+    for (const [unused, rkData] of Object.entries(advertInfos)) {
+      //// formulas
+      let include_this_rk = false;
+      let rkStatInRanges = [];
+      for (let i = 0; i < stat_date_ranges.length; i++) {
+        const rkRangeDateData = calc_adv_stats_in_date_range(
+          rkData.advertId,
+          stat_date_ranges[i]
+        );
+        if (rkRangeDateData.sum != 0) include_this_rk = true;
+        const to_push = Array(unique_params.length);
+        for (let j = 0; j < to_push.length; j++) {
+          to_push[j] = rkRangeDateData[param_map[unique_params[j]].name];
+        }
+        // if (mask == "КПБ_2_СТРАЙП") console.log(mask, to_push);
+        rkStatInRanges = rkStatInRanges.concat(to_push);
+        // console.log(mask, fact[i], to_push);
+      }
+      const rk_type_map = { 6: "Поиск", 8: "Авто" };
+      const rk_status_map = {
+        4: "Готова к запуску",
+        7: "Завершена",
+        8: "Отказался",
+        9: "Идут показы",
+        11: "Пауза",
+      };
+      if (include_this_rk) {
+        rkData.type = rk_type_map[rkData.type];
+        rkData.status = rk_status_map[rkData.status];
+        sheet_data_temp.push(
+          [
+            rkData[infos_columns_map[advert_infos_columns[0]]],
+            rkData[infos_columns_map[advert_infos_columns[1]]],
+            rkData[infos_columns_map[advert_infos_columns[2]]],
+            rkData[infos_columns_map[advert_infos_columns[3]]],
+          ].concat(
+            rkStatInRanges.concat([advertBudgets[rkData.advertId].total])
+          )
+        );
+      }
+    }
+    sheet_data_temp.sort((a, b) => {
+      return b[0] - a[0];
+    });
+
+    for (let i = 0; i < sheet_data_temp.length; i++) {
+      sheet_data.push(sheet_data_temp[i]);
+      console.log(sheet_data_temp[i].length);
+    }
+    // return;
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `${spIds[campaign]}!4:1000`,
+    });
+    await sheets.spreadsheets.values
+      .update({
+        spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+        range: `${spIds[campaign]}!1:1000`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: sheet_data,
+        },
+      })
+      .then((pr) => resolve());
+  });
+}
+
 function fetchNewRKsToCreate(auth) {
   return new Promise(async (resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
@@ -974,6 +1228,13 @@ function fetchNewRKsToCreate(auth) {
       new_rks_data.push({});
       for (let j = 0; j < unique_params.length; j++) {
         new_rks_data[i][param_map[unique_params[j]]] = row[j];
+        if (
+          param_map[unique_params[j]] == "budget" ||
+          param_map[unique_params[j]] == "bid"
+        )
+          new_rks_data[i][param_map[unique_params[j]]] = parseInt(
+            row[j].replace(/\s/g, "")
+          );
       }
     }
     // console.log(new_rks_data);
@@ -1695,6 +1956,10 @@ module.exports = {
   updatePlanFact: async (campaign) => {
     const auth = await authorize();
     await updatePlanFact(auth, campaign).catch(console.error);
+  },
+  updateFactStatsByRK: async (campaign) => {
+    const auth = await authorize();
+    await updateFactStatsByRK(auth, campaign).catch(console.error);
   },
   generateAdvertSpreadsheet: async () => {
     const auth = await authorize();
