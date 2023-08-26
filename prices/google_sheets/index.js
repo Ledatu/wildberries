@@ -1239,6 +1239,10 @@ function fetchNewRKsToCreate(auth) {
       }
     }
     // console.log(new_rks_data);
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `Запуск РК!2:1000`,
+    });
     writeDataToFile(
       new_rks_data,
       path.join(__dirname, `../files/RKsToCreate.json`)
