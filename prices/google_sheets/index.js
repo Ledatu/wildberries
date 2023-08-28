@@ -188,6 +188,10 @@ async function writeDrrToDataSpreadsheet(auth) {
 
     // console.log(data);
     const sheets = google.sheets({ version: "v4", auth });
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Данные!L2:L",
+    });
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
@@ -198,16 +202,16 @@ async function writeDrrToDataSpreadsheet(auth) {
     const rows = res.data.values;
     // console.log(rows);
     const data = [];
-    for (const [campaign, seller_id] of Object.entries(seller_ids)) {
-      const drr = JSON.parse(
-        await fs.readFile(
-          path.join(__dirname, `../files/${campaign}/avgDrrByMask.json`)
-        )
-      );
+    for (let i = 0; i < rows.length; i++) {
+      for (const [campaign, seller_id] of Object.entries(seller_ids)) {
+        const drr = JSON.parse(
+          await fs.readFile(
+            path.join(__dirname, `../files/${campaign}/avgDrrByMask.json`)
+          )
+        );
 
-      for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        if (!row[0]) continue;
+        if (row[0] == "") continue;
         data.push([row[11]]);
 
         if (row[4] != seller_ids[campaign]) continue;
