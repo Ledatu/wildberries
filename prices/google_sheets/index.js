@@ -207,6 +207,7 @@ async function writeDrrToDataSpreadsheet(auth) {
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
+        if (!row[0]) continue;
         data.push([row[11]]);
 
         if (row[4] != seller_ids[campaign]) continue;

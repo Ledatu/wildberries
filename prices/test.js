@@ -128,11 +128,11 @@ const a = async () => {
 // );
 //
 // fetchAdvertsAndWriteToJson("mayusha");
-// writeDrrToDataSpreadsheet();
+writeDrrToDataSpreadsheet();
 // fetchSubjectDictionaryAndWriteToJSON()
 // createNewAdverts();
 // getAdvertStatByDayAndWriteToJSONMpManager("TKS").then(() =>
 //   fetchRksBudgetsAndWriteToJSON("TKS").then(() =>
-    updateFactStatsByRK("mayusha")
+    // updateFactStatsByRK("mayusha")
 //   )
 // );
