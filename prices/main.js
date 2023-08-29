@@ -360,6 +360,11 @@ const buildXlsx = (data, campaign) => {
       path.join(__dirname, "files", campaign, "vendorCodes.json")
     )
   );
+  const fullWeekArtStats = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "fullWeekArtStats.json")
+    )
+  );
   const orders = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "orders.json"))
   );
@@ -399,6 +404,7 @@ const buildXlsx = (data, campaign) => {
       "Расходы",
       "Реклама",
       "%ДРР",
+      "%ДРР/АРТ",
     ],
   ];
   data.forEach((el) => {
@@ -437,6 +443,7 @@ const buildXlsx = (data, campaign) => {
 
     const ad = spp_price * (arts_data[vendorCode].ad / 100);
     const drr = ad / spp_price;
+    const drr_art = fullWeekArtStats[vendorCode] ? fullWeekArtStats[vendorCode].drr : 0;
 
     const profit =
       -ad - commission - delivery - tax - expences - prime_cost + roz_price;
@@ -476,6 +483,7 @@ const buildXlsx = (data, campaign) => {
       expences,
       ad,
       drr,
+      drr_art,
     ]);
   });
   // console.log(new_data);
@@ -842,6 +850,93 @@ const calcOrdersFromDetailedByPeriodAndWriteToJSON = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const calcAvgDrrByArtAndWriteToJSON = (campaign) => {
+  const advertStatsByArtByDay = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advert stats by art by day.json")
+    )
+  );
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const orders = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "orders by day.json")
+    )
+  );
+  const sum_orders = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "sum of orders by day.json")
+    )
+  );
+
+  const calc_adv_stats = (art) => {
+    const result = {
+      views: 0,
+      clicks: 0,
+      sum: 0,
+      ctr: 0,
+      cpm: 0,
+      cpc: 0,
+      orders: 0,
+      sum_orders: 0,
+      drr: 0,
+    };
+    const artData = advertStatsByArtByDay[art];
+    if (!artData) return result;
+    const today_date = new Date();
+    for (let i = 2; i <= 8; i++) {
+      // last full week
+      const cur_date = new Date();
+      cur_date.setDate(today_date.getDate() - i);
+      const str_date = cur_date
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10);
+
+      // console.log(nms_to_sum_orders);
+      if (!orders[str_date]) continue;
+      for (const [_art, value] of Object.entries(orders[str_date])) {
+        if (art != _art) continue;
+        result.orders += value;
+      }
+      for (const [_art, value] of Object.entries(sum_orders[str_date])) {
+        if (art != _art) continue;
+        result.sum_orders += value;
+      }
+
+      if (!artData[str_date]) continue;
+      // console.log(str_date);
+
+      result.views += artData[str_date].views ?? 0;
+      result.clicks += artData[str_date].clicks ?? 0;
+      result.sum += artData[str_date].sum ?? 0;
+      if (result.views) result.ctr = result.clicks / result.views;
+      if (result.views) result.cpm = result.sum / (result.views / 1000);
+      if (result.clicks) result.cpc = result.sum / result.clicks;
+      // console.log(result);
+    }
+    result.drr = result.sum / result.sum_orders;
+    // result.drr = result.sum_orders ? result.sum / result.sum_orders : 0;
+    // console.log(result);
+    return result;
+  };
+
+  const jsonData = {};
+  for (const [id, art] of Object.entries(vendorCodes)) {
+    jsonData[art] = calc_adv_stats(art);
+  }
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "fullWeekArtStats.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("fullWeekArtStats.json created."))
+    .catch((error) => console.error(error));
+};
+
 const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
   const advertInfos = JSON.parse(
     afs.readFileSync(
@@ -869,6 +964,7 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
     return mask_splitted.join("_");
   };
   const jsonData = {};
+  const jsonDataByArt = {};
   jsonData[campaign] = {};
   for (const [name, rkData] of Object.entries(advertStats)) {
     for (const [index, day] of Object.entries(rkData.days)) {
@@ -884,10 +980,35 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
           // const mask = get_proper_mask(
           //   getMaskFromVendorCode(vendorCodes[nm.nmId])
           // );
-          const mask = getMaskFromVendorCode(vendorCodes[nm.nmId]);
+          const art = vendorCodes[nm.nmId];
+          if (!(art in jsonDataByArt)) jsonDataByArt[art] = {};
+          if (!(date in jsonDataByArt[art]))
+            jsonDataByArt[art][date] = {
+              views: 0,
+              clicks: 0,
+              unique_users: 0,
+              sum: 0,
+              ctr: 0,
+              cpm: 0,
+              cpc: 0,
+            };
+          jsonDataByArt[art][date].views += nm.views ?? 0;
+          jsonDataByArt[art][date].clicks += nm.clicks ?? 0;
+          jsonDataByArt[art][date].unique_users += nm.unique_users ?? 0;
+          jsonDataByArt[art][date].sum += nm.sum ?? 0;
+          if (jsonDataByArt[art][date].views)
+            jsonDataByArt[art][date].ctr =
+              jsonDataByArt[art][date].clicks / jsonDataByArt[art][date].views;
+          if (jsonDataByArt[art][date].views)
+            jsonDataByArt[art][date].cpm =
+              jsonDataByArt[art][date].sum /
+              (jsonDataByArt[art][date].views / 1000);
+          if (jsonDataByArt[art][date].clicks)
+            jsonDataByArt[art][date].cpc =
+              jsonDataByArt[art][date].sum / jsonDataByArt[art][date].clicks;
 
+          const mask = getMaskFromVendorCode(art);
           if (!(mask in jsonData)) jsonData[mask] = {};
-
           if (!(date in jsonData[mask]))
             jsonData[mask][date] = {
               views: 0,
@@ -949,11 +1070,24 @@ const getAdvertStatByMaskByDayAndWriteToJSON = async (campaign) => {
         __dirname,
         "files",
         campaign,
-        "advert stats by mask by day.json"
+        "advert stats by art by day.json"
       ),
-      JSON.stringify(jsonData)
+      JSON.stringify(jsonDataByArt)
     )
-    .then(() => console.log("advert stats by mask by day.json created."))
+    .then(() =>
+      fs
+        .writeFile(
+          path.join(
+            __dirname,
+            "files",
+            campaign,
+            "advert stats by mask by day.json"
+          ),
+          JSON.stringify(jsonData)
+        )
+        .then(() => console.log("advert stats by mask by day.json created."))
+        .catch((error) => console.error(error))
+    )
     .catch((error) => console.error(error));
 };
 
@@ -968,6 +1102,7 @@ const getAdvertStatByMaskByDayAndWriteToJSONMpManager = async (campaign) => {
       path.join(__dirname, "files", campaign, "vendorCodes.json")
     )
   );
+  const jsonDataByArt = {};
   const jsonData = {};
   let a = 0;
   jsonData[campaign] = {};
@@ -1010,7 +1145,33 @@ const getAdvertStatByMaskByDayAndWriteToJSONMpManager = async (campaign) => {
         console.log(art_id, date);
         continue;
       }
-      const mask = getMaskFromVendorCode(vendorCodes[art_id]);
+      const art = vendorCodes[art_id];
+      if (!(art in jsonDataByArt)) jsonDataByArt[art] = {};
+      if (!(date in jsonDataByArt[art]))
+        jsonDataByArt[art][date] = {
+          views: 0,
+          clicks: 0,
+          sum: 0,
+          ctr: 0,
+          cpm: 0,
+          cpc: 0,
+        };
+      jsonDataByArt[art][date].views += artData.views ?? 0;
+      jsonDataByArt[art][date].clicks += artData.clicks ?? 0;
+      jsonDataByArt[art][date].unique_users += artData.unique_users ?? 0;
+      jsonDataByArt[art][date].sum += artData.cost ?? 0;
+      if (jsonDataByArt[art][date].views)
+        jsonDataByArt[art][date].ctr =
+          jsonDataByArt[art][date].clicks / jsonDataByArt[art][date].views;
+      if (jsonDataByArt[art][date].views)
+        jsonDataByArt[art][date].cpm =
+          jsonDataByArt[art][date].sum /
+          (jsonDataByArt[art][date].views / 1000);
+      if (jsonDataByArt[art][date].clicks)
+        jsonDataByArt[art][date].cpc =
+          jsonDataByArt[art][date].sum / jsonDataByArt[art][date].clicks;
+
+      const mask = getMaskFromVendorCode(art);
 
       if (!(mask in jsonData)) jsonData[mask] = {};
 
@@ -1044,11 +1205,24 @@ const getAdvertStatByMaskByDayAndWriteToJSONMpManager = async (campaign) => {
         __dirname,
         "files",
         campaign,
-        "advert stats by mask by day.json"
+        "advert stats by art by day.json"
       ),
-      JSON.stringify(jsonData)
+      JSON.stringify(jsonDataByArt)
     )
-    .then(() => console.log("advert stats by mask by day.json created."))
+    .then(() =>
+      fs
+        .writeFile(
+          path.join(
+            __dirname,
+            "files",
+            campaign,
+            "advert stats by mask by day.json"
+          ),
+          JSON.stringify(jsonData)
+        )
+        .then(() => console.log("advert stats by mask by day.json created."))
+        .catch((error) => console.error(error))
+    )
     .catch((error) => console.error(error));
 };
 
@@ -2269,6 +2443,7 @@ module.exports = {
   createNewRKs,
   getAdvertStatByDayAndWriteToJSONMpManager,
   fetchRksBudgetsAndWriteToJSON,
+  calcAvgDrrByArtAndWriteToJSON,
 };
 
 const getMaskFromVendorCode = (vendorCode) => {

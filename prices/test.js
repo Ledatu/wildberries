@@ -38,6 +38,7 @@ const {
   createNewRKs,
   getAdvertStatByDayAndWriteToJSONMpManager,
   fetchRksBudgetsAndWriteToJSON,
+  calcAvgDrrByArtAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -128,11 +129,14 @@ const a = async () => {
 // );
 //
 // fetchAdvertsAndWriteToJson("mayusha");
-writeDrrToDataSpreadsheet();
+// writeDrrToDataSpreadsheet();
+// getAdvertStatByMaskByDayAndWriteToJSONMpManager("TKS").then(() =>
+//   calcAvgDrrByArtAndWriteToJSON("TKS")
+// );
 // fetchSubjectDictionaryAndWriteToJSON()
 // createNewAdverts();
 // getAdvertStatByDayAndWriteToJSONMpManager("TKS").then(() =>
 //   fetchRksBudgetsAndWriteToJSON("TKS").then(() =>
-    // updateFactStatsByRK("mayusha")
+// updateFactStatsByRK("mayusha")
 //   )
 // );
