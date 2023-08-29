@@ -21,6 +21,7 @@ const {
   createNewRKs,
   getAdvertStatByDayAndWriteToJSONMpManager,
   fetchRksBudgetsAndWriteToJSON,
+  calcAvgDrrByArtAndWriteToJSON,
 } = require("./main");
 const {
   writePrices,
