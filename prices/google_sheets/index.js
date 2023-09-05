@@ -1877,7 +1877,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
         } else {
           mask = title == "delicatus" ? mask.slice(-1) : mask.slice(-2, -1);
         }
-        mask = row[0].includes("DELICATUS") && row[0].includes("КПБ") ? mask[0] + "_DELICATUS" : mask[0];
+        mask = row[0].includes("DELICATUS") && row[0].includes("КПБ") ? mask[0] + " 2" : mask[0];
         if (!masks.includes(mask)) masks.push(mask);
       }
       // console.log(masks);
@@ -1891,7 +1891,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
         for (let j = 0; j < sheet_data.length; j++) {
           const row = sheet_data[j];
           if (!row[0]) continue;
-          if (!row[0].split("_").includes(masks[i])) continue;
+          if (!row[0].split("_").includes(masks[i].split(' ')[0])) continue;
 
           mask_sheet_data.push(sheet_data[j]);
         }
