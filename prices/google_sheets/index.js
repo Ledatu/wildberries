@@ -1877,7 +1877,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
         } else {
           mask = title == "delicatus" ? mask.slice(-1) : mask.slice(-2, -1);
         }
-        mask = row[0].includes("DELICATUS") && mask.includes("КПБ") ? mask[0] + " 2" : mask[0];
+        mask = row[0].includes("DELICATUS") && row[0].includes("КПБ") ? mask[0] + "_DELICATUS" : mask[0];
         if (!masks.includes(mask)) masks.push(mask);
       }
       // console.log(masks);
