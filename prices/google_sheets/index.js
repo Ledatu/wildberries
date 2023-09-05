@@ -1279,7 +1279,7 @@ function fetchFeedbackAnswerTemplatesAndWriteToJSON(auth) {
         if (mask == "" || !mask) continue;
         for (let i = 1; i < answers_temp.length; i++) {
           const answer_template = answers_temp[i][j];
-        if (answer_template == ""|| !answer_template) continue;
+          if (answer_template == "" || !answer_template) continue;
           if (!(mask in answers)) answers[mask] = [];
           answers[mask].push(answer_template);
         }
@@ -1877,7 +1877,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
         } else {
           mask = title == "delicatus" ? mask.slice(-1) : mask.slice(-2, -1);
         }
-        mask = mask[0];
+        mask = row[0].includes("DELICATUS") ? mask[0] + " 2" : mask[0];
         if (!masks.includes(mask)) masks.push(mask);
       }
       // console.log(masks);
@@ -2051,12 +2051,10 @@ const getMaskFromVendorCode = (vendorCode) => {
   if (code.slice(-1) == "2") code.pop();
   if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
   else if (code.includes("КПБ")) {
-      code.splice(3, 1);
-      if (code.includes("DELICATUS")) 
-        code.pop()
-  }
-  else code.splice(2, 1);
-    
+    code.splice(3, 1);
+    if (code.includes("DELICATUS")) code.pop();
+  } else code.splice(2, 1);
+
   return code.join("_");
 };
 
