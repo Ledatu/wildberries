@@ -12,6 +12,7 @@ const {
   pivotOrders,
   writeDrrToDataSpreadsheet,
   updateFactStatsByRK,
+  fetchFeedbackAnswerTemplatesAndWriteToJSON,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -39,6 +40,7 @@ const {
   getAdvertStatByDayAndWriteToJSONMpManager,
   fetchRksBudgetsAndWriteToJSON,
   calcAvgDrrByArtAndWriteToJSON,
+  fetchUnasweredFeedbacksAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -140,3 +142,5 @@ const a = async () => {
 // updateFactStatsByRK("mayusha")
 //   )
 // );
+// fetchUnasweredFeedbacksAndWriteToJSON("mayusha")
+// fetchFeedbackAnswerTemplatesAndWriteToJSON()

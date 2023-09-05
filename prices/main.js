@@ -57,6 +57,18 @@ const getDetailedByPeriod = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
+const getFeedbacks = (authToken, params) => {
+  return axios
+    .get("https://feedbacks-api.wildberries.ru/api/v1/feedbacks", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const getAdverts = (authToken, params) => {
   return axios
     .get("https://advert-api.wb.ru/adv/v0/adverts", {
@@ -443,7 +455,9 @@ const buildXlsx = (data, campaign) => {
 
     const ad = spp_price * (arts_data[vendorCode].ad / 100);
     const drr = ad / spp_price;
-    const drr_art = fullWeekArtStats[vendorCode] ? fullWeekArtStats[vendorCode].drr : 0;
+    const drr_art = fullWeekArtStats[vendorCode]
+      ? fullWeekArtStats[vendorCode].drr
+      : 0;
 
     const profit =
       -ad - commission - delivery - tax - expences - prime_cost + roz_price;
@@ -1394,6 +1408,39 @@ const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
         });
       })
       .catch((error) => console.error(error));
+  });
+
+const fetchUnasweredFeedbacksAndWriteToJSON = (campaign) =>
+  new Promise(async (resolve, reject) => {
+    const authToken = getAuthToken("api-token", campaign);
+    const vendorCodes = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "vendorCodes.json")
+      )
+    );
+    const jsonData = {};
+    const params = {
+      isAnswered: false,
+      take: 5000,
+      skip: 0,
+    };
+    await getFeedbacks(authToken, params).then((pr) => {
+      const data = pr.data;
+      for (const [index, feedback] of Object.entries(data.feedbacks)) {
+        const art = vendorCodes[feedback.productDetails.nmId];
+        if (!art) continue;
+        if (!(art in jsonData)) jsonData[art] = [];
+        jsonData[art].push(feedback);
+      }
+      console.log(jsonData);
+      return fs
+        .writeFile(
+          path.join(__dirname, "files", campaign, "feedbacks.json"),
+          JSON.stringify(jsonData)
+        )
+        .then(() => console.log("feedbacks.json created."))
+        .catch((error) => console.error(error));
+    });
   });
 
 const updatePrices = async (campaign) => {
@@ -2444,6 +2491,7 @@ module.exports = {
   getAdvertStatByDayAndWriteToJSONMpManager,
   fetchRksBudgetsAndWriteToJSON,
   calcAvgDrrByArtAndWriteToJSON,
+  fetchUnasweredFeedbacksAndWriteToJSON,
 };
 
 const getMaskFromVendorCode = (vendorCode) => {
@@ -2451,8 +2499,12 @@ const getMaskFromVendorCode = (vendorCode) => {
   const code = vendorCode.split("_");
   if (code.slice(-1) == "2") code.pop();
   if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
-  else if (code.includes("КПБ")) code.splice(3, 1);
+  else if (code.includes("КПБ")) {
+      code.splice(3, 1);
+      if (code.includes("DELICATUS")) 
+        code.pop()
+  }
   else code.splice(2, 1);
-
+    
   return code.join("_");
 };

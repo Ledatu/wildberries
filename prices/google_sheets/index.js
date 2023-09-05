@@ -1255,6 +1255,46 @@ function fetchNewRKsToCreate(auth) {
   });
 }
 
+function fetchFeedbackAnswerTemplatesAndWriteToJSON(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+    const campaigns = await JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files", "campaigns.json"))
+    ).campaigns;
+    const promises = [];
+    const sheet_names = {
+      mayusha: "Маюша",
+      delicatus: "Деликатус",
+      TKS: "ТКС",
+    };
+    for (const [index, campaign] of Object.entries(campaigns)) {
+      const answers_res = await sheets.spreadsheets.values.get({
+        spreadsheetId: "1M31LYMUCYRQeQYtzoHasaQzsp7AQjQ-NNwVf2kY-DLc",
+        range: `${sheet_names[campaign]}!1:1000`,
+      });
+      const answers_temp = answers_res.data.values;
+      const answers = {};
+      for (let j = 0; j < 10; j++) {
+        const mask = answers_temp[0][j];
+        if (mask == "" || !mask) continue;
+        for (let i = 1; i < answers_temp.length; i++) {
+          const answer_template = answers_temp[i][j];
+        if (answer_template == ""|| !answer_template) continue;
+          if (!(mask in answers)) answers[mask] = [];
+          answers[mask].push(answer_template);
+        }
+      }
+      promises.push(
+        writeDataToFile(
+          answers,
+          path.join(__dirname, "../files", campaign, "answerTemplates.json")
+        )
+      );
+    }
+    Promise.all(promises).then((pr) => resolve());
+  });
+}
+
 function updateAnalyticsOrders(auth, campaign) {
   return new Promise(async (resolve, reject) => {
     const orders = await JSON.parse(
@@ -1987,6 +2027,10 @@ module.exports = {
     const auth = await authorize();
     await updateLowRatingStocksSheet(auth).catch(console.error);
   },
+  fetchFeedbackAnswerTemplatesAndWriteToJSON: async () => {
+    const auth = await authorize();
+    await fetchFeedbackAnswerTemplatesAndWriteToJSON(auth).catch(console.error);
+  },
   sendEmail: async (to, subject, body) => {
     const auth = await authorize();
     await sendEmail(auth, to, subject, body).catch(console.error);
@@ -2002,12 +2046,17 @@ module.exports = {
 };
 
 const getMaskFromVendorCode = (vendorCode) => {
+  if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE";
   const code = vendorCode.split("_");
   if (code.slice(-1) == "2") code.pop();
   if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
-  else if (code.includes("КПБ")) code.splice(3, 1);
+  else if (code.includes("КПБ")) {
+      code.splice(3, 1);
+      if (code.includes("DELICATUS")) 
+        code.pop()
+  }
   else code.splice(2, 1);
-
+    
   return code.join("_");
 };
 
