@@ -1895,6 +1895,8 @@ async function copyZakazToOtherSpreadsheet(auth) {
           const row = sheet_data[j];
           if (!row[0]) continue;
           if (!row[0].split("_").includes(masks[i].split(" ")[0])) continue;
+          if (masks[i].split(" ").length == 1 && row[0].includes("КПБ") && row[0].includes("DELICATUS"))
+            continue;
           if (masks[i].split(" ").length == 2 && !row[0].includes("DELICATUS"))
             continue;
 

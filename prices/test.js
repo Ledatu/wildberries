@@ -144,3 +144,4 @@ const a = async () => {
 // );
 // fetchUnasweredFeedbacksAndWriteToJSON("mayusha")
 // fetchFeedbackAnswerTemplatesAndWriteToJSON()
+copyZakazToOtherSpreadsheet() 
