@@ -43,8 +43,10 @@ const fs = require("fs");
 const { fetchAdsIdsAndWriteToJSON } = require("../analytics/google_sheets");
 
 const updateAtriculesData = async () => {
-  await copyPricesToDataSpreadsheet().then(
-    async (pr) => await fetchDataAndWriteToJSON()
+  await fetchArtMaskPricesAndWriteToJSON().then(() =>
+    copyPricesToDataSpreadsheet().then(
+      async (pr) => await fetchDataAndWriteToJSON()
+    )
   );
 };
 
