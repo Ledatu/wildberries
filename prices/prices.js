@@ -37,6 +37,7 @@ const {
   updatePlanFact,
   fetchNewRKsToCreate,
   updateFactStatsByRK,
+  fetchArtMaskPricesAndWriteToJSON,
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 const fs = require("fs");
