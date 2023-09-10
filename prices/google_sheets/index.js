@@ -315,6 +315,7 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
     const rows = res.data.values;
     const data = [];
     rows.forEach((row) => {
+      if (row[16] == "" || !row[16]) return;
       const new_price = Number(
         row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );

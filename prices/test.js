@@ -61,7 +61,7 @@ const {
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
 // getDelivery().then((pr) => console.log(pr));
 // fetchDataAndWriteToJSON()
-getPrices();
+// getPrices();
 // updateAnalyticsOrders("mayusha");
 // sendRKErrors('projecttriggers@gmail.com', 'Ошибки РК', 'Тест');
 // updateAdvertArtActivitiesAndGenerateNotIncluded('mayusha')
@@ -116,7 +116,7 @@ const a = async () => {
 // getAdvertStatByMaskByDayAndWriteToJSON('TKS')
 // updatePlanFact('mayusha')
 // fetchOrdersAndWriteToJSON("TKS");
-// fetchNewPricesAndWriteToJSON('mayusha')
+fetchNewPricesAndWriteToJSON("delicatus");
 // fetchOrdersAndWriteToJSON("delicatus");
 // updatePlanFact('delicatus')
 // fetchByNowStats()
@@ -152,4 +152,4 @@ const a = async () => {
 // );
 // fetchUnasweredFeedbacksAndWriteToJSON("mayusha")
 // fetchFeedbackAnswerTemplatesAndWriteToJSON()
-// copyZakazToOtherSpreadsheet() 
+// copyZakazToOtherSpreadsheet()
