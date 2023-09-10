@@ -309,13 +309,15 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `${campaign}!A2:Q`,
-      valueRenderOption: "UNFORMATTED_VALUE",
+      // valueRenderOption: "UNFORMATTED_VALUE",
     });
 
     const rows = res.data.values;
     const data = [];
     rows.forEach((row) => {
-      const new_price = Number(row[16]);
+      const new_price = Number(
+        row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
+      );
       if (!new_price || new_price > 20000 || new_price < 4500) return;
       const roi = Number(
         row[13].replace("%", "").replace(",", ".").replace(/\s/g, "")
@@ -337,11 +339,11 @@ async function fetchArtMaskPricesAndWriteToJSON(auth) {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ",
       range: `ЦЕНЫ+ШК!A2:C`,
-      valueRenderOption: "UNFORMATTED_VALUE",
     });
     const rows = res.data.values;
     const jsonData = {};
     rows.forEach((row) => {
+      if (row[0] == "") return;
       jsonData[row[0]] = {
         card: Math.abs(
           Number(

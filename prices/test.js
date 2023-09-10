@@ -61,7 +61,7 @@ const {
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
 // getDelivery().then((pr) => console.log(pr));
 // fetchDataAndWriteToJSON()
-// getPrices();
+getPrices();
 // updateAnalyticsOrders("mayusha");
 // sendRKErrors('projecttriggers@gmail.com', 'Ошибки РК', 'Тест');
 // updateAdvertArtActivitiesAndGenerateNotIncluded('mayusha')
@@ -127,7 +127,7 @@ const a = async () => {
 // pivotOrders('mayusha')
 // updatePlanFact('delicatus')
 // updateAutoAdverts()
-fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
+// fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
 // fetchNewRKsToCreate();
 // setFixedPhrasesForCreatedRKs("mayusha");
 // fetchOrdersAndWriteToJSON("mayusha").then(() =>
