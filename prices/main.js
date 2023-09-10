@@ -83,7 +83,7 @@ const getAdverts = (authToken, params) => {
 
 const getAdvertInfo = (authToken, params) => {
   return axios
-    .get("https://advert-api.wb.ru/adv/v0/advert", {
+    .get("http://advert-api.wb.ru/adv/v0/advert", {
       headers: {
         Authorization: authToken,
       },
@@ -1345,6 +1345,37 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
       : resolve(undefined);
   });
 
+const generateGeneralMaskFormsAndWriteToJSON = () =>
+  new Promise((resolve, reject) => {
+    const arts_data = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files", "data.json"))
+    );
+    const jsonData = [];
+    for (const [art, art_data] of Object.entries(arts_data)) {
+      const generalMask = getGeneralMaskFromVendorCode(art);
+      if (!jsonData.includes(generalMask)) {
+        jsonData.push(generalMask);
+        if (art.includes("САВ"))
+        console.log(art, generalMask);
+      }
+      // jsonData.push(mask_array.join("_"));
+    }
+    jsonData.sort();
+    return fs
+      .writeFile(
+        path.join(__dirname, "files", "generalMasks.json"),
+        JSON.stringify(jsonData)
+      )
+      .then(() => {
+        console.log("generalMasks.json created.");
+        resolve(jsonData);
+      })
+      .catch((error) => {
+        console.error(error);
+        reject(error);
+      });
+  });
+
 const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
   new Promise(async (resolve, reject) => {
     const filePath = path.join(
@@ -2477,6 +2508,7 @@ module.exports = {
   getAdvertStatByMaskByDayAndWriteToJSONMpManager,
   calculateNewValuesAndWriteToXlsx,
   updatePrices,
+  generateGeneralMaskFormsAndWriteToJSON,
   getKTErrorsAndWriteToJson,
   fetchArtsRatings,
   fetchAdvertInfosAndWriteToJson,
@@ -2494,17 +2526,27 @@ module.exports = {
   fetchUnasweredFeedbacksAndWriteToJSON,
 };
 
-const getMaskFromVendorCode = (vendorCode) => {
+const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
   if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE";
   const code = vendorCode.split("_");
   if (code.slice(-1) == "2") code.pop();
-  if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
+  if (cut_namatr && code.includes("НАМАТРАСНИК")) code.splice(1, 1);
   else if (code.includes("КПБ")) {
-      code.splice(3, 1);
-      if (code.includes("DELICATUS")) 
-        code.pop()
-  }
-  else code.splice(2, 1);
-    
+    code.splice(3, 1);
+    if (code.includes("DELICATUS")) code.pop();
+  } else code.splice(2, 1);
+
   return code.join("_");
+};
+
+const getGeneralMaskFromVendorCode = (vendorCode) => {
+  const mask = getMaskFromVendorCode(vendorCode, false);
+  const mask_array = mask.split("_");
+  let campaign_flag = mask_array[mask_array.length - 1];
+  if ("САВ" == campaign_flag) mask_array.pop();
+  campaign_flag = mask_array[mask_array.length - 1];
+
+  if (["ОТК", "ТКС", "DELICATUS"].includes(campaign_flag)) mask_array.pop();
+
+  return mask_array.join("_");
 };

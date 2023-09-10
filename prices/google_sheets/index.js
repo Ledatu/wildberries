@@ -309,6 +309,7 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `${campaign}!A2:Q`,
+      valueRenderOption: "UNFORMATTED_VALUE",
     });
 
     const rows = res.data.values;
@@ -327,6 +328,82 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
       data,
       path.join(__dirname, `../files/${campaign}/newPrices.json`)
     ).then((pr) => resolve());
+  });
+}
+
+async function fetchArtMaskPricesAndWriteToJSON(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ",
+      range: `ЦЕНЫ+ШК!A2:C`,
+      valueRenderOption: "UNFORMATTED_VALUE",
+    });
+    const rows = res.data.values;
+    const jsonData = {};
+    rows.forEach((row) => {
+      jsonData[row[0]] = {
+        card: Math.abs(
+          Number(
+            row[1]
+              ? row[1].replace("%", "").replace(",", ".").replace(/\s/, "")
+              : 0
+          )
+        ),
+        rc: Math.abs(
+          Number(
+            row[2]
+              ? row[2].replace("%", "").replace(",", ".").replace(/\s/, "")
+              : 0
+          )
+        ),
+      };
+    });
+
+    writeDataToFile(
+      jsonData,
+      path.join(__dirname, "../files", "artPrices.json")
+    ).then((pr) => resolve());
+  });
+}
+
+async function generatePricesTemplateSheet(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+    const generalMasks = JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files", "generalMasks.json"))
+    );
+
+    const art_types = [];
+    for (const [index, mask] of Object.entries(generalMasks)) {
+      const type = mask.split("_")[0];
+      if (!art_types.includes(type)) art_types.push(type);
+    }
+
+    const sheet_data = [];
+    for (const [index, type] of Object.entries(art_types)) {
+      for (const [jndex, mask] of Object.entries(generalMasks)) {
+        const art_type = mask.split("_")[0];
+        if (art_type != type) continue;
+        sheet_data.push([mask]);
+      }
+      sheet_data.push([""]);
+    }
+
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ",
+      range: `ЦЕНЫ+ШК!A2:C`,
+    });
+    sheets.spreadsheets.values
+      .update({
+        spreadsheetId: "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ",
+        range: `ЦЕНЫ+ШК!A2:A`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: sheet_data,
+        },
+      })
+      .then((pr) => resolve());
   });
 }
 
@@ -980,6 +1057,9 @@ function updateFactStatsByRK(auth, campaign) {
         path.join(__dirname, "../files", campaign, "advertInfos.json")
       )
     );
+    const generalMasks = await JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files", "generalMasks.json"))
+    );
     const advertNames = {};
     for (const [unused, rkData] of Object.entries(advertInfos))
       advertNames[rkData.advertId] = rkData.name;
@@ -1065,7 +1145,14 @@ function updateFactStatsByRK(auth, campaign) {
           .slice(0, 10);
 
         const nms_to_sum_orders = [];
-        if (!artsData[advertNames[advertId]]) {
+        if (advertNames[advertId].split("/")[0] in generalMasks) {
+          const mask = advertNames[advertId].split("/")[0];
+          for (const [art, art_data] of Object.entries(artsData)) {
+            const generalMask = getGeneralMaskFromVendorCode(art);
+            if (generalMask != mask) continue;
+            nms_to_sum_orders.push(art);
+          }
+        } else if (!artsData[advertNames[advertId]]) {
           const rkStat = advertStatsMpManager[advertId];
           for (const [index, artData] of Object.entries(rkStat)) {
             const vendorCode = vendorCodes[artData.vendorCode];
@@ -1754,7 +1841,9 @@ async function generateAdvertSpreadsheet(auth) {
 
 async function copyPricesToDataSpreadsheet(auth) {
   return new Promise(async (resolve, reject) => {
-    const sourceSpreadsheetId = "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ";
+    const artPrices = await JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files", "artPrices.json"))
+    );
     const destinationSpreadsheetId =
       "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs";
 
@@ -1769,18 +1858,6 @@ async function copyPricesToDataSpreadsheet(auth) {
         },
       });
     };
-    const prices_rows = (
-      await sheets.spreadsheets.values.get({
-        spreadsheetId: sourceSpreadsheetId,
-        range: `ЦЕНЫ+ШК!D2:F`,
-      })
-    ).data.values;
-
-    const prices = {};
-    prices_rows.forEach((row) => {
-      if (!row[0]) return;
-      prices[row[0]] = Number(row[2]);
-    });
 
     // console.log(prices);
 
@@ -1793,10 +1870,15 @@ async function copyPricesToDataSpreadsheet(auth) {
 
     const data = [];
     data_rows.forEach((row) => {
-      const mask = getMaskFromVendorCode(row[0]);
-      data.push([prices[mask]]);
+      const mask = getGeneralMaskFromVendorCode(row[0]);
+      if (row[0] == "") return;
+      // console.log(mask, row[0]);
+      data.push([artPrices[mask].rc]);
     });
-
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: destinationSpreadsheetId,
+      range: `Данные!J2:J`,
+    });
     await update_data(data).then((pr) => resolve());
   });
 }
@@ -1895,7 +1977,11 @@ async function copyZakazToOtherSpreadsheet(auth) {
           const row = sheet_data[j];
           if (!row[0]) continue;
           if (!row[0].split("_").includes(masks[i].split(" ")[0])) continue;
-          if (masks[i].split(" ").length == 1 && row[0].includes("КПБ") && row[0].includes("DELICATUS"))
+          if (
+            masks[i].split(" ").length == 1 &&
+            row[0].includes("КПБ") &&
+            row[0].includes("DELICATUS")
+          )
             continue;
           if (masks[i].split(" ").length == 2 && !row[0].includes("DELICATUS"))
             continue;
@@ -2050,19 +2136,37 @@ module.exports = {
     const auth = await authorize();
     await writeDrrToDataSpreadsheet(auth).catch(console.error);
   },
+  generatePricesTemplateSheet: async () => {
+    const auth = await authorize();
+    await generatePricesTemplateSheet(auth).catch(console.error);
+  },
+  fetchArtMaskPricesAndWriteToJSON: async () => {
+    const auth = await authorize();
+    await fetchArtMaskPricesAndWriteToJSON(auth).catch(console.error);
+  },
 };
 
-const getMaskFromVendorCode = (vendorCode) => {
+const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
   if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE";
   const code = vendorCode.split("_");
   if (code.slice(-1) == "2") code.pop();
-  if (code.includes("НАМАТРАСНИК")) code.splice(1, 1);
+  if (cut_namatr && code.includes("НАМАТРАСНИК")) code.splice(1, 1);
   else if (code.includes("КПБ")) {
     code.splice(3, 1);
     if (code.includes("DELICATUS")) code.pop();
   } else code.splice(2, 1);
 
   return code.join("_");
+};
+
+const getGeneralMaskFromVendorCode = (vendorCode) => {
+  const mask = getMaskFromVendorCode(vendorCode, false);
+  const mask_array = mask.split("_");
+  let campaign_flag = mask_array[mask_array.length - 1];
+  if ("САВ" == campaign_flag) mask_array.pop();
+  campaign_flag = mask_array[mask_array.length - 1];
+  if (["ОТК", "ТКС", "DELICATUS"].includes(campaign_flag)) mask_array.pop();
+  return mask_array.join("_");
 };
 
 const indexToColumn = (index) => {

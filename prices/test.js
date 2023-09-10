@@ -13,6 +13,8 @@ const {
   writeDrrToDataSpreadsheet,
   updateFactStatsByRK,
   fetchFeedbackAnswerTemplatesAndWriteToJSON,
+  generatePricesTemplateSheet,
+  fetchArtMaskPricesAndWriteToJSON,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -41,6 +43,7 @@ const {
   fetchRksBudgetsAndWriteToJSON,
   calcAvgDrrByArtAndWriteToJSON,
   fetchUnasweredFeedbacksAndWriteToJSON,
+  generateGeneralMaskFormsAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -74,6 +77,10 @@ const {
 // });
 // fetchStocksAndWriteToJSON("mayusha")
 // fetchStocksAndWriteToJSON("delicatus")
+// generateGeneralMaskFormsAndWriteToJSON()
+// generatePricesTemplateSheet()
+// fetchArtMaskPricesAndWriteToJSON()
+// copyPricesToDataSpreadsheet()
 // fetchStocksAndWriteToJSON("TKS")
 // updateAnalytics()
 // fetchArtsRatings("mayusha");
@@ -108,8 +115,9 @@ const a = async () => {
 // fetchAdvertStatsAndWriteToJson("mayusha");
 // getAdvertStatByMaskByDayAndWriteToJSON('TKS')
 // updatePlanFact('mayusha')
+// fetchOrdersAndWriteToJSON("TKS");
+// fetchNewPricesAndWriteToJSON('mayusha')
 // fetchOrdersAndWriteToJSON("delicatus");
-// fetchOrdersAndWriteToJSON("mayusha");
 // updatePlanFact('delicatus')
 // fetchByNowStats()
 // updateAutoAdvertsInCampaign('delicatus')
@@ -119,7 +127,7 @@ const a = async () => {
 // pivotOrders('mayusha')
 // updatePlanFact('delicatus')
 // updateAutoAdverts()
-// fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
+fetchAdverts().then((pr) => console.log(JSON.stringify(pr)));
 // fetchNewRKsToCreate();
 // setFixedPhrasesForCreatedRKs("mayusha");
 // fetchOrdersAndWriteToJSON("mayusha").then(() =>
@@ -144,4 +152,4 @@ const a = async () => {
 // );
 // fetchUnasweredFeedbacksAndWriteToJSON("mayusha")
 // fetchFeedbackAnswerTemplatesAndWriteToJSON()
-copyZakazToOtherSpreadsheet() 
+// copyZakazToOtherSpreadsheet() 
