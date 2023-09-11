@@ -396,8 +396,7 @@ const buildXlsx = (data, campaign) => {
   );
   const today_date_str = new Date(
     new Date()
-      // .toLocaleDateString("ru-RU")
-      .toLocaleDateString("en-US")
+      .toLocaleDateString("ru-RU")
       .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
   )
     .toISOString()
