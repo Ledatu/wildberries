@@ -22,6 +22,7 @@ const {
   getAdvertStatByDayAndWriteToJSONMpManager,
   fetchRksBudgetsAndWriteToJSON,
   calcAvgDrrByArtAndWriteToJSON,
+  generateGeneralMaskFormsAndWriteToJSON,
 } = require("./main");
 const {
   writePrices,
