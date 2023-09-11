@@ -377,6 +377,11 @@ const buildXlsx = (data, campaign) => {
       path.join(__dirname, "files", campaign, "fullWeekArtStats.json")
     )
   );
+  const advertStatsByArtByDay = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advert stats by art by day.json")
+    )
+  );
   const orders = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "orders.json"))
   );
@@ -389,6 +394,14 @@ const buildXlsx = (data, campaign) => {
   const ads = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "ads.json"))
   );
+  const today_date_str = new Date(
+    new Date()
+      // .toLocaleDateString("ru-RU")
+      .toLocaleDateString("en-US")
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+  )
+    .toISOString()
+    .slice(0, 10);
   let new_data = [
     [
       "Артикул продавца",
@@ -416,7 +429,8 @@ const buildXlsx = (data, campaign) => {
       "Расходы",
       "Реклама",
       "%ДРР",
-      "%ДРР/АРТ",
+      "%ДРР/АРТ неделя",
+      "Рек. сегодня",
     ],
   ];
   data.forEach((el) => {
@@ -455,9 +469,15 @@ const buildXlsx = (data, campaign) => {
 
     const ad = spp_price * (arts_data[vendorCode].ad / 100);
     const drr = ad / spp_price;
-    const drr_art = fullWeekArtStats[vendorCode]
+    const drr_art_week = fullWeekArtStats[vendorCode]
       ? fullWeekArtStats[vendorCode].drr
       : 0;
+    const advert_sum_art_today = advertStatsByArtByDay[vendorCode]
+      ? advertStatsByArtByDay[vendorCode][today_date_str]
+        ? advertStatsByArtByDay[vendorCode][today_date_str].sum
+        : 0
+      : 0;
+      // console.log(today_date_str, vendorCode, drr_art_today);
 
     const profit =
       -ad - commission - delivery - tax - expences - prime_cost + roz_price;
@@ -497,7 +517,8 @@ const buildXlsx = (data, campaign) => {
       expences,
       ad,
       drr,
-      drr_art,
+      drr_art_week,
+      advert_sum_art_today,
     ]);
   });
   // console.log(new_data);
@@ -1355,8 +1376,7 @@ const generateGeneralMaskFormsAndWriteToJSON = () =>
       const generalMask = getGeneralMaskFromVendorCode(art);
       if (!jsonData.includes(generalMask)) {
         jsonData.push(generalMask);
-        if (art.includes("САВ"))
-        console.log(art, generalMask);
+        // if (art.includes("САВ")) console.log(art, generalMask);
       }
       // jsonData.push(mask_array.join("_"));
     }
