@@ -116,7 +116,7 @@ const a = async () => {
 // getAdvertStatByMaskByDayAndWriteToJSON('TKS')
 // updatePlanFact('mayusha')
 // fetchOrdersAndWriteToJSON("TKS");
-fetchNewPricesAndWriteToJSON("delicatus");
+// fetchNewPricesAndWriteToJSON("delicatus");
 // fetchOrdersAndWriteToJSON("delicatus");
 // updatePlanFact('delicatus')
 // fetchByNowStats()
@@ -147,7 +147,7 @@ fetchNewPricesAndWriteToJSON("delicatus");
 // createNewAdverts();
 // getAdvertStatByDayAndWriteToJSONMpManager("TKS").then(() =>
 //   fetchRksBudgetsAndWriteToJSON("TKS").then(() =>
-// updateFactStatsByRK("mayusha")
+updateFactStatsByRK("delicatus")
 //   )
 // );
 // fetchUnasweredFeedbacksAndWriteToJSON("mayusha")

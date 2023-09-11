@@ -1148,12 +1148,16 @@ function updateFactStatsByRK(auth, campaign) {
           .slice(0, 10);
 
         const nms_to_sum_orders = [];
-        if (advertNames[advertId].split("/")[0] in generalMasks) {
-          const mask = advertNames[advertId].split("/")[0];
+        const generalMaskOfRK = advertNames[advertId].replace(/\s/, '').split("/")[0];
+        if (generalMasks.includes(generalMaskOfRK)) {
+          // if (generalMaskOfRK == 'ПРПЭ_200') console.log(date_range);
+          // console.log(advertNames[advertId], generalMaskOfRK, nms_to_sum_orders, generalMasks.includes(generalMaskOfRK));
+          // const mask = advertNames[advertId].split("/")[0];
           for (const [art, art_data] of Object.entries(artsData)) {
             const generalMask = getGeneralMaskFromVendorCode(art);
-            if (generalMask != mask) continue;
-            nms_to_sum_orders.push(art);
+            if (generalMask != generalMaskOfRK) continue;
+            // console.log(generalMask, generalMaskOfRK);
+            if (!nms_to_sum_orders.includes(art)) nms_to_sum_orders.push(art);
           }
         } else if (!artsData[advertNames[advertId]]) {
           const rkStat = advertStatsMpManager[advertId];
@@ -1170,7 +1174,7 @@ function updateFactStatsByRK(auth, campaign) {
           nms_to_sum_orders.push(advertNames[advertId]);
         }
 
-        // console.log(nms_to_sum_orders);
+        // console.log(advertNames[advertId], nms_to_sum_orders, generalMasks, advertNames[advertId].split("/")[0], generalMasks.includes(advertNames[advertId].split("/")[0]));
         if (!orders[str_date]) continue;
         for (const [art, value] of Object.entries(orders[str_date])) {
           if (!nms_to_sum_orders.includes(art)) continue;
