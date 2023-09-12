@@ -1148,7 +1148,9 @@ function updateFactStatsByRK(auth, campaign) {
           .slice(0, 10);
 
         const nms_to_sum_orders = [];
-        const generalMaskOfRK = advertNames[advertId].replace(/\s/, '').split("/")[0];
+        const generalMaskOfRK = advertNames[advertId]
+          .replace(/\s/, "")
+          .split("/")[0];
         if (generalMasks.includes(generalMaskOfRK)) {
           // if (generalMaskOfRK == 'ПРПЭ_200') console.log(date_range);
           // console.log(advertNames[advertId], generalMaskOfRK, nms_to_sum_orders, generalMasks.includes(generalMaskOfRK));
@@ -1355,6 +1357,7 @@ function fetchFeedbackAnswerTemplatesAndWriteToJSON(auth) {
     const campaigns = await JSON.parse(
       await fs.readFile(path.join(__dirname, "../files", "campaigns.json"))
     ).campaigns;
+
     const promises = [];
     const sheet_names = {
       mayusha: "Маюша",
@@ -1362,13 +1365,25 @@ function fetchFeedbackAnswerTemplatesAndWriteToJSON(auth) {
       TKS: "ТКС",
     };
     for (const [index, campaign] of Object.entries(campaigns)) {
+      let previouslyFetchedTemplates = {};
+      if (
+        afs.existsSync(
+          path.join(__dirname, "../files", campaign, "answerTemplates.json")
+        )
+      )
+        previouslyFetchedTemplates = await JSON.parse(
+          await fs.readFile(
+            path.join(__dirname, "../files", campaign, "answerTemplates.json")
+          )
+        );
+
       const answers_res = await sheets.spreadsheets.values.get({
         spreadsheetId: "1M31LYMUCYRQeQYtzoHasaQzsp7AQjQ-NNwVf2kY-DLc",
         range: `${sheet_names[campaign]}!1:1000`,
       });
       const answers_temp = answers_res.data.values;
       const answers = {};
-      for (let j = 0; j < 10; j++) {
+      for (let j = 0; j < answers_temp[0].length; j++) {
         const mask = answers_temp[0][j];
         if (mask == "" || !mask) continue;
         for (let i = 1; i < answers_temp.length; i++) {
@@ -1378,6 +1393,28 @@ function fetchFeedbackAnswerTemplatesAndWriteToJSON(auth) {
           answers[mask].push(answer_template);
         }
       }
+
+      // check if templates were modified
+      const needRewrite = () => {
+        // console.log(previouslyFetchedTemplates);
+        let rewrite_flag = true;
+        if (Object.entries(previouslyFetchedTemplates).length) {
+          rewrite_flag = false;
+          for (const [mask, mask_templates] of Object.entries(answers)) {
+            if (!(mask in previouslyFetchedTemplates)) return true;
+
+            for (const [index, temp] of Object.entries(mask_templates)) {
+              if (!previouslyFetchedTemplates[mask].includes(temp)) return true;
+            }
+          }
+        }
+        return rewrite_flag;
+      };
+
+      if (!needRewrite()) {
+        console.log("No need to rewrite", campaign, "feedback templates");
+        continue;
+      }
       promises.push(
         writeDataToFile(
           answers,
@@ -1386,6 +1423,95 @@ function fetchFeedbackAnswerTemplatesAndWriteToJSON(auth) {
       );
     }
     Promise.all(promises).then((pr) => resolve());
+  });
+}
+
+function genAllEqualTemplatesSheet(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+    const campaigns = await JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files", "campaigns.json"))
+    ).campaigns;
+
+    const promises = [];
+    const sheet_names = {
+      mayusha: "Маюша",
+      delicatus: "Деликатус",
+      TKS: "ТКС",
+    };
+    const templates = {
+      mayusha: [
+        "Доброго времени суток! Ваш отзыв очень важен. Мы благодарны, что выбираете наши товары, ведь мы работаем для вас. Нажмите на сердечко, чтобы добавить бренд в избранное и первым узнавайте о скидках и новинках. С нежностью, Маюша.",
+        "Благодарим за ваш отзыв! Это помогает нам стать еще лучше для вас. А чтобы всегда найти нас - добавьте бренд в избранное и всегда будьте в курсе новинок и распродаж. С любовью, Маюша.",
+        "Здравствуйте! Спасибо за выбор нашего товара и ваш отзыв. Наша важная миссия - заботиться о вас и вашем доме. Будем рады вашим новым заказам, а чтобы всегда найти нас - добавьте бренд в избранное и всегда будьте в курсе новинок и распродаж! С нежностью, Маюша.",
+        "Приветствуем! Благодарим за ваш отзыв. Благодаря обратной связи мы становимся еще лучше для своих покупателей. Добавьте наш бренд в избранное и сможете увидеть полный каталог наших товаров, а также первым узнавать о скидках и новинках. С наилучшими пожеланиями, Маюша.",
+        "Здравствуйте! Спасибо за ваш отзыв и покупку. Мы работаем для вас и нам очень важна обратная связь.  Нажмите на сердечко, чтобы добавить наш бренд в избранное и первым узнавайте о скидках и новинках. С благодарностью, Маюша.",
+        "Приветствуем! Спасибо, что выбрали нас. Ваше доверие - наша лучшая награда! Добавьте наш бренд в избранное и первым узнавайте о скидках и новинках. С заботой, Маюша.",
+        "Приветствуем! Спасибо, что нашли время оставить отзыв! Это наполняет нашу работу смыслом. Добавьте наш бренд в избранное и сможете увидеть полный каталог наших товаров, а также первым узнавать о скидках и новинках. С благодарностью, Маюша.",
+        "Доброго времени суток! Спасибо за то, что выбираете нас. Добавьте наш бренд в избранное и первым узнавайте о скидках и новинках. В нашем полном каталоге вас ждет приятный выбор товаров. С уважением, Маюша.",
+        "Спасибо за ваш отзыв! Мы ценим, что вы выбираете нас. В нашем полном каталоге вас ждет увлекательный выбор) Нажмите на сердечко, чтобы добавить бренд в избранное и первым узнавайте о скидках и новинках. С наилучшими пожеланиями, Маюша.",
+        "Спасибо за то, что нашли время оценить наши товары! В нашем полном каталоге прекрасный выбор и мы будем рады вашим новым заказам. С уважением, Маюша.",
+      ],
+      delicatus: [
+        "Спасибо за ваш отзыв! Мы признательны, что вы выбираете нас. В нашем полном каталоге вас ждет яркий выбор для самого уютного дома. С теплотой, команда DELICATUS.",
+        "Здравствуйте! Благодарим за выбор бренда DELICATUS. Ваше мнение делает нас лучше.  Добавьте бренд в избранное и всегда будьте в курсе новинок и распродаж.",
+        "Здравствуйте! Спасибо, что выбрали нас. Ваш уютный дом - наша лучшая награда! Добавьте бренд DELICATUS в избранное и первым узнавайте о скидках и новинках.",
+        "Приветствуем! Спасибо за то, что выбираете нас. Мы работаем для вас и нам очень важна обратная связь.  Нажмите на сердечко, чтобы добавить бренд DELICATUS в избранное и первым узнавайте о скидках и новинках.",
+        "Приветствуем! Спасибо за ваш отзыв и покупку. Благодаря обратной связи мы становимся еще лучше для своих покупателей. Добавьте наш бренд в избранное и сможете увидеть полный каталог наших товаров, а также первым узнавать о скидках и новинках. С наилучшими пожеланиями, команда DELICATUS.",
+        "Доброго времени суток! Благодарим за то, что нашли время оставить отзыв. DELICATUS растущий бренд и мнение наших покупателей помогает сделать его еще лучше для вас. Нажмите на сердечко, чтобы добавить нас в избранное и первым узнавайте о скидках и новинках.",
+        "Спасибо за то, что нашли время оценить наши товары! Ваша обратная связь помогает нам стать еще лучше для вас. Добавьте наш бренд в избранное и сможете увидеть полный каталог наших товаров, а также первым узнавать о скидках и новинках. С благодарностью, команда DELICATUS.",
+        "Здравствуйте! Спасибо за выбор нашего товара и ваш отзыв. Нам приятно заботиться о вас и вашем доме. Добавьте наш бренд в избранное и первым узнавайте о скидках и новинках. С заботой, команда DELICATUS.",
+        "Благодарим за ваш отзыв! Ваше мнение очень важно для нас. Будем рады вашим новым заказам, а чтобы всегда найти нас, добавьте бренд в избранное и всегда будьте в курсе новинок и распродаж. С уважением, команда DELICATUS.",
+      ],
+      TKS: [
+        "Спасибо, что нашли время оставить отзыв! Это мотивирует нас становиться еще лучше для вас. Нажмите на сердечко, чтобы добавить наш бренд в избранное и первым узнавайте о скидках и новинках магазина.",
+        "Добрый день! Мы благодарны за ваш отзыв. Выбор в пользу заботы о своем комфорте - самый верный. Нам приятно, что Вы доверяете нам. С любовью и заботой, Объединенная текстильная компания",
+        "Здравствуйте! Спасибо за выбор нашего товара и ваш отзыв. Миссия нашей компании - искренне заботиться о вас и вашем доме. В нашем полном каталоге прекрасный выбор качественных товаров. С наилучшими пожеланиями, Объединенная текстильная компания.",
+        "Приветствуем! Спасибо, что выбрали нас. Благодарим за доверие нашему бренду. Наша главная особенность - полезные товары для дома и Вашего комфорта. Добавьте наш бренд в избранное и сможете увидеть полный каталог наших товаров, а также первым узнавать о скидках и новинках. С уважением, Объединенная текстильная компания.",
+        "Здравствуйте! Спасибо за покупку и ваш отзыв. Добавьте наш бренд в избранное и первым узнавайте о скидках и новинках магазина. Переходите в полный каталог и наслаждайтесь выбором.",
+        "Доброго времени суток! Мы работаем для вас и каждый отзыв очень важен. Добавьте наш бренд в избранное и сможете увидеть полный каталог наших товаров, а также первым узнавать о скидках и новинках. С заботой, Объединенная текстильная компания.",
+        "Здравствуйте! Ваш отзыв очень важен. Спасибо за то, что выбираете нас! Добавьте наш бренд в избранное и первым узнавайте о скидках и новинках магазина. В нашем полном каталоге вас может многое заинтересовать)",
+        "Спасибо, что нашли время оставить отзыв! Вы помогаете нам становиться лучше. Будем рады вашим новым заказам, а чтобы всегда найти нас - добавьте бренд в избранное и всегда будьте в курсе новинок и распродаж!",
+        "Благодарим за ваш отзыв! Спасибо за доверие. Добавьте наш бренд в избранное и первым узнавайте о скидках и новинках. В нашем полном каталоге прекрасный выбор и мы будем рады вашим заказам. С любовью, Объединенная текстильная компания.",
+      ],
+    };
+    for (const [index, campaign] of Object.entries(campaigns)) {
+      if (!sheet_names[campaign]) continue;
+      const vendorCodes = await JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, "../files", campaign, "vendorCodes.json")
+        )
+      );
+      const masks = [];
+      for (const [id, art] of Object.entries(vendorCodes)) {
+        const mask = getMaskFromVendorCode(art);
+        if (!masks.includes(mask)) masks.push(mask);
+      }
+      masks.sort();
+      console.log(masks);
+
+      const sheet_data = [masks];
+      const camp_templates = templates[campaign];
+      for (const [index, template] of Object.entries(camp_templates)) {
+        const to_push = [];
+        for (const [index, mask] of Object.entries(masks)) {
+          to_push.push(template);
+        }
+        sheet_data.push(to_push);
+      }
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: "1M31LYMUCYRQeQYtzoHasaQzsp7AQjQ-NNwVf2kY-DLc",
+        range: `${sheet_names[campaign]}!1:1000`,
+      });
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: "1M31LYMUCYRQeQYtzoHasaQzsp7AQjQ-NNwVf2kY-DLc",
+        range: `${sheet_names[campaign]}!1:1000`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: sheet_data,
+        },
+      });
+    }
   });
 }
 
@@ -2150,6 +2276,10 @@ module.exports = {
   fetchArtMaskPricesAndWriteToJSON: async () => {
     const auth = await authorize();
     await fetchArtMaskPricesAndWriteToJSON(auth).catch(console.error);
+  },
+  genAllEqualTemplatesSheet: async () => {
+    const auth = await authorize();
+    await genAllEqualTemplatesSheet(auth).catch(console.error);
   },
 };
 

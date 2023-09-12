@@ -15,6 +15,7 @@ const {
   fetchFeedbackAnswerTemplatesAndWriteToJSON,
   generatePricesTemplateSheet,
   fetchArtMaskPricesAndWriteToJSON,
+  genAllEqualTemplatesSheet,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -44,6 +45,7 @@ const {
   calcAvgDrrByArtAndWriteToJSON,
   fetchUnasweredFeedbacksAndWriteToJSON,
   generateGeneralMaskFormsAndWriteToJSON,
+  answerFeedbacks,
 } = require("./main");
 const {
   getPrices,
@@ -56,6 +58,7 @@ const {
   fetchByNowStats,
   updateAutoAdverts,
   createNewAdverts,
+  answerAllFeedbacks,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
@@ -147,9 +150,9 @@ const a = async () => {
 // createNewAdverts();
 // getAdvertStatByDayAndWriteToJSONMpManager("TKS").then(() =>
 //   fetchRksBudgetsAndWriteToJSON("TKS").then(() =>
-updateFactStatsByRK("delicatus")
+// updateFactStatsByRK("delicatus")
 //   )
 // );
-// fetchUnasweredFeedbacksAndWriteToJSON("mayusha")
-// fetchFeedbackAnswerTemplatesAndWriteToJSON()
+answerAllFeedbacks()
+// genAllEqualTemplatesSheet()
 // copyZakazToOtherSpreadsheet()

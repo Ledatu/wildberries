@@ -68,6 +68,17 @@ const getFeedbacks = (authToken, params) => {
     .then((response) => response.data)
     .catch((error) => console.error(error));
 };
+const updateFeedback = (authToken, params) => {
+  // console.log(authToken);
+  return axios
+    .patch("https://feedbacks-api.wildberries.ru/api/v1/feedbacks", params, {
+      headers: {
+        Authorization: authToken,
+      },
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
 
 const getAdverts = (authToken, params) => {
   return axios
@@ -476,7 +487,7 @@ const buildXlsx = (data, campaign) => {
         ? advertStatsByArtByDay[vendorCode][today_date_str].sum
         : 0
       : 0;
-      // console.log(today_date_str, vendorCode, drr_art_today);
+    // console.log(today_date_str, vendorCode, drr_art_today);
 
     const profit =
       -ad - commission - delivery - tax - expences - prime_cost + roz_price;
@@ -1482,15 +1493,63 @@ const fetchUnasweredFeedbacksAndWriteToJSON = (campaign) =>
         if (!(art in jsonData)) jsonData[art] = [];
         jsonData[art].push(feedback);
       }
-      console.log(jsonData);
+      // console.log(jsonData);
       return fs
         .writeFile(
           path.join(__dirname, "files", campaign, "feedbacks.json"),
           JSON.stringify(jsonData)
         )
-        .then(() => console.log("feedbacks.json created."))
+        .then(() => {
+          console.log("feedbacks.json created.");
+          resolve();
+        })
         .catch((error) => console.error(error));
     });
+  });
+
+const answerFeedbacks = (campaign) =>
+  new Promise(async (resolve, reject) => {
+    const authToken = getAuthToken("api-token", campaign);
+    const feedbacks = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "feedbacks.json")
+      )
+    );
+    const answerTemplates = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "answerTemplates.json")
+      )
+    );
+
+    for (const [art, art_feedbacks] of Object.entries(feedbacks)) {
+      console.log(art, art_feedbacks.length);
+      const mask = getMaskFromVendorCode(art);
+      const answers = answerTemplates[mask];
+      for (const [index, feedback_data] of Object.entries(art_feedbacks)) {
+        if (!answers || !answers.length) continue;
+        console.log(feedback_data.id, art, mask, answers[0]);
+        console.log("");
+        await updateFeedback(authToken, {
+          id: feedback_data.id,
+          text: answers[0],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        // return;
+        answers.push(answers.shift());
+      }
+      answerTemplates[mask] = answers;
+    }
+
+    return fs
+      .writeFile(
+        path.join(__dirname, "files", campaign, "answerTemplates.json"),
+        JSON.stringify(answerTemplates)
+      )
+      .then(() => {
+        console.log("answerTemplates.json shifted.");
+        resolve();
+      })
+      .catch((error) => console.error(error));
   });
 
 const updatePrices = async (campaign) => {
@@ -2543,6 +2602,7 @@ module.exports = {
   fetchRksBudgetsAndWriteToJSON,
   calcAvgDrrByArtAndWriteToJSON,
   fetchUnasweredFeedbacksAndWriteToJSON,
+  answerFeedbacks,
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {

@@ -35,6 +35,7 @@ const {
   fetchByNowStats,
   updateAutoAdverts,
   createNewAdverts,
+  answerAllFeedbacks,
 } = require("../prices/prices");
 const { updatePrices } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
@@ -191,6 +192,11 @@ app.get("/api/updateAnalytics", authenticateToken, (req, res) => {
 app.get("/api/updateAutoAdverts", authenticateToken, (req, res) => {
   updateAutoAdverts();
   res.send("updateAutoAdverts is updating...");
+});
+
+app.get("/api/answerFeedbacks", authenticateToken, (req, res) => {
+  answerAllFeedbacks();
+  res.send("answerFeedbacks is updating...");
 });
 
 app.get("/api/fetchAdverts", authenticateToken, (req, res) => {

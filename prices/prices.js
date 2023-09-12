@@ -23,6 +23,8 @@ const {
   fetchRksBudgetsAndWriteToJSON,
   calcAvgDrrByArtAndWriteToJSON,
   generateGeneralMaskFormsAndWriteToJSON,
+  fetchUnasweredFeedbacksAndWriteToJSON,
+  answerFeedbacks,
 } = require("./main");
 const {
   writePrices,
@@ -39,6 +41,7 @@ const {
   fetchNewRKsToCreate,
   updateFactStatsByRK,
   fetchArtMaskPricesAndWriteToJSON,
+  fetchFeedbackAnswerTemplatesAndWriteToJSON,
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 const fs = require("fs");
@@ -93,6 +96,22 @@ const updateAnalytics = async () => {
       await fetchStocksAndWriteToJSON(campaign),
       await fetchAdvertsAndWriteToJson(campaign),
       await updateAnalyticsOrders(campaign),
+    ])
+      .then(async () => {
+        console.log("All tasks completed successfully");
+      })
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      });
+  });
+};
+
+const answerAllFeedbacks = async () => {
+  await fetchFeedbackAnswerTemplatesAndWriteToJSON();
+  campaigns.forEach(async (campaign) => {
+    Promise.all([
+      await fetchUnasweredFeedbacksAndWriteToJSON(campaign),
+      await answerFeedbacks(campaign),
     ])
       .then(async () => {
         console.log("All tasks completed successfully");
@@ -253,4 +272,5 @@ module.exports = {
   fetchAdverts,
   createNewAdverts,
   fetchByNowStats,
+  answerAllFeedbacks,
 };
