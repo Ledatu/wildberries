@@ -1718,7 +1718,7 @@ const fetchUnasweredFeedbacksAndWriteToJSON = (campaign) =>
       const data = pr.data;
       for (const [index, feedback] of Object.entries(data.feedbacks)) {
         console.log(feedback);
-        const art = feedback.productDetails.supplierArticle;
+        const art = feedback.productDetails.supplierArticle.replace(/\s/g, "");;
         if (!art) continue;
         if (!(art in jsonData)) jsonData[art] = [];
         jsonData[art].push(feedback);
