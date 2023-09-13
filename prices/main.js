@@ -1708,11 +1708,6 @@ const fetchDetailedByPeriodAndWriteToJSON = (campaign) =>
 const fetchUnasweredFeedbacksAndWriteToJSON = (campaign) =>
   new Promise(async (resolve, reject) => {
     const authToken = getAuthToken("api-token", campaign);
-    const vendorCodes = JSON.parse(
-      afs.readFileSync(
-        path.join(__dirname, "files", campaign, "vendorCodes.json")
-      )
-    );
     const jsonData = {};
     const params = {
       isAnswered: false,
@@ -1722,7 +1717,8 @@ const fetchUnasweredFeedbacksAndWriteToJSON = (campaign) =>
     await getFeedbacks(authToken, params).then((pr) => {
       const data = pr.data;
       for (const [index, feedback] of Object.entries(data.feedbacks)) {
-        const art = vendorCodes[feedback.productDetails.nmId];
+        console.log(feedback);
+        const art = feedback.productDetails.supplierArticle;
         if (!art) continue;
         if (!(art in jsonData)) jsonData[art] = [];
         jsonData[art].push(feedback);

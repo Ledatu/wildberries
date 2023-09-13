@@ -159,4 +159,5 @@ const a = async () => {
 // updateStorageCost({ mayusha: 0, delicatus: 0, TKS: 0 })
 // genAllEqualTemplatesSheet()
 // copyZakazToOtherSpreadsheet()
-fetchSalesAndWriteToJSON("mayusha");
+// fetchSalesAndWriteToJSON("mayusha")
+fetchUnasweredFeedbacksAndWriteToJSON('delicatus')
