@@ -377,6 +377,18 @@ const getOrders = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
+const getSales = (authToken, params) => {
+  return axios
+    .get("https://statistics-api.wildberries.ru/api/v1/supplier/sales", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const buildXlsx = (data, campaign) => {
   const vendorCodes = JSON.parse(
     afs.readFileSync(
@@ -388,6 +400,20 @@ const buildXlsx = (data, campaign) => {
       path.join(__dirname, "files", campaign, "fullWeekArtStats.json")
     )
   );
+
+  // ------------------------
+  const storageCost = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", "storageCost.json"))
+  )[campaign].cost;
+  const byDayCampaignSalesSum = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "byDayCampaignSalesSum.json")
+    )
+  );
+  const storageCostForArt =
+    storageCost / byDayCampaignSalesSum.fullLastWeek.count;
+  // ------------------------
+
   const advertStatsByArtByDay = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "files", campaign, "advert stats by art by day.json")
@@ -435,6 +461,7 @@ const buildXlsx = (data, campaign) => {
       "Себестоимость",
       "Коммисия",
       "Логистика",
+      "Хранение",
       "Налоги",
       "Расходы",
       "Реклама",
@@ -490,7 +517,14 @@ const buildXlsx = (data, campaign) => {
     // console.log(today_date_str, vendorCode, drr_art_today);
 
     const profit =
-      -ad - commission - delivery - tax - expences - prime_cost + roz_price;
+      -ad -
+      commission -
+      delivery -
+      storageCostForArt -
+      tax -
+      expences -
+      prime_cost +
+      roz_price;
     const roi = profit / (prime_cost + expences);
     const rentabelnost = profit / spp_price;
 
@@ -523,6 +557,7 @@ const buildXlsx = (data, campaign) => {
       prime_cost,
       commission,
       delivery,
+      storageCostForArt,
       tax,
       expences,
       ad,
@@ -852,6 +887,150 @@ const writeOrdersToJson = (data, campaign, date) => {
     ),
   ])
     .then(() => console.log("orders by days.json created."))
+    .catch((error) => console.error(error));
+};
+
+const writeSalesToJson = (data, campaign, date) => {
+  const now = new Date();
+  // new Date()
+  // .toLocaleDateString("ru-RU")
+  // .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+  const dateFrom = new Date(date);
+  console.log(now, dateFrom);
+  const jsonData = {};
+  const orderSumJsonData = {};
+  const jsonDataByNow = { today: {}, yesterday: {} };
+  const orderSumJsonDataByNow = { today: {}, yesterday: {} };
+  const byDayCampaignSum = {};
+
+  const vendorCodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+
+  const excluded = { excluded: [] };
+  data.forEach((item) => {
+    const supplierArticle = item.supplierArticle.replace(/\s/g, "");
+    const get_item_price = () => {
+      return item.totalPrice * (1 - item.discountPercent / 100);
+    };
+    const get_normalized_price = (
+      cur_count,
+      cur_sum,
+      log = false,
+      dop = ""
+    ) => {
+      const price = get_item_price();
+      const res_if_violated = cur_count ? cur_sum / cur_count : 500;
+      if (log && supplierArticle.includes("ПР_90")) {
+        console.log(
+          dop,
+          supplierArticle,
+          price <= 3000 ? price : res_if_violated
+        );
+      }
+      if (price <= 3000) return price;
+      // console.log(item, price);
+      return res_if_violated;
+    };
+
+    const order_date = new Date(item.date);
+    if (order_date < dateFrom) {
+      excluded.excluded.push({
+        order_date: order_date,
+        supplierArticle: supplierArticle,
+        reason: "Date less than dateFrom",
+      });
+      return;
+    }
+    const order_date_string = item.date.slice(0, 10);
+    if (item.isCancel /*|| order_date_string == today*/) {
+      excluded.excluded.push({
+        order_date: order_date,
+        supplierArticle: supplierArticle,
+        reason: "isCancel or today == order_date_string",
+      });
+      return;
+    }
+
+    if (!(order_date_string in jsonData)) {
+      jsonData[order_date_string] = {};
+      for (key in vendorCodes) {
+        jsonData[order_date_string][vendorCodes[key]] = 0;
+      }
+      // console.log(jsonData[order_date_string]);
+    }
+
+    if (!(order_date_string in orderSumJsonData)) {
+      orderSumJsonData[order_date_string] = {};
+      for (key in vendorCodes) {
+        orderSumJsonData[order_date_string][vendorCodes[key]] = 0;
+      }
+      // console.log(orderSumJsonData[order_date_string]);
+    }
+    if (!(supplierArticle in jsonData[order_date_string])) {
+      jsonData[order_date_string][supplierArticle] = 0;
+      orderSumJsonData[order_date_string][supplierArticle] = 0;
+    }
+
+    orderSumJsonData[order_date_string][supplierArticle] +=
+      get_normalized_price(
+        jsonData[order_date_string][supplierArticle],
+        orderSumJsonData[order_date_string][supplierArticle]
+      );
+    jsonData[order_date_string][supplierArticle] += 1;
+
+    // ---------------------------
+    if (!(order_date_string in byDayCampaignSum))
+      byDayCampaignSum[order_date_string] = { count: 0, sum: 0 };
+    byDayCampaignSum[order_date_string].sum += get_normalized_price(
+      jsonData[order_date_string][supplierArticle],
+      orderSumJsonData[order_date_string][supplierArticle]
+    );
+    byDayCampaignSum[order_date_string].count += 1;
+    // ---------------------------
+  });
+
+  // calc full week campaign sum
+  const fullWeekCampaignSalesSum = { count: 0, sum: 0 };
+  {
+    const today_date = new Date();
+    for (let i = 1; i <= 7; i++) {
+      // last full week
+      const cur_date = new Date();
+      cur_date.setDate(today_date.getDate() - i);
+      const str_date = cur_date
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10);
+
+      // console.log(nms_to_sum_orders);
+      if (!byDayCampaignSum[str_date]) continue;
+      fullWeekCampaignSalesSum.count += byDayCampaignSum[str_date].count;
+      fullWeekCampaignSalesSum.sum += byDayCampaignSum[str_date].sum;
+    }
+  }
+  byDayCampaignSum["fullLastWeek"] = fullWeekCampaignSalesSum;
+  fs.writeFile(
+    path.join(__dirname, "files", campaign, "excluded_sales.json"),
+    JSON.stringify(excluded)
+  ).then(() => console.log("excluded_sales.xlsx created."));
+  return Promise.all([
+    fs.writeFile(
+      path.join(__dirname, "files", campaign, "sales by day.json"),
+      JSON.stringify(jsonData)
+    ),
+    fs.writeFile(
+      path.join(__dirname, "files", campaign, "sum of sales by day.json"),
+      JSON.stringify(orderSumJsonData)
+    ),
+    fs.writeFile(
+      path.join(__dirname, "files", campaign, "byDayCampaignSalesSum.json"),
+      JSON.stringify(byDayCampaignSum)
+    ),
+  ])
+    .then(() => console.log("sales by days.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -1399,6 +1578,58 @@ const generateGeneralMaskFormsAndWriteToJSON = () =>
       .then(() => {
         console.log("generalMasks.json created.");
         resolve(jsonData);
+      })
+      .catch((error) => {
+        console.error(error);
+        reject(error);
+      });
+  });
+
+const updateStorageCost = (storageCostData) =>
+  new Promise((resolve, reject) => {
+    let storageCost = {};
+    if (afs.existsSync(path.join(__dirname, "files", "storageCost.json"))) {
+      storageCost = JSON.parse(
+        afs.readFileSync(path.join(__dirname, "files", "storageCost.json"))
+      );
+    }
+
+    const tempPrevMonday = new Date();
+    tempPrevMonday.setDate(
+      tempPrevMonday.getDate() - ((tempPrevMonday.getDay() + 6) % 7)
+    );
+    const prevMonday = new Date(tempPrevMonday.toISOString().slice(0, 10));
+    let isUpdated = {};
+    for (const [campaign, cost] of Object.entries(storageCostData)) {
+      if (cost < 1) {
+        isUpdated[campaign] = storageCost[campaign]
+          ? storageCost[campaign].date == prevMonday.toISOString().slice(0, 10)
+            ? true
+            : false
+          : false;
+      } else {
+        if (!(campaign in storageCost))
+          storageCost[campaign] = { date: "", cost: 0 };
+
+        storageCost[campaign] = {
+          date: prevMonday.toISOString().slice(0, 10),
+          cost: cost,
+        };
+        isUpdated[campaign] = true;
+      }
+    }
+
+    console.log(isUpdated);
+    console.log(storageCost);
+
+    return fs
+      .writeFile(
+        path.join(__dirname, "files", "storageCost.json"),
+        JSON.stringify(storageCost)
+      )
+      .then(() => {
+        console.log("storageCost.json created.");
+        resolve(isUpdated);
       })
       .catch((error) => {
         console.error(error);
@@ -2251,6 +2482,29 @@ const fetchOrdersAndWriteToJSON = (campaign) => {
   });
 };
 
+const fetchSalesAndWriteToJSON = (campaign) => {
+  return new Promise((resolve, reject) => {
+    const authToken = getAuthToken("api-statistic-token", campaign);
+    const dateFrom = new Date();
+    dateFrom.setDate(dateFrom.getDate() - 30);
+    const date = dateFrom.toISOString().slice(0, 10);
+    console.log(date);
+    const params = {
+      dateFrom: date,
+    };
+    return getSales(authToken, params)
+      .then((data) => {
+        fs.writeFile(
+          path.join(__dirname, "files", campaign, "sales_full.json"),
+          JSON.stringify(data)
+        ).then((pr) =>
+          writeSalesToJson(data, campaign, date).then((pr) => resolve())
+        );
+      })
+      .catch((error) => console.error(error));
+  });
+};
+
 const calcAdvertismentAndWriteToJSON = (campaign) => {
   const analytics = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "analytics.json"))
@@ -2603,6 +2857,8 @@ module.exports = {
   calcAvgDrrByArtAndWriteToJSON,
   fetchUnasweredFeedbacksAndWriteToJSON,
   answerFeedbacks,
+  updateStorageCost,
+  fetchSalesAndWriteToJSON,
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {

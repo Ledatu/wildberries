@@ -46,6 +46,8 @@ const {
   fetchUnasweredFeedbacksAndWriteToJSON,
   generateGeneralMaskFormsAndWriteToJSON,
   answerFeedbacks,
+  updateStorageCostAndWriteToJSON,
+  fetchSalesAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -153,6 +155,8 @@ const a = async () => {
 // updateFactStatsByRK("delicatus")
 //   )
 // );
-answerAllFeedbacks()
+// answerAllFeedbacks()
+// updateStorageCost({ mayusha: 0, delicatus: 0, TKS: 0 })
 // genAllEqualTemplatesSheet()
 // copyZakazToOtherSpreadsheet()
+fetchSalesAndWriteToJSON("mayusha");

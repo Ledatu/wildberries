@@ -37,7 +37,7 @@ const {
   createNewAdverts,
   answerAllFeedbacks,
 } = require("../prices/prices");
-const { updatePrices } = require("../prices/main");
+const { updatePrices, updateStorageCost } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
 
@@ -140,6 +140,13 @@ app.post("/api/getDelivery", authenticateToken, (req, res) => {
   // console.log(req)
 
   getDelivery(campaign)
+    .then((pr) => res.send(JSON.stringify(pr)))
+    .catch((err) => res.send(err));
+});
+
+app.post("/api/updateStorageCost", authenticateToken, (req, res) => {
+  const storageCostData = req.body;
+  updateStorageCost(storageCostData)
     .then((pr) => res.send(JSON.stringify(pr)))
     .catch((err) => res.send(err));
 });

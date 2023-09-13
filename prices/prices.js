@@ -25,6 +25,7 @@ const {
   generateGeneralMaskFormsAndWriteToJSON,
   fetchUnasweredFeedbacksAndWriteToJSON,
   answerFeedbacks,
+  fetchSalesAndWriteToJSON,
 } = require("./main");
 const {
   writePrices,
@@ -73,6 +74,7 @@ const getPrices = async () => {
       await calcAdvertismentAndWriteToJSON(campaign),
       await fetchCardsAndWriteToJSON(campaign),
       await fetchOrdersAndWriteToJSON(campaign),
+      await fetchSalesAndWriteToJSON(campaign),
       await fetchStocksAndWriteToJSON(campaign),
       await calcAvgOrdersAndWriteToJSON(campaign),
       // await updateAnalyticsOrders(campaign),
@@ -142,6 +144,7 @@ const getDelivery = (camp = undefined) =>
 
     Promise.all(promises).then((result) => resolve(updateStatus));
   });
+
 
 const calcNewValues = async () => {
   // await fetchDataAndWriteToJSON()
