@@ -151,6 +151,13 @@ app.post("/api/updateStorageCost", authenticateToken, (req, res) => {
     .catch((err) => res.send(err));
 });
 
+// app.post("/api/getCurrentStorageCost", authenticateToken, (req, res) => {
+//   const storageCost = JSON.parse(
+//     fs.readFileSync(path.join(__dirname, "../prices/files/storageCost.json"))
+//   );
+//   res.send(JSON.stringify(storageCost)).catch((err) => res.send(err));
+// });
+
 app.get("/api/copyZakaz", authenticateToken, (req, res) => {
   copyZakazToOtherSpreadsheet();
   res.send("Zakaz copying started!");

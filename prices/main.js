@@ -995,17 +995,20 @@ const writeSalesToJson = (data, campaign, date) => {
   // calc full week campaign sum
   const fullWeekCampaignSalesSum = { count: 0, sum: 0 };
   {
-    const today_date = new Date();
-    for (let i = 1; i <= 7; i++) {
+    const prevMonday = new Date();
+    prevMonday.setDate(
+      prevMonday.getDate() - 7 - ((prevMonday.getDay() + 6) % 7)
+    );
+    for (let i = 0; i < 7; i++) {
       // last full week
       const cur_date = new Date();
-      cur_date.setDate(today_date.getDate() - i);
+      cur_date.setDate(prevMonday.getDate() + i);
       const str_date = cur_date
         .toLocaleDateString("ru-RU")
         .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
         .slice(0, 10);
 
-      // console.log(nms_to_sum_orders);
+      // console.log(str_date);
       if (!byDayCampaignSum[str_date]) continue;
       fullWeekCampaignSalesSum.count += byDayCampaignSum[str_date].count;
       fullWeekCampaignSalesSum.sum += byDayCampaignSum[str_date].sum;
