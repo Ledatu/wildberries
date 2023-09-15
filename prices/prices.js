@@ -166,11 +166,9 @@ const calcNewValues = async () => {
 
 const writeSpp = async () => {
   // await fetchDataAndWriteToJSON()
+  await fetchSpp();
   campaigns.forEach(async (campaign) => {
-    Promise.all([
-      await fetchSpp(campaign),
-      await writeSppToDataSpreadsheet(campaign),
-    ])
+    Promise.all([await writeSppToDataSpreadsheet(campaign)])
       .then(async () => {
         console.log("All tasks completed successfully");
       })

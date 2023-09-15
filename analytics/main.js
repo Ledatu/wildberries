@@ -27,20 +27,21 @@ const fetchAnalytics = async () => {
   }
 };
 
-const fetchSpp = async () => {
-  for (const campaign of campaigns) {
-    // if (campaign != "mayusha") continue;
-    await Promise.all([]) // await fetchAdsIdsAndWriteToJSON(campaign)
-      .then(async () => {
-        console.log("All tasks completed successfully");
-        // await getSpp(campaign);
-        getSpp(campaign);
-      })
-      .catch((error) => {
-        console.error("An error occurred:", error);
-      });
-  }
-};
+const fetchSpp = async () =>
+  new Promise((resolve, reject) => {
+    for (const campaign of campaigns) {
+      // if (campaign != "mayusha") continue;
+      getSpp(campaign)
+        .then(() => {
+          console.log("All tasks completed successfully");
+          resolve();
+          // await getSpp(campaign);
+        })
+        .catch((error) => {
+          console.error("An error occurred:", error);
+        });
+    }
+  });
 
 module.exports = {
   fetchAnalytics,

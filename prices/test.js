@@ -62,6 +62,7 @@ const {
   updateAutoAdverts,
   createNewAdverts,
   answerAllFeedbacks,
+  writeSpp,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
@@ -164,3 +165,4 @@ const a = async () => {
 // fetchUnasweredFeedbacksAndWriteToJSON('delicatus')
 // writeSppToDataSpreadsheet()
 // writeDrrToDataSpreadsheet()
+writeSpp()
