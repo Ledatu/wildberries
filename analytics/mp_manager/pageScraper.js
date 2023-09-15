@@ -2,6 +2,7 @@ const fs = require("fs");
 const xlsx = require("node-xlsx").default;
 const path = require("path");
 const { updateAnalyticsOrders } = require("../../prices/google_sheets");
+const { log } = require("console");
 const cookies = require(path.join(
   __dirname,
   "../../secrets/mp_manager/cookies"
@@ -12,6 +13,103 @@ function getRandomArbitrary(min, max) {
 }
 
 const scraperObject = {
+  async spp_scraper(browser, campaign) {
+    const context = await browser.newContext();
+    const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
+      if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE";
+      const code = vendorCode.split("_");
+      if (code.slice(-1) == "2") code.pop();
+      if (cut_namatr && code.includes("НАМАТРАСНИК")) code.splice(1, 1);
+      else if (code.includes("КПБ")) {
+        code.splice(3, 1);
+        if (code.includes("DELICATUS")) code.pop();
+      } else code.splice(2, 1);
+
+      return code.join("_");
+    };
+    const vendorCodes = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, "../../prices/files", campaign, "vendorCodes.json")
+      )
+    );
+    const stocks = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, "../../prices/files", campaign, "stocks.json")
+      )
+    );
+    const arts_to_check = {};
+    for (const [id, art] of Object.entries(vendorCodes)) {
+      const mask = getMaskFromVendorCode(art);
+      if (!stocks.today[art]) continue;
+
+      if (!(mask in arts_to_check)) arts_to_check[mask] = { id: 0, stock: 0 };
+
+      if (arts_to_check[mask].stock > stocks.today[art]) continue;
+      arts_to_check[mask] = { id: id, stock: stocks.today[art] };
+    }
+    console.log(arts_to_check);
+
+    const getSpp = async (art) =>
+      new Promise(async (resolve, reject) => {
+        const page = await context.newPage();
+        const url = `https://www.wildberries.ru/catalog/${art}/detail.aspx?targetUrl=SP`;
+
+        console.log(`Navigating to ${url}...`);
+        await page.goto(url);
+        await page.waitForLoadState();
+        await page.goto(url);
+        await page.waitForLoadState();
+        await page.waitForTimeout(getRandomArbitrary(2000, 3000));
+
+        if ((await page.locator("span.sold-out-product__text").count()) > 0) {
+          console.log(art, "sold out");
+          page.close();
+          resolve(0);
+          return;
+        }
+
+        await page.waitForSelector(
+          "div.product-page__grid > div.product-page__price-block.product-page__price-block--common > div:nth-child(1) > div > div > div > p > span > ins"
+        );
+        const price_with_spp = (
+          await page
+            .locator(
+              "div.product-page__grid > div.product-page__price-block.product-page__price-block--common > div:nth-child(1) > div > div > div > p > span > ins"
+            )
+            .textContent()
+        )
+          .replace(/\s/g, "")
+          .slice(0, -1);
+        const price_without_spp = (
+          await page
+            .locator(
+              "div.product-page__grid > div.product-page__price-block.product-page__price-block--common > div:nth-child(1) > div > div > div > p > del"
+            )
+            .textContent()
+        )
+          .replace(/\s/g, "")
+          .slice(0, -2);
+          const int_price_with_spp = parseInt(price_with_spp);
+          const int_price_without_spp = parseInt(price_without_spp);
+        // console.log(int_price_with_spp, int_price_without_spp, (1 - int_price_with_spp / int_price_without_spp) * 100);
+        page.close();
+        resolve((1 - int_price_with_spp / int_price_without_spp) * 100);
+      });
+
+    const jsonData = {};
+    for (const [mask, mask_data] of Object.entries(arts_to_check)) {
+      // if (mask_data.stock > 1) continue;
+      const spp = await getSpp(mask_data.id);
+      // console.log(temp_value, price, intprice);
+      jsonData[mask] = Math.round(spp);
+    }
+    // console.log(jsonData);
+
+    fs.writeFileSync(
+      path.join(__dirname, "../../prices/files", campaign, "spp by mask.json"),
+      JSON.stringify(jsonData)
+    );
+  },
   async scraper(browser, campaign) {
     const context = await browser.newContext();
     // for (let id = 0; id < adsIds.data.length; id++) {
@@ -56,7 +154,7 @@ const scraperObject = {
           "body > app-root > div > div.wrapper__body > div.wrapper__body__content > div > app-edit-auction-campaign > div > form > div:nth-child(7) > div > button.btn.btn--orange.p-l-50.p-r-50.btn--medium.ng-star-inserted"
         );
         await page.waitForTimeout(getRandomArbitrary(2000, 4000));
-        
+
         page.close();
         resolve();
       });

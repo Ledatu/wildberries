@@ -43,10 +43,12 @@ const {
   updateFactStatsByRK,
   fetchArtMaskPricesAndWriteToJSON,
   fetchFeedbackAnswerTemplatesAndWriteToJSON,
+  writeSppToDataSpreadsheet,
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 const fs = require("fs");
 const { fetchAdsIdsAndWriteToJSON } = require("../analytics/google_sheets");
+const { fetchSpp } = require("../analytics/main");
 
 const updateAtriculesData = async () => {
   await fetchArtMaskPricesAndWriteToJSON().then(() =>
@@ -145,7 +147,6 @@ const getDelivery = (camp = undefined) =>
     Promise.all(promises).then((result) => resolve(updateStatus));
   });
 
-
 const calcNewValues = async () => {
   // await fetchDataAndWriteToJSON()
   campaigns.forEach(async (campaign) => {
@@ -156,6 +157,22 @@ const calcNewValues = async () => {
       .then(async () => {
         console.log("All tasks completed successfully");
         await writePrices(campaign);
+      })
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      });
+  });
+};
+
+const writeSpp = async () => {
+  // await fetchDataAndWriteToJSON()
+  campaigns.forEach(async (campaign) => {
+    Promise.all([
+      await fetchSpp(campaign),
+      await writeSppToDataSpreadsheet(campaign),
+    ])
+      .then(async () => {
+        console.log("All tasks completed successfully");
       })
       .catch((error) => {
         console.error("An error occurred:", error);
@@ -276,4 +293,5 @@ module.exports = {
   createNewAdverts,
   fetchByNowStats,
   answerAllFeedbacks,
+  writeSpp,
 };

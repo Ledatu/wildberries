@@ -36,6 +36,7 @@ const {
   updateAutoAdverts,
   createNewAdverts,
   answerAllFeedbacks,
+  writeSpp,
 } = require("../prices/prices");
 const { updatePrices, updateStorageCost } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
@@ -170,6 +171,11 @@ app.get("/api/createNewAdverts", authenticateToken, (req, res) => {
 
 app.get("/api/writeDrr", authenticateToken, (req, res) => {
   writeDrrToDataSpreadsheet();
+  res.send("Drr writing started!");
+});
+
+app.get("/api/writeSpp", authenticateToken, (req, res) => {
+  writeSpp();
   res.send("Drr writing started!");
 });
 

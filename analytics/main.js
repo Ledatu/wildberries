@@ -1,4 +1,4 @@
-const createXlsx = require("./mp_manager/index.js");
+const { getAll, getSpp } = require("./mp_manager/index.js");
 const { fetchAdsIdsAndWriteToJSON } = require("./google_sheets/index.js");
 const {
   createFlagFile,
@@ -19,7 +19,22 @@ const fetchAnalytics = async () => {
     await Promise.all([]) // await fetchAdsIdsAndWriteToJSON(campaign)
       .then(async () => {
         console.log("All tasks completed successfully");
-        await createXlsx('mayusha');
+        await getAll("mayusha");
+      })
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      });
+  }
+};
+
+const fetchSpp = async () => {
+  for (const campaign of campaigns) {
+    // if (campaign != "mayusha") continue;
+    await Promise.all([]) // await fetchAdsIdsAndWriteToJSON(campaign)
+      .then(async () => {
+        console.log("All tasks completed successfully");
+        // await getSpp(campaign);
+        getSpp(campaign);
       })
       .catch((error) => {
         console.error("An error occurred:", error);
@@ -29,4 +44,5 @@ const fetchAnalytics = async () => {
 
 module.exports = {
   fetchAnalytics,
+  fetchSpp,
 };

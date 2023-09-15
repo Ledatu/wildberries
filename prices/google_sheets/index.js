@@ -228,6 +228,70 @@ async function writeDrrToDataSpreadsheet(auth) {
   });
 }
 
+async function writeSppToDataSpreadsheet(auth) {
+  return new Promise(async (resolve, reject) => {
+    const seller_ids = (
+      await JSON.parse(
+        await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
+      )
+    ).seller_ids;
+
+    const update_data = async (data) => {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+        range: `Данные!K2:K`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: data,
+        },
+      });
+    };
+
+    // console.log(data);
+    const sheets = google.sheets({ version: "v4", auth });
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Данные!K2:K",
+    });
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Данные!A2:K",
+    });
+
+    // Parse the values into a JSON object
+    const rows = res.data.values;
+    // console.log(rows);
+    const data = [];
+    for (let i = 0; i < rows.length; i++) {
+      for (const [campaign, seller_id] of Object.entries(seller_ids)) {
+        const spp = JSON.parse(
+          await fs.readFile(
+            path.join(
+              __dirname,
+              `../files/${campaign}/spp by mask.json`
+            )
+          )
+        );
+    
+        const row = rows[i];
+        if (row[0] == "") continue;
+        data.push([row[10]]);
+
+        if (row[4] != seller_ids[campaign]) continue;
+
+        const type = getMaskFromVendorCode(row[0]);
+        // console.log(type);
+        data[i][0] = spp[type] ?? 0;
+        // console.log(campaign, type, data[i]);
+      }
+    }
+
+    await update_data(data).then((pr) => resolve());
+    console.log(`Spp data written to the google sheets.`);
+  });
+}
+
 async function pivotOrders(auth, campaign) {
   return new Promise(async (resolve, reject) => {
     // console.log(campaign);
@@ -308,20 +372,20 @@ async function fetchNewPricesAndWriteToJSON(auth, campaign) {
     // console.log(data);
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `${campaign}!A2:Q`,
+      range: `${campaign}!A2:R`,
       // valueRenderOption: "UNFORMATTED_VALUE",
     });
 
     const rows = res.data.values;
     const data = [];
     rows.forEach((row) => {
-      if (row[16] == "" || !row[16]) return;
+      if (row[17] == "" || !row[17]) return;
       const new_price = Number(
-        row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
+        row[17].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
       if (!new_price || new_price > 20000 || new_price < 4500) return;
       const roi = Number(
-        row[13].replace("%", "").replace(",", ".").replace(/\s/g, "")
+        row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
       if (roi < -30) return;
       data.push({ nmId: nmIds[row[0]], price: new_price });
@@ -1813,7 +1877,7 @@ function updateLowRatingStocksSheet(auth) {
     const find_spp = (vendorCode, rows) => {
       for (const row of rows) {
         if (row[0] != vendorCode) continue;
-        return row[5];
+        return row[6];
       }
     };
     const sheet_data = [];
@@ -2268,6 +2332,10 @@ module.exports = {
   writeDrrToDataSpreadsheet: async () => {
     const auth = await authorize();
     await writeDrrToDataSpreadsheet(auth).catch(console.error);
+  },
+  writeSppToDataSpreadsheet: async () => {
+    const auth = await authorize();
+    await writeSppToDataSpreadsheet(auth).catch(console.error);
   },
   generatePricesTemplateSheet: async () => {
     const auth = await authorize();

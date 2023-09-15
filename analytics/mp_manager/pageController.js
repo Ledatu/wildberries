@@ -9,5 +9,17 @@ async function scrapeAll(browserInstance, campaign_id) {
   }
 }
 
-module.exports = (browserInstance, campaign_id) =>
-  scrapeAll(browserInstance, campaign_id);
+async function scrapeSpp(browserInstance, campaign_id) {
+  let browser;
+  try {
+    browser = await browserInstance;
+    await pageScraper.spp_scraper(browser, campaign_id);
+  } catch (err) {
+    console.log("Could not resolve the browser instance => ", err);
+  }
+}
+
+module.exports = {
+  scrapeSpp,
+  scrapeAll,
+};

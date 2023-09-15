@@ -16,6 +16,7 @@ const {
   generatePricesTemplateSheet,
   fetchArtMaskPricesAndWriteToJSON,
   genAllEqualTemplatesSheet,
+  writeSppToDataSpreadsheet,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -160,4 +161,6 @@ const a = async () => {
 // genAllEqualTemplatesSheet()
 // copyZakazToOtherSpreadsheet()
 // fetchSalesAndWriteToJSON("mayusha")
-fetchUnasweredFeedbacksAndWriteToJSON('delicatus')
+// fetchUnasweredFeedbacksAndWriteToJSON('delicatus')
+// writeSppToDataSpreadsheet()
+// writeDrrToDataSpreadsheet()

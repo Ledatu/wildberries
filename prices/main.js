@@ -445,6 +445,7 @@ const buildXlsx = (data, campaign) => {
       "Текущая розн. цена (до скидки)",
       "Текущая скидка на сайте, %",
       "Цена со скидкой",
+      "%CПП",
       "Цена СПП",
       "Профит",
       "Остаток",
@@ -541,6 +542,7 @@ const buildXlsx = (data, campaign) => {
       el.price,
       el.discount,
       roz_price, // розничная стоимость
+      arts_data[vendorCode].spp / 100,
       spp_price,
       profit,
       stock,
@@ -2726,10 +2728,10 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
     // console.log(row);
     const vendorCode = row[0];
     if (!vendorCode || !arts_data[vendorCode] || !enteredValues[vendorCode]) {
-      row[13] = "";
       row[14] = "";
       row[15] = "";
       row[16] = "";
+      row[17] = "";
 
       data[i] = row;
       continue;
@@ -2779,10 +2781,10 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
     if (entered_roz_price) count++;
     if (entered_spp_price) count++;
     if (count != 1) {
-      row[13] = "";
       row[14] = "";
       row[15] = "";
       row[16] = "";
+      row[17] = "";
 
       data[i] = row;
       continue;
@@ -2808,10 +2810,10 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
     diffs.sort();
     const min_diff = String(diffs[0]);
     // console.log(min_diff, diffs, calculateds[min_diff])
-    row[13] = calculateds[min_diff].new_roi;
-    row[14] = calculateds[min_diff].new_roz_price;
-    row[15] = calculateds[min_diff].new_spp_price;
-    row[16] = calculateds[min_diff].new_wb_price;
+    row[14] = calculateds[min_diff].new_roi;
+    row[15] = calculateds[min_diff].new_roz_price;
+    row[16] = calculateds[min_diff].new_spp_price;
+    row[17] = calculateds[min_diff].new_wb_price;
 
     data[i] = row;
   }
