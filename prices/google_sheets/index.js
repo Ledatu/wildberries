@@ -577,7 +577,7 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
     sheets.spreadsheets.values
       .get({
         spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-        range: `${campaign}!A2:P`,
+        range: `${campaign}!A2:Q`,
       })
       .then((res) => {
         const rows = res.data.values;
