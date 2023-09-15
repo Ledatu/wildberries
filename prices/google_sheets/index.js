@@ -584,21 +584,21 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
         // console.log(rows);
         const data = {};
         rows.forEach((row) => {
-          if (!row.slice(13).length) return;
+          if (!row.slice(14).length) return;
           data[row[0]] = {
             roi: Number(
-              row[13]
-                ? row[13].replace("%", "").replace(",", ".").replace(/\s/g, "")
-                : 0
-            ),
-            roz_price: Number(
               row[14]
                 ? row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
                 : 0
             ),
-            spp_price: Number(
+            roz_price: Number(
               row[15]
                 ? row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
+                : 0
+            ),
+            spp_price: Number(
+              row[16]
+                ? row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
                 : 0
             ),
           };
