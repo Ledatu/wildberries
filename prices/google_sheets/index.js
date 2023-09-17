@@ -267,13 +267,10 @@ async function writeSppToDataSpreadsheet(auth) {
       for (const [campaign, seller_id] of Object.entries(seller_ids)) {
         const spp = JSON.parse(
           await fs.readFile(
-            path.join(
-              __dirname,
-              `../files/${campaign}/spp by mask.json`
-            )
+            path.join(__dirname, `../files/${campaign}/spp by mask.json`)
           )
         );
-    
+
         const row = rows[i];
         if (row[0] == "") continue;
         data.push([row[10]]);
@@ -289,6 +286,78 @@ async function writeSppToDataSpreadsheet(auth) {
 
     await update_data(data).then((pr) => resolve());
     console.log(`Spp data written to the google sheets.`);
+  });
+}
+
+async function calcAndWriteMinZakazToDataSpreadsheet(auth) {
+  return new Promise(async (resolve, reject) => {
+    const seller_ids = (
+      await JSON.parse(
+        await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
+      )
+    ).seller_ids;
+    const arts_data = await JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files/data.json"))
+    );
+
+    const orders = {};
+    for (const [campaign, seller_id] of Object.entries(seller_ids)) {
+      orders[seller_id] = await JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, "../files", campaign, "orders by day.json")
+        )
+      );
+    }
+
+    const update_data = async (data) => {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+        range: `Данные!N2:N`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: data,
+        },
+      });
+    };
+
+    // console.log(data);
+    const sheets = google.sheets({ version: "v4", auth });
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Данные!N2:N",
+    });
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Данные!A2:N",
+    });
+
+    const calc_min_zakaz = (art, seller_id) => {
+      let max_zakaz = 0;
+      for (const [date, date_data] of Object.entries(orders[seller_id])) {
+        max_zakaz = Math.max(max_zakaz, date_data[art]);
+      }
+      if (!max_zakaz) return 5;
+      return Math.ceil(
+        (Math.ceil(max_zakaz / 2) * arts_data[art].pref_obor) /
+          arts_data[art].multiplicity
+      );
+    };
+
+    // Parse the values into a JSON object
+    const rows = res.data.values;
+    // console.log(rows);
+    const data = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const art = row[0];
+      if (art == "") continue;
+      const seller_id = row[4];
+      data.push([calc_min_zakaz(art, seller_id)]);
+    }
+
+    await update_data(data).then((pr) => resolve());
+    console.log(`Min zakaz data written to the google sheets.`);
   });
 }
 
@@ -2336,6 +2405,10 @@ module.exports = {
   writeSppToDataSpreadsheet: async () => {
     const auth = await authorize();
     await writeSppToDataSpreadsheet(auth).catch(console.error);
+  },
+  calcAndWriteMinZakazToDataSpreadsheet: async () => {
+    const auth = await authorize();
+    await calcAndWriteMinZakazToDataSpreadsheet(auth).catch(console.error);
   },
   generatePricesTemplateSheet: async () => {
     const auth = await authorize();

@@ -17,6 +17,7 @@ const {
   fetchArtMaskPricesAndWriteToJSON,
   genAllEqualTemplatesSheet,
   writeSppToDataSpreadsheet,
+  calcAndWriteMinZakazToDataSpreadsheet,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -82,7 +83,7 @@ const {
 //   console.log("Prices fetched.");
 //   updatePrices("mayusha");
 // });
-// fetchStocksAndWriteToJSON("mayusha")
+fetchStocksAndWriteToJSON("mayusha")
 // fetchStocksAndWriteToJSON("delicatus")
 // generateGeneralMaskFormsAndWriteToJSON()
 // generatePricesTemplateSheet()
@@ -165,4 +166,5 @@ const a = async () => {
 // fetchUnasweredFeedbacksAndWriteToJSON('delicatus')
 // writeSppToDataSpreadsheet()
 // writeDrrToDataSpreadsheet()
-writeSpp()
+// writeSpp()
+calcAndWriteMinZakazToDataSpreadsheet()
