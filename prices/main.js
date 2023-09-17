@@ -1720,7 +1720,7 @@ const fetchUnasweredFeedbacksAndWriteToJSON = (campaign) =>
       const data = pr.data;
       for (const [index, feedback] of Object.entries(data.feedbacks)) {
         console.log(feedback);
-        const art = feedback.productDetails.supplierArticle.replace(/\s/g, "");;
+        const art = feedback.productDetails.supplierArticle.replace(/\s/g, "");
         if (!art) continue;
         if (!(art in jsonData)) jsonData[art] = [];
         jsonData[art].push(feedback);
@@ -2723,6 +2723,19 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
     afs.readFileSync(path.join(__dirname, "files", campaign, "ads.json"))
   );
 
+  // ------------------------
+  const storageCost = JSON.parse(
+    afs.readFileSync(path.join(__dirname, "files", "storageCost.json"))
+  )[campaign].cost;
+  const byDayCampaignSalesSum = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "byDayCampaignSalesSum.json")
+    )
+  );
+  const storageCostForArt =
+    storageCost / byDayCampaignSalesSum.fullLastWeek.count;
+  // ------------------------
+
   for (let i = 1; i < data.length; i++) {
     let row = data[i];
     // console.log(row);
@@ -2762,7 +2775,14 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
       const drr = ad / spp_price;
 
       const profit =
-        -ad - commission - delivery - tax - expences - prime_cost + roz_price;
+        -ad -
+        commission -
+        delivery -
+        storageCostForArt -
+        tax -
+        expences -
+        prime_cost +
+        roz_price;
       const wb_price = roz_price / (1 - row[3] / 100);
 
       const roi = profit / (prime_cost + expences);
