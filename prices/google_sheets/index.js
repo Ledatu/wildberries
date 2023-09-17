@@ -954,8 +954,8 @@ function updatePlanFact(auth, campaign) {
         if (!(all_masks[j] in avg_drr_by_mask))
           avg_drr_by_mask[all_masks[j]] = 0;
         if (1 <= i && i < 8) {
-          if (all_masks[j] == "ПРПЭ_120_DELICATUS")
-            console.log(str_date, dates_datas[str_date][all_masks[j]]);
+          // if (all_masks[j] == "ПРПЭ_120_DELICATUS")
+          //   console.log(str_date, dates_datas[str_date][all_masks[j]]);
           if (dates_datas[str_date][all_masks[j]]) {
             const date_drr =
               dates_datas[str_date][all_masks[j]][

@@ -32,7 +32,6 @@ const {
   writeDetailedByPeriod,
   fetchDataAndWriteToJSON,
   fetchEnteredValuesAndWriteToJSON,
-  fetchAnalyticsLastWeekValuesAndWriteToJSON,
   copyPricesToDataSpreadsheet,
   updateAnalyticsOrders,
   sendEmail,
@@ -72,7 +71,6 @@ const getPrices = async () => {
 
   campaigns.forEach(async (campaign) => {
     Promise.all([
-      await fetchAnalyticsLastWeekValuesAndWriteToJSON(campaign),
       await calcAdvertismentAndWriteToJSON(campaign),
       await fetchCardsAndWriteToJSON(campaign),
       await fetchOrdersAndWriteToJSON(campaign),
