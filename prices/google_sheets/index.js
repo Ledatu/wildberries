@@ -908,6 +908,7 @@ function updatePlanFact(auth, campaign) {
       СРМ: { name: "cpm", formula: "СРЗНАЧ" },
       Расход: { name: "sum", formula: "СУММ" },
       "Заказы/шт": { name: "orders", formula: "СУММ" },
+      "Ср. чек": { name: "avg_bill", formula: "СРЗНАЧ" },
       "Заказы/Р": { name: "sum_orders", formula: "СУММ" },
       "ДРР%": { name: "drr", formula: "СРЗНАЧ" },
     };
@@ -992,6 +993,7 @@ function updatePlanFact(auth, campaign) {
           dateData.orders += count;
         }
         dateData.drr = dateData.sum / dateData.sum_orders;
+        dateData.avg_bill = dateData.sum_orders / dateData.orders;
 
         const to_push = Array(unique_params.length);
         for (let j = 0; j < unique_params.length; j++) {
@@ -1062,6 +1064,7 @@ function updatePlanFact(auth, campaign) {
           cpm: 0,
           cpc: 0,
           orders: 0,
+          avg_bill: 0,
           sum_orders: 0,
           drr: 0,
         };
@@ -1078,6 +1081,9 @@ function updatePlanFact(auth, campaign) {
       advertStatsByMaskByDay[campaign][str_date].drr =
         advertStatsByMaskByDay[campaign][str_date].sum /
         advertStatsByMaskByDay[campaign][str_date].sum_orders;
+      advertStatsByMaskByDay[campaign][str_date].avg_bill =
+        advertStatsByMaskByDay[campaign][str_date].sum_orders /
+        advertStatsByMaskByDay[campaign][str_date].orders;
 
       const to_push = [];
       for (let j = 0; j < unique_params.length; j++) {
@@ -1253,6 +1259,7 @@ function updateFactStatsByRK(auth, campaign) {
       СРМ: { name: "cpm", formula: "СРЗНАЧ" },
       Расход: { name: "sum", formula: "СУММ" },
       "Заказы/шт": { name: "orders", formula: "СУММ" },
+      "Ср. чек": { name: "avg_bill", formula: "СРЗНАЧ" },
       "Заказы/Р": { name: "sum_orders", formula: "СУММ" },
       "ДРР%": { name: "drr", formula: "СРЗНАЧ" },
     };
@@ -1266,6 +1273,7 @@ function updateFactStatsByRK(auth, campaign) {
         cpm: 0,
         cpc: 0,
         orders: 0,
+        avg_bill: 0,
         sum_orders: 0,
         drr: 0,
       };
@@ -1332,6 +1340,7 @@ function updateFactStatsByRK(auth, campaign) {
         // console.log(result);
       }
       result.drr = result.sum / result.sum_orders;
+      result.avg_bill = result.sum_orders / result.orders;
       // result.drr = result.sum_orders ? result.sum / result.sum_orders : 0;
       // console.log(result);
       return result;
@@ -1386,7 +1395,7 @@ function updateFactStatsByRK(auth, campaign) {
         9: "Идут показы",
         11: "Пауза",
       };
-      if (include_this_rk) {
+      if (include_this_rk && [9, 11].includes(rkData.status)) {
         rkData.type = rk_type_map[rkData.type];
         rkData.status = rk_status_map[rkData.status];
         sheet_data_temp.push(
