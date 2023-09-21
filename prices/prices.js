@@ -184,6 +184,7 @@ const fetchAdverts = async () => {
         await fetchAdvertsAndWriteToJson(campaign),
         await fetchAdvertInfosAndWriteToJson(campaign),
         await fetchAdvertStatsAndWriteToJsonMpManager(campaign),
+        await fetchAdvertStatsAndWriteToJsonMpManagerLog(campaign),
         await fetchRksBudgetsAndWriteToJSON(campaign),
         await getAdvertStatByMaskByDayAndWriteToJSONMpManager(campaign),
         await getAdvertStatByDayAndWriteToJSONMpManager(campaign),

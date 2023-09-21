@@ -136,6 +136,26 @@ const getAdvertStatMpManager = (
     .catch((error) => console.error(error));
 };
 
+const getHourAdvertStatMpManager = (
+  authToken,
+  params,
+  organizationId,
+  externalId
+) => {
+  return axios
+    .get(
+      `https://api.mpmgr.ru/v3/organizations/${organizationId}/campaigns/${externalId}/full-stats`,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+        params: params,
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const updateAdvertArtActivities = (authToken, params) => {
   return axios
     .post("https://advert-api.wb.ru/adv/v0/nmactive", params, {
@@ -480,7 +500,7 @@ const buildXlsx = (data, campaign) => {
       "%ДРР",
       "%ДРР/АРТ неделя",
       "Рек. сегодня",
-      "=ОКРУГЛ(СУММ(AD2:AD))& \" Профит сегодня\"",
+      '=ОКРУГЛ(СУММ(AD2:AD))& " Профит сегодня"',
     ],
   ];
   data.forEach((el) => {
@@ -908,6 +928,147 @@ const writeOrdersToJson = (data, campaign, date) => {
     .then(() => console.log("orders by days.json created."))
     .catch((error) => console.error(error));
 };
+
+const calcStatsTrendsAndWtriteToJSON = (campaign) =>
+  new Promise((resolve, reject) => {
+    const jsonData = {
+      today: {
+        orders: 0,
+        sum_orders: 0,
+        avg_bill: 0,
+        sum_advert: 0,
+        drr: 0,
+      },
+      yesterday: {
+        orders: 0,
+        sum_orders: 0,
+        avg_bill: 0,
+        sum_advert: 0,
+        drr: 0,
+      },
+      trend: {
+        orders: 0,
+        sum_orders: 0,
+        avg_bill: 0,
+        sum_advert: 0,
+        drr: 0,
+      },
+    };
+
+    const get_normalized_price = (item) => {
+      const price = item.totalPrice * (1 - item.discountPercent / 100);
+      if (price <= 3000) return price;
+      return 500;
+    };
+
+    const orders = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "orders_full.json")
+      )
+    );
+    const advertStatsMpManager = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "advertStatsMpManager.json")
+      )
+    );
+
+    const today = new Date();
+    const today_string = today
+      .toLocaleDateString("ru-RU")
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+      .slice(0, 10);
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterday_string = yesterday
+      .toLocaleDateString("ru-RU")
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+      .slice(0, 10);
+
+    // console.log(now, yesterday);
+
+    // orders ------------------------------------------------------------
+    for (const [index, item] of Object.entries(orders)) {
+      const order_date = new Date(item.date);
+      const order_date_string = order_date.slice(0, 10);
+
+      if (order_date_string == today_string) {
+        if (order_date <= today) {
+          jsonData.today.sum_orders += get_normalized_price(item);
+          jsonData.today.orders += 1;
+        }
+      }
+      if (order_date_string == yesterday_string) {
+        if (order_date <= yesterday) {
+          jsonData.yesterday.sum_orders += get_normalized_price(item);
+          jsonData.yesterday.orders += 1;
+        }
+      }
+    }
+    jsonData.today.avg_bill = jsonData.today.sum_orders / jsonData.today.orders;
+    jsonData.yesterday.avg_bill =
+      jsonData.yesterday.sum_orders / jsonData.yesterday.orders;
+
+    // /orders ------------------------------------------------------------
+
+    // adverts ------------------------------------------------------------
+    for (const [rk_id, rk_data] of Object.entries(advertStatsMpManager)) {
+      for (const [index, item] of Object.entries(rk_data)) {
+        const order_date = new Date(item.date);
+        const order_date_string = order_date.slice(0, 10);
+
+        if (order_date_string == today_string) {
+          if (order_date <= today) {
+            jsonData.today.sum_orders += get_normalized_price(item);
+            jsonData.today.orders += 1;
+          }
+        }
+        if (order_date_string == yesterday_string) {
+          if (order_date <= yesterday) {
+            jsonData.yesterday.sum_orders += get_normalized_price(item);
+            jsonData.yesterday.orders += 1;
+          }
+        }
+      }
+    }
+    jsonData.today.avg_bill = jsonData.today.sum_orders / jsonData.today.orders;
+    jsonData.yesterday.avg_bill =
+      jsonData.yesterday.sum_orders / jsonData.yesterday.orders;
+
+    // /adverts ------------------------------------------------------------
+
+    for (const [metric, val] of Object.entries(jsonData.trend)) {
+      jsonData.trend[metric] =
+        -1 * (jsonData.yesterday[metric] / jsonData.today[metric] - 1);
+    }
+    return Promise.all([
+      fs.writeFile(
+        path.join(__dirname, "files", campaign, "orders by day.json"),
+        JSON.stringify(jsonData)
+      ),
+      fs.writeFile(
+        path.join(__dirname, "files", campaign, "sum of orders by day.json"),
+        JSON.stringify(orderSumJsonData)
+      ),
+      fs.writeFile(
+        path.join(__dirname, "files", campaign, "orders by now.json"),
+        JSON.stringify(jsonDataByNow)
+      ),
+      fs.writeFile(
+        path.join(__dirname, "files", campaign, "sum of orders by now.json"),
+        JSON.stringify(orderSumJsonDataByNow)
+      ),
+      fs.writeFile(
+        path.join(__dirname, "files", campaign, "byDayCampaignSum.json"),
+        JSON.stringify(byDayCampaignSum)
+      ),
+    ])
+      .then(() => {
+        console.log("orders by days.json created.");
+        resolve();
+      })
+      .catch((error) => console.error(error));
+  });
 
 const writeSalesToJson = (data, campaign, date) => {
   const now = new Date();
@@ -2231,6 +2392,77 @@ const fetchAdvertStatsAndWriteToJsonMpManager = async (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const fetchAdvertStatsAndWriteToJsonMpManagerLog = async (campaign) => {
+  const authToken = getAuthTokenMpManager("api-token", campaign);
+  const advertInfos = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "advertInfos.json")
+    )
+  );
+  const mp_manager_data = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "../secrets/mp_manager", `${campaign}.json`)
+    )
+  );
+
+  let jsonData = { today: {}, yesterday: {} };
+  if (
+    afs.existsSync(
+      path.join(__dirname, "files", campaign, "advertStatsMpManagerLog.json")
+    )
+  )
+    jsonData = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "advertStatsMpManagerLog.json")
+      )
+    );
+
+  const dateTo = new Date();
+  dateTo.setDate(dateTo.getDate() - 1);
+  const dateFrom = new Date(
+    dateTo
+      .toLocaleDateString("ru-RU")
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+      .slice(0, 10)
+  );
+  const hour_key = dateTo.toLocaleTimeString("ru-RU").slice(0, 2);
+  jsonData.yesterday[hour_key] = jsonData.today[hour_key];
+  jsonData.today[hour_key] = [];
+
+  for (const [key, data] of Object.entries(advertInfos)) {
+    if (data.status == 7) continue;
+    const advertId = data.advertId;
+    if (!advertId) continue;
+    const params = {
+      from: dateFrom
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10),
+      to: dateTo
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10),
+    };
+    await getAdvertStatMpManager(
+      authToken,
+      params,
+      mp_manager_data.organizationId,
+      advertId
+    ).then((pr) => {
+      jsonData.today[hour_key] = jsonData.today[hour_key].concat(pr);
+      console.log(campaign, advertId);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1 * 300));
+  }
+  return fs
+    .writeFile(
+      path.join(__dirname, "files", campaign, "advertStatsMpManagerLog.json"),
+      JSON.stringify(jsonData)
+    )
+    .then(() => console.log("advertStatsLog.json created."))
+    .catch((error) => console.error(error));
+};
+
 const updateAdvertArtActivitiesAndGenerateNotIncluded = async (campaign) => {
   const authToken = getAuthToken("api-advert-token", campaign);
   const advertInfos = JSON.parse(
@@ -2897,6 +3129,7 @@ module.exports = {
   answerFeedbacks,
   updateStorageCost,
   fetchSalesAndWriteToJSON,
+  fetchAdvertStatsAndWriteToJsonMpManagerLog,
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {

@@ -50,6 +50,7 @@ const {
   answerFeedbacks,
   updateStorageCostAndWriteToJSON,
   fetchSalesAndWriteToJSON,
+  fetchAdvertStatsAndWriteToJsonMpManagerLog,
 } = require("./main");
 const {
   getPrices,
@@ -69,7 +70,7 @@ const {
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
 // getDelivery().then((pr) => console.log(pr));
 // fetchDataAndWriteToJSON()
-getPrices();
+// getPrices();
 // updateAnalyticsOrders("mayusha");
 // sendRKErrors('projecttriggers@gmail.com', 'Ошибки РК', 'Тест');
 // updateAdvertArtActivitiesAndGenerateNotIncluded('mayusha')
@@ -83,7 +84,7 @@ getPrices();
 //   console.log("Prices fetched.");
 //   updatePrices("mayusha");
 // });
-fetchStocksAndWriteToJSON("mayusha")
+// fetchStocksAndWriteToJSON("mayusha")
 // fetchStocksAndWriteToJSON("delicatus")
 // generateGeneralMaskFormsAndWriteToJSON()
 // generatePricesTemplateSheet()
@@ -168,3 +169,5 @@ const a = async () => {
 // writeDrrToDataSpreadsheet()
 // writeSpp()
 // calcAndWriteMinZakazToDataSpreadsheet()
+
+fetchAdvertStatsAndWriteToJsonMpManagerLog('mayusha')
