@@ -412,6 +412,17 @@ const buildXlsx = (data, campaign) => {
   );
   const storageCostForArt =
     storageCost / byDayCampaignSalesSum.fullLastWeek.count;
+
+  // const path_cost_by_art = path.join(
+  //   __dirname,
+  //   "files",
+  //   "storageCost by art.json"
+  // );
+  // let storageCostByArt = {};
+  // if (afs.existsSync(path_cost_by_art))
+  //   storageCostByArt = JSON.parse(afs.readFileSync(path_cost_by_art));
+  // storageCostByArt[campaign] = storageCostForArt;
+  // afs.writeFileSync(path_cost_by_art, JSON.stringify(storageCostByArt));
   // ------------------------
 
   const advertStatsByArtByDay = JSON.parse(
@@ -469,6 +480,7 @@ const buildXlsx = (data, campaign) => {
       "%ДРР",
       "%ДРР/АРТ неделя",
       "Рек. сегодня",
+      "=ОКРУГЛ(СУММ(AD2:AD))& \" Профит сегодня\"",
     ],
   ];
   data.forEach((el) => {
@@ -536,6 +548,10 @@ const buildXlsx = (data, campaign) => {
       : zakaz > 0
       ? zakaz
       : 0;
+
+    const profit_today = !stock
+      ? 0
+      : (campaign == "TKS" ? expences : profit) * per_day;
     new_data.push([
       vendorCode,
       realZakaz,
@@ -566,6 +582,7 @@ const buildXlsx = (data, campaign) => {
       drr,
       drr_art_week,
       advert_sum_art_today,
+      profit_today,
     ]);
   });
   // console.log(new_data);
