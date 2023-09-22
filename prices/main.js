@@ -966,9 +966,9 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
         path.join(__dirname, "files", campaign, "orders_full.json")
       )
     );
-    const advertStatsMpManager = JSON.parse(
+    const advertStatsMpManagerLog = JSON.parse(
       afs.readFileSync(
-        path.join(__dirname, "files", campaign, "advertStatsMpManager.json")
+        path.join(__dirname, "files", campaign, "advertStatsMpManagerLog.json")
       )
     );
 
@@ -990,7 +990,10 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
     // orders ------------------------------------------------------------
     for (const [index, item] of Object.entries(orders)) {
       const order_date = new Date(item.date);
-      const order_date_string = order_date.slice(0, 10);
+      const order_date_string = order_date
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10);
 
       if (order_date_string == today_string) {
         if (order_date <= today) {
@@ -1012,28 +1015,38 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
     // /orders ------------------------------------------------------------
 
     // adverts ------------------------------------------------------------
-    for (const [rk_id, rk_data] of Object.entries(advertStatsMpManager)) {
-      for (const [index, item] of Object.entries(rk_data)) {
-        const order_date = new Date(item.date);
-        const order_date_string = order_date.slice(0, 10);
-
-        if (order_date_string == today_string) {
-          if (order_date <= today) {
-            jsonData.today.sum_orders += get_normalized_price(item);
-            jsonData.today.orders += 1;
-          }
-        }
-        if (order_date_string == yesterday_string) {
-          if (order_date <= yesterday) {
-            jsonData.yesterday.sum_orders += get_normalized_price(item);
-            jsonData.yesterday.orders += 1;
-          }
-        }
+    const hour_key = today.toLocaleTimeString("ru-RU").slice(0, 2);
+    for (const [rk_id, item] of Object.entries(
+      advertStatsMpManagerLog.today[hour_key]
+    )) {
+      const order_date = new Date(item.createdAt);
+      const order_date_string = order_date
+      .toLocaleDateString("ru-RU")
+      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+      .slice(0, 10);
+      
+      console.log(item, today_string, order_date_string);
+      if (order_date_string == today_string) {
+        jsonData.today.sum_orders += item.cost;
       }
     }
-    jsonData.today.avg_bill = jsonData.today.sum_orders / jsonData.today.orders;
-    jsonData.yesterday.avg_bill =
-      jsonData.yesterday.sum_orders / jsonData.yesterday.orders;
+    if (advertStatsMpManagerLog.yesterday[hour_key])
+      for (const [rk_id, item] of Object.entries(
+        advertStatsMpManagerLog.yesterday[hour_key]
+      )) {
+        const order_date = new Date(item.createdAt);
+        const order_date_string = order_date
+          .toLocaleDateString("ru-RU")
+          .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+          .slice(0, 10);
+
+        if (order_date_string == today_string) {
+          jsonData.yesterday.sum_advert += item.cost;
+        }
+      }
+    jsonData.today.drr = jsonData.today.sum_advert / jsonData.today.sum_orders;
+    jsonData.yesterday.drr =
+      jsonData.yesterday.sum_advert / jsonData.yesterday.sum_orders;
 
     // /adverts ------------------------------------------------------------
 
@@ -1041,28 +1054,11 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
       jsonData.trend[metric] =
         -1 * (jsonData.yesterday[metric] / jsonData.today[metric] - 1);
     }
-    return Promise.all([
-      fs.writeFile(
-        path.join(__dirname, "files", campaign, "orders by day.json"),
+    return fs
+      .writeFile(
+        path.join(__dirname, "files", campaign, "metricTrends.json"),
         JSON.stringify(jsonData)
-      ),
-      fs.writeFile(
-        path.join(__dirname, "files", campaign, "sum of orders by day.json"),
-        JSON.stringify(orderSumJsonData)
-      ),
-      fs.writeFile(
-        path.join(__dirname, "files", campaign, "orders by now.json"),
-        JSON.stringify(jsonDataByNow)
-      ),
-      fs.writeFile(
-        path.join(__dirname, "files", campaign, "sum of orders by now.json"),
-        JSON.stringify(orderSumJsonDataByNow)
-      ),
-      fs.writeFile(
-        path.join(__dirname, "files", campaign, "byDayCampaignSum.json"),
-        JSON.stringify(byDayCampaignSum)
-      ),
-    ])
+      )
       .then(() => {
         console.log("orders by days.json created.");
         resolve();
@@ -2418,7 +2414,6 @@ const fetchAdvertStatsAndWriteToJsonMpManagerLog = async (campaign) => {
     );
 
   const dateTo = new Date();
-  dateTo.setDate(dateTo.getDate() - 1);
   const dateFrom = new Date(
     dateTo
       .toLocaleDateString("ru-RU")
@@ -3130,6 +3125,7 @@ module.exports = {
   updateStorageCost,
   fetchSalesAndWriteToJSON,
   fetchAdvertStatsAndWriteToJsonMpManagerLog,
+  calcStatsTrendsAndWtriteToJSON,
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
