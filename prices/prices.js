@@ -26,6 +26,7 @@ const {
   fetchUnasweredFeedbacksAndWriteToJSON,
   answerFeedbacks,
   fetchSalesAndWriteToJSON,
+  fetchAdvertStatsAndWriteToJsonMpManagerLog,
 } = require("./main");
 const {
   writePrices,
