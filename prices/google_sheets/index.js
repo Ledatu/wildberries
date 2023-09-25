@@ -1287,20 +1287,20 @@ function updateFactStatsByRK(auth, campaign) {
           .toLocaleDateString("ru-RU")
           .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
           .slice(0, 10);
-
-        const nms_to_sum_orders = [];
-        const generalMaskOfRK = advertNames[advertId]
+          
+          const nms_to_sum_orders = [];
+          const generalMaskOfRK = advertNames[advertId]
           .replace(/\s/, "")
           .split("/")[0];
-        if (generalMasks.includes(generalMaskOfRK)) {
-          // if (generalMaskOfRK == 'ПРПЭ_200') console.log(date_range);
-          // console.log(advertNames[advertId], generalMaskOfRK, nms_to_sum_orders, generalMasks.includes(generalMaskOfRK));
-          // const mask = advertNames[advertId].split("/")[0];
-          for (const [art, art_data] of Object.entries(artsData)) {
-            const generalMask = getGeneralMaskFromVendorCode(art);
-            if (generalMask != generalMaskOfRK) continue;
-            // console.log(generalMask, generalMaskOfRK);
-            if (!nms_to_sum_orders.includes(art)) nms_to_sum_orders.push(art);
+          if (generalMasks.includes(generalMaskOfRK)) {
+            // if (generalMaskOfRK == 'ПРПЭ_200') console.log(date_range);
+            // console.log(advertNames[advertId], generalMaskOfRK, nms_to_sum_orders, generalMasks.includes(generalMaskOfRK));
+            // const mask = advertNames[advertId].split("/")[0];
+            for (const [art, art_data] of Object.entries(artsData)) {
+              const generalMask = getGeneralMaskFromVendorCode(art);
+              if (generalMask != generalMaskOfRK) continue;
+              // console.log(generalMask, generalMaskOfRK);
+              if (!nms_to_sum_orders.includes(art)) nms_to_sum_orders.push(art);
           }
         } else if (!artsData[advertNames[advertId]]) {
           const rkStat = advertStatsMpManager[advertId];
@@ -1311,14 +1311,15 @@ function updateFactStatsByRK(auth, campaign) {
             if (stat_date != str_date) continue;
             // console.log(vendorCode, artData.vendorCode);
             if (!nms_to_sum_orders.includes(vendorCode))
-              nms_to_sum_orders.push(vendorCode);
-          }
-        } else {
-          nms_to_sum_orders.push(advertNames[advertId]);
+            nms_to_sum_orders.push(vendorCode);
         }
-
-        // console.log(advertNames[advertId], nms_to_sum_orders, generalMasks, advertNames[advertId].split("/")[0], generalMasks.includes(advertNames[advertId].split("/")[0]));
-        if (!orders[str_date]) continue;
+      } else {
+        nms_to_sum_orders.push(advertNames[advertId]);
+      }
+      
+      // console.log(advertNames[advertId], nms_to_sum_orders, generalMasks, advertNames[advertId].split("/")[0], generalMasks.includes(advertNames[advertId].split("/")[0]));
+      if (!orders[str_date]) continue;
+      // console.log(str_date);
         for (const [art, value] of Object.entries(orders[str_date])) {
           if (!nms_to_sum_orders.includes(art)) continue;
           result.orders += value;
@@ -1329,7 +1330,6 @@ function updateFactStatsByRK(auth, campaign) {
         }
 
         if (!rkData[str_date]) continue;
-        // console.log(str_date);
 
         result.views += rkData[str_date].views ?? 0;
         result.clicks += rkData[str_date].clicks ?? 0;
@@ -1421,7 +1421,7 @@ function updateFactStatsByRK(auth, campaign) {
     // return;
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      range: `${spIds[campaign]}!4:1000`,
+      range: `${spIds[campaign]}!3:1000`,
     });
     await sheets.spreadsheets.values
       .update({

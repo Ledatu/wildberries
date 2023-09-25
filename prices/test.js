@@ -127,7 +127,7 @@ const a = async () => {
 // updatePlanFact('mayusha')
 // fetchOrdersAndWriteToJSON("TKS");
 // fetchNewPricesAndWriteToJSON("delicatus");
-// fetchOrdersAndWriteToJSON("delicatus");
+// fetchOrdersAndWriteToJSON("mayusha");
 // updatePlanFact('delicatus')
 // fetchByNowStats()
 // updateAutoAdvertsInCampaign('delicatus')
@@ -138,7 +138,8 @@ const a = async () => {
 // updatePlanFact('delicatus')
 // updateAutoAdverts()
 // fetchAdverts().then((pr) => {});
-calcStatsTrendsAndWtriteToJSON("mayusha")
+// calcStatsTrendsAndWtriteToJSON("mayusha")
+// updateFactStatsByRK('mayusha')
 // fetchNewRKsToCreate();
 // setFixedPhrasesForCreatedRKs("mayusha");
 // fetchOrdersAndWriteToJSON("mayusha").then(() =>
@@ -169,7 +170,7 @@ calcStatsTrendsAndWtriteToJSON("mayusha")
 // fetchUnasweredFeedbacksAndWriteToJSON('delicatus')
 // writeSppToDataSpreadsheet()
 // writeDrrToDataSpreadsheet()
-// writeSpp()
+writeSpp()
 // calcAndWriteMinZakazToDataSpreadsheet()
 
 // fetchAdvertStatsAndWriteToJsonMpManagerLog('mayusha')

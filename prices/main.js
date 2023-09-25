@@ -1021,13 +1021,13 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
     )) {
       const order_date = new Date(item.createdAt);
       const order_date_string = order_date
-      .toLocaleDateString("ru-RU")
-      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-      .slice(0, 10);
-      
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10);
+
       console.log(item, today_string, order_date_string);
       if (order_date_string == today_string) {
-        jsonData.today.sum_orders += item.cost;
+        jsonData.today.sum_advert += item.cost;
       }
     }
     if (advertStatsMpManagerLog.yesterday[hour_key])
@@ -1040,7 +1040,7 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
           .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
           .slice(0, 10);
 
-        if (order_date_string == today_string) {
+        if (order_date_string == yesterday_string) {
           jsonData.yesterday.sum_advert += item.cost;
         }
       }
@@ -3056,7 +3056,7 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
 
     const diffs = [];
     const calculateds = {};
-    for (let i = 450; i < 2000; i++) {
+    for (let i = 450; i < 2800; i++) {
       const calculated = calc(i);
       let diff = undefined;
       if (entered_roi) {
