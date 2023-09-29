@@ -4,7 +4,7 @@ const { fetchAdverts } = require("../prices/prices");
 const { scheduleJob, gracefulShutdown } = require("node-schedule");
 
 startServer();
-scheduleJob("58 * * * *", () => fetchAdverts());
+scheduleJob("55 * * * *", () => fetchAdverts());
 
 const flagFile = "top-stakes-flag.txt";
 
