@@ -1,7 +1,11 @@
 const startServer = require("./server");
 const { deleteFlagFile } = require("../flags/flagWork");
+const { fetchAdverts } = require("../prices/prices");
+const { scheduleJob, gracefulShutdown } = require("node-schedule");
 
 startServer();
+scheduleJob("58 * * * *", () => fetchAdverts());
+
 const flagFile = "top-stakes-flag.txt";
 
 function cleanup() {
@@ -9,7 +13,7 @@ function cleanup() {
   deleteFlagFile(flagFile).catch((err) => {
     console.error(`Error deleting flag file: ${err}`);
   });
-  process.exit();
+  gracefulShutdown().then(() => process.exit(0));
 }
 
 process.on("exit", cleanup);

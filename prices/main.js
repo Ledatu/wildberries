@@ -5,6 +5,7 @@ const fs = require("fs").promises;
 const afs = require("fs");
 const path = require("path");
 const { fetchHandStocks, sendEmail } = require("./google_sheets");
+const TelegramBot = require("node-telegram-bot-api");
 
 const sortData = (data) => {
   const header = data.shift(); // Remove the header row and store it in a variable
@@ -638,7 +639,8 @@ const writeVendorCodeToJson = (data, campaign) => {
     jsonDataFull[item.vendorCode.replace(/\s/g, "")] = {
       object: item.object,
       brand: item.brand,
-      skus: item.sizes[0].skus[0],
+      sizes: item.sizes,
+      colors: item.colors,
     };
   });
   fs.writeFile(
@@ -1025,7 +1027,7 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
         .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
         .slice(0, 10);
 
-      console.log(item, today_string, order_date_string);
+      // console.log(item, today_string, order_date_string);
       if (order_date_string == today_string) {
         jsonData.today.sum_advert += item.cost;
       }
@@ -1044,9 +1046,10 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
           jsonData.yesterday.sum_advert += item.cost;
         }
       }
-    jsonData.today.drr = jsonData.today.sum_advert / jsonData.today.sum_orders;
+    jsonData.today.drr =
+      (jsonData.today.sum_advert / jsonData.today.sum_orders) * 100;
     jsonData.yesterday.drr =
-      jsonData.yesterday.sum_advert / jsonData.yesterday.sum_orders;
+      (jsonData.yesterday.sum_advert / jsonData.yesterday.sum_orders) * 100;
 
     // /adverts ------------------------------------------------------------
 
@@ -1054,6 +1057,7 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
       jsonData.trend[metric] =
         -1 * (jsonData.yesterday[metric] / jsonData.today[metric] - 1);
     }
+    jsonData.trend.drr = jsonData.today.drr - jsonData.yesterday.drr;
     return fs
       .writeFile(
         path.join(__dirname, "files", campaign, "metricTrends.json"),
@@ -1762,6 +1766,62 @@ const generateGeneralMaskFormsAndWriteToJSON = () =>
         console.error(error);
         reject(error);
       });
+  });
+
+const sendTgBotTrendMessage = () =>
+  new Promise((resolve, reject) => {
+    const campaigns = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files", "campaigns.json"))
+    ).campaigns;
+    const tg = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "../secrets/telegram", "secret.json")
+      )
+    );
+    const campaignNames = {
+      mayusha: "Маюша🐝",
+      delicatus: "Деликатус🇸🇪",
+      TKS: "Текстиль🏭",
+    };
+    let text = "";
+    const jsonData = {};
+
+    for (const [index, campaign] of Object.entries(campaigns)) {
+      const metricTrends = JSON.parse(
+        afs.readFileSync(
+          path.join(__dirname, "files", campaign, "metricTrends.json")
+        )
+      );
+      for (const [metric, trend] of Object.entries(metricTrends.trend)) {
+        jsonData[metric] = `${
+          Math.round(metricTrends.today[metric] * (metric == "drr" ? 100 : 1)) /
+          (metric == "drr" ? 100 : 1)
+        } * [${trend > 0 ? "+" : ""}${
+          Math.round(trend * 100) /
+          (metric == "drr" ? 100 : 1)
+        }%]`;
+      }
+      text += `Бренд: ${
+        campaignNames[campaign]
+      }\nметрики:\n• Сумма заказов: ${jsonData.sum_orders.replace(
+        "*",
+        "р."
+      )}\n• Количество заказов: ${jsonData.orders.replace(
+        "*",
+        "шт."
+      )}\n• Средний чек: ${jsonData.avg_bill.replace(
+        "*",
+        "р."
+      )}\n• Расход на рекламу: ${jsonData.sum_advert.replace(
+        "*",
+        "р."
+      )}\n• ДРР: ${jsonData.drr.replace(" *", "%")}\n\n`;
+    }
+    const bot = new TelegramBot(tg.token);
+    bot.sendMessage(tg.chatIds.dev, text);
+    bot.sendMessage(tg.chatIds.prod, text);
+    delete bot;
+    // jsonData.push(mask_array.join("_"));
   });
 
 const updateStorageCost = (storageCostData) =>
@@ -3126,6 +3186,7 @@ module.exports = {
   fetchSalesAndWriteToJSON,
   fetchAdvertStatsAndWriteToJsonMpManagerLog,
   calcStatsTrendsAndWtriteToJSON,
+  sendTgBotTrendMessage,
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {

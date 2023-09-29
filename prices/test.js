@@ -52,6 +52,7 @@ const {
   fetchSalesAndWriteToJSON,
   fetchAdvertStatsAndWriteToJsonMpManagerLog,
   calcStatsTrendsAndWtriteToJSON,
+  sendTgBotTrendMessage,
 } = require("./main");
 const {
   getPrices,
@@ -66,6 +67,8 @@ const {
   createNewAdverts,
   answerAllFeedbacks,
   writeSpp,
+  updateAtriculesData,
+  calcAndSendTrendsToTg,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
@@ -108,7 +111,6 @@ const a = async () => {
 // fetchCardsAndWriteToJSON("delicatus");
 // fetchCardsAndWriteToJSON("TKS");
 // updateLowRatingStocksSheet()
-
 // updateAdvertActivity()
 // calcOrdersFromDetailedByPeriodAndWriteToJSON("mayusha");
 // fetchAdvertStatsAndWriteToJson("delicatus");
@@ -138,7 +140,6 @@ const a = async () => {
 // updatePlanFact('delicatus')
 // updateAutoAdverts()
 // fetchAdverts().then((pr) => {});
-// calcStatsTrendsAndWtriteToJSON("mayusha")
 // updateFactStatsByRK('mayusha')
 // fetchNewRKsToCreate();
 // setFixedPhrasesForCreatedRKs("mayusha");
@@ -170,7 +171,14 @@ const a = async () => {
 // fetchUnasweredFeedbacksAndWriteToJSON('delicatus')
 // writeSppToDataSpreadsheet()
 // writeDrrToDataSpreadsheet()
-writeSpp()
+// writeSpp()
 // calcAndWriteMinZakazToDataSpreadsheet()
+// updateAtriculesData()
 
 // fetchAdvertStatsAndWriteToJsonMpManagerLog('mayusha')
+
+// calcStatsTrendsAndWtriteToJSON("mayusha")
+// calcStatsTrendsAndWtriteToJSON("delicatus")
+// calcStatsTrendsAndWtriteToJSON("TKS")
+// sendTgBotTrendMessage()
+calcAndSendTrendsToTg()

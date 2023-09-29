@@ -27,6 +27,8 @@ const {
   answerFeedbacks,
   fetchSalesAndWriteToJSON,
   fetchAdvertStatsAndWriteToJsonMpManagerLog,
+  sendTgBotTrendMessage,
+  calcStatsTrendsAndWtriteToJSON,
 } = require("./main");
 const {
   writePrices,
@@ -163,9 +165,18 @@ const calcNewValues = async () => {
   });
 };
 
+const calcAndSendTrendsToTg = async (hour_key) => {
+  if (!["05", "08", "11", "14", "17", "20", "23"].includes(hour_key)) return;
+  const promises = [];
+  campaigns.forEach(async (campaign) => {
+    promises.push(calcStatsTrendsAndWtriteToJSON(campaign));
+  });
+  Promise.all(promises).then(async () => await sendTgBotTrendMessage());
+};
+
 const writeSpp = async () => {
   // await fetchDataAndWriteToJSON()
-  await fetchSpp();
+  // await fetchSpp();
   campaigns.forEach(async (campaign) => {
     Promise.all([await writeSppToDataSpreadsheet(campaign)])
       .then(async () => {
@@ -178,6 +189,7 @@ const writeSpp = async () => {
 };
 
 const fetchAdverts = async () => {
+  const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
   return new Promise((resolve, reject) => {
     campaigns.forEach(async (campaign) => {
       Promise.all([
@@ -195,7 +207,7 @@ const fetchAdverts = async () => {
       ])
         .then(async () => {
           console.log("All tasks completed successfully");
-          resolve("Updated.");
+          await calcAndSendTrendsToTg(hour_key).then(() => resolve("Updated."));
         })
         .catch((error) => {
           console.error("An error occurred:", error);
@@ -292,4 +304,5 @@ module.exports = {
   fetchByNowStats,
   answerAllFeedbacks,
   writeSpp,
+  calcAndSendTrendsToTg,
 };
