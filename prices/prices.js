@@ -191,8 +191,9 @@ const writeSpp = async () => {
 const fetchAdverts = async () => {
   const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
   return new Promise((resolve, reject) => {
+    let promises = [];
     campaigns.forEach(async (campaign) => {
-      Promise.all([
+      promises = promises.concat([
         await fetchOrdersAndWriteToJSON(campaign),
         await fetchAdvertsAndWriteToJson(campaign),
         await fetchAdvertInfosAndWriteToJson(campaign),
@@ -204,15 +205,16 @@ const fetchAdverts = async () => {
         await calcAvgDrrByArtAndWriteToJSON(campaign),
         await updatePlanFact(campaign),
         await updateFactStatsByRK(campaign),
-      ])
-        .then(async () => {
-          console.log("All tasks completed successfully");
-          await calcAndSendTrendsToTg(hour_key).then(() => resolve("Updated."));
-        })
-        .catch((error) => {
-          console.error("An error occurred:", error);
-        });
+      ]);
     });
+    Promise.all(promises)
+      .then(async () => {
+        console.log("All tasks completed successfully");
+        await calcAndSendTrendsToTg(hour_key).then(() => resolve("Updated."));
+      })
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      });
   });
 };
 
