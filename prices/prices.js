@@ -190,27 +190,31 @@ const writeSpp = async () => {
 
 const fetchAdverts = async () => {
   const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
-  return new Promise((resolve, reject) => {
-    let promises = [];
-    campaigns.forEach(async (campaign) => {
-      promises = promises.concat([
-        await fetchOrdersAndWriteToJSON(campaign),
-        await fetchAdvertsAndWriteToJson(campaign),
-        await fetchAdvertInfosAndWriteToJson(campaign),
-        await fetchAdvertStatsAndWriteToJsonMpManager(campaign),
-        await fetchAdvertStatsAndWriteToJsonMpManagerLog(campaign),
-        await fetchRksBudgetsAndWriteToJSON(campaign),
-        await getAdvertStatByMaskByDayAndWriteToJSONMpManager(campaign),
-        await getAdvertStatByDayAndWriteToJSONMpManager(campaign),
-        await calcAvgDrrByArtAndWriteToJSON(campaign),
-        await updatePlanFact(campaign),
-        await updateFactStatsByRK(campaign),
-      ]);
-    });
+  return new Promise(async (resolve, reject) => {
+    const promises = [];
+    campaigns.forEach(async (campaign) =>
+      promises.push(
+        new Promise(async (resolve, reject) => {
+          Promise.all([
+            await fetchOrdersAndWriteToJSON(campaign),
+            await fetchAdvertsAndWriteToJson(campaign),
+            await fetchAdvertInfosAndWriteToJson(campaign),
+            await fetchAdvertStatsAndWriteToJsonMpManager(campaign),
+            await fetchAdvertStatsAndWriteToJsonMpManagerLog(campaign),
+            await fetchRksBudgetsAndWriteToJSON(campaign),
+            await getAdvertStatByMaskByDayAndWriteToJSONMpManager(campaign),
+            await getAdvertStatByDayAndWriteToJSONMpManager(campaign),
+            await calcAvgDrrByArtAndWriteToJSON(campaign),
+            await updatePlanFact(campaign),
+            await updateFactStatsByRK(campaign),
+          ]).then(() => resolve("Updated."));
+        })
+      )
+    );
     Promise.all(promises)
       .then(async () => {
-        console.log("All tasks completed successfully");
         await calcAndSendTrendsToTg(hour_key).then(() => resolve("Updated."));
+        console.log("All tasks completed successfully");
       })
       .catch((error) => {
         console.error("An error occurred:", error);
