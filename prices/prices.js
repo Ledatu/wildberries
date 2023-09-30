@@ -69,7 +69,7 @@ const createNewAdverts = async () =>
     );
   });
 
-const getPrices = async () => {
+const getPrices = async (rewriteProfit = false) => {
   await updateAtriculesData();
 
   campaigns.forEach(async (campaign) => {
@@ -81,7 +81,7 @@ const getPrices = async () => {
       await fetchStocksAndWriteToJSON(campaign),
       await calcAvgOrdersAndWriteToJSON(campaign),
       // await updateAnalyticsOrders(campaign),
-      await fetchDataAndWriteToXlsx(campaign),
+      await fetchDataAndWriteToXlsx(campaign, rewriteProfit),
     ])
       .then(async () => {
         console.log("All tasks completed successfully");

@@ -410,7 +410,7 @@ const getSales = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
-const buildXlsx = (data, campaign) => {
+const buildXlsx = (data, campaign, rewriteProfit) => {
   const vendorCodes = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "files", campaign, "vendorCodes.json")
@@ -623,15 +623,17 @@ const buildXlsx = (data, campaign) => {
   ];
 
   // -------------------------
-  afs.writeFileSync(path_profit_trend, JSON.stringify(profit_trend));
+  const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
+  if (["05", "08", "11", "14", "17", "20", "23"].includes(hour_key) && rewriteProfit) 
+    afs.writeFileSync(path_profit_trend, JSON.stringify(profit_trend));
   // -------------------------
 
   new_data = sortData(new_data); // Sort the data
   return xlsx.build([{ name: "Общий отчёт", data: new_data }]);
 };
 
-const writeDataToXlsx = (data, campaign) => {
-  const buffer = buildXlsx(data, campaign);
+const writeDataToXlsx = (data, campaign, rewriteProfit = false) => {
+  const buffer = buildXlsx(data, campaign, rewriteProfit);
   return fs
     .writeFile(path.join(__dirname, "files", campaign, "data.xlsx"), buffer)
     .then(() => console.log("data.xlsx created."))
@@ -2076,11 +2078,11 @@ const updatePrices = async (campaign) => {
   fs.rm(newPricesPath);
 };
 
-const fetchDataAndWriteToXlsx = (campaign) => {
+const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
   const authToken = getAuthToken("api-token", campaign);
   return getInfo(authToken)
     .then((data) => {
-      return writeDataToXlsx(data, campaign);
+      return writeDataToXlsx(data, campaign, rewriteProfit);
     })
     .catch((error) => console.error(error));
 };
