@@ -446,6 +446,18 @@ const buildXlsx = (data, campaign) => {
   // afs.writeFileSync(path_cost_by_art, JSON.stringify(storageCostByArt));
   // ------------------------
 
+  const path_profit_trend = path.join(
+    __dirname,
+    "files",
+    campaign,
+    "profitTrend.json"
+  );
+  let profit_trend = { current: 0, previous: 0 };
+  if (afs.existsSync(path_profit_trend))
+    profit_trend = JSON.parse(afs.readFileSync(path_profit_trend));
+  profit_trend.previous = profit_trend.current;
+  profit_trend.current = 0;
+
   const advertStatsByArtByDay = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "files", campaign, "advert stats by art by day.json")
@@ -470,40 +482,7 @@ const buildXlsx = (data, campaign) => {
   )
     .toISOString()
     .slice(0, 10);
-  let new_data = [
-    [
-      "Артикул продавца",
-      "ЗАКАЗАТЬ",
-      "Текущая розн. цена (до скидки)",
-      "Текущая скидка на сайте, %",
-      "Цена со скидкой",
-      "%CПП",
-      "Цена СПП",
-      "Профит",
-      "Остаток",
-      "Заказов/7",
-      "Заказов/1",
-      "Оборачиваемость",
-      "Рентабельность",
-      "ROI",
-      "Новый ROI",
-      "Новая РЦ",
-      "Новая РЦ с СПП",
-      "Новая WB цена",
-      "",
-      "Себестоимость",
-      "Коммисия",
-      "Логистика",
-      "Хранение",
-      "Налоги",
-      "Расходы",
-      "Реклама",
-      "%ДРР",
-      "%ДРР/АРТ неделя",
-      "Рек. сегодня",
-      '=ОКРУГЛ(СУММ(AD2:AD))& " Профит сегодня"',
-    ],
-  ];
+  let new_data = [[]];
   data.forEach((el) => {
     let vendorCode = vendorCodes[el.nmId];
     if (!vendorCode || !arts_data[vendorCode]) return;
@@ -573,6 +552,8 @@ const buildXlsx = (data, campaign) => {
     const profit_today = !stock
       ? 0
       : (campaign == "TKS" ? expences : profit) * per_day;
+    profit_trend.current += profit_today;
+
     new_data.push([
       vendorCode,
       realZakaz,
@@ -607,6 +588,44 @@ const buildXlsx = (data, campaign) => {
     ]);
   });
   // console.log(new_data);
+
+  new_data[0] = [
+    "Артикул продавца",
+    "ЗАКАЗАТЬ",
+    "Текущая розн. цена (до скидки)",
+    "Текущая скидка на сайте, %",
+    "Цена со скидкой",
+    "%CПП",
+    "Цена СПП",
+    "Профит",
+    "Остаток",
+    "Заказов/7",
+    "Заказов/1",
+    "Оборачиваемость",
+    "Рентабельность",
+    "ROI",
+    "Новый ROI",
+    "Новая РЦ",
+    "Новая РЦ с СПП",
+    "Новая WB цена",
+    "",
+    "Себестоимость",
+    "Коммисия",
+    "Логистика",
+    "Хранение",
+    "Налоги",
+    "Расходы",
+    "Реклама",
+    "%ДРР",
+    "%ДРР/АРТ неделя",
+    "Рек. сегодня",
+    `${profit_trend.current} Профит сегодня`,
+  ];
+
+  // -------------------------
+  afs.writeFileSync(path_profit_trend, JSON.stringify(profit_trend));
+  // -------------------------
+
   new_data = sortData(new_data); // Sort the data
   return xlsx.build([{ name: "Общий отчёт", data: new_data }]);
 };
@@ -940,6 +959,7 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
         avg_bill: 0,
         sum_advert: 0,
         drr: 0,
+        profit: 0,
       },
       yesterday: {
         orders: 0,
@@ -947,6 +967,7 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
         avg_bill: 0,
         sum_advert: 0,
         drr: 0,
+        profit: 0,
       },
       trend: {
         orders: 0,
@@ -954,6 +975,7 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
         avg_bill: 0,
         sum_advert: 0,
         drr: 0,
+        profit: 0,
       },
     };
 
@@ -971,6 +993,11 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
     const advertStatsMpManagerLog = JSON.parse(
       afs.readFileSync(
         path.join(__dirname, "files", campaign, "advertStatsMpManagerLog.json")
+      )
+    );
+    const profit_trend = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "profitTrend.json")
       )
     );
 
@@ -1052,6 +1079,11 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
       (jsonData.yesterday.sum_advert / jsonData.yesterday.sum_orders) * 100;
 
     // /adverts ------------------------------------------------------------
+
+    // profit ------------------------------------------------------------
+    jsonData.today.profit = profit_trend.current;
+    jsonData.yesterday.profit = profit_trend.previous;
+    // /profit ------------------------------------------------------------
 
     for (const [metric, val] of Object.entries(jsonData.trend)) {
       jsonData.trend[metric] =
@@ -1797,8 +1829,7 @@ const sendTgBotTrendMessage = () =>
           Math.round(metricTrends.today[metric] * (metric == "drr" ? 100 : 1)) /
           (metric == "drr" ? 100 : 1)
         } * [${trend > 0 ? "+" : ""}${
-          Math.round(trend * 100) /
-          (metric == "drr" ? 100 : 1)
+          Math.round(trend * 100) / (metric == "drr" ? 100 : 1)
         }%]`;
       }
       text += `Бренд: ${
@@ -1815,7 +1846,7 @@ const sendTgBotTrendMessage = () =>
       )}\n• Расход на рекламу: ${jsonData.sum_advert.replace(
         "*",
         "р."
-      )}\n• ДРР: ${jsonData.drr.replace(" *", "%")}\n\n`;
+      )}\n• ДРР: ${jsonData.drr.replace(" *", "%")}\n• Профит: ${jsonData.profit.replace("*", "р.")}\n\n`;
     }
     const bot = new TelegramBot(tg.token);
     bot.sendMessage(tg.chatIds.dev, text);

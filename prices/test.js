@@ -181,5 +181,6 @@ const a = async () => {
 // calcStatsTrendsAndWtriteToJSON("delicatus")
 // calcStatsTrendsAndWtriteToJSON("TKS")
 // sendTgBotTrendMessage()
-// calcAndSendTrendsToTg()
-fetchAdverts()
+calcAndSendTrendsToTg('11')
+// fetchAdverts()
+// getPrices()

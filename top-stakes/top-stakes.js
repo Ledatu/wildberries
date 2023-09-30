@@ -1,9 +1,10 @@
 const startServer = require("./server");
 const { deleteFlagFile } = require("../flags/flagWork");
-const { fetchAdverts } = require("../prices/prices");
+const { fetchAdverts, getPrices } = require("../prices/prices");
 const { scheduleJob, gracefulShutdown } = require("node-schedule");
 
 startServer();
+scheduleJob("50 * * * *", () => getPrices());
 scheduleJob("55 * * * *", () => fetchAdverts());
 
 const flagFile = "top-stakes-flag.txt";
