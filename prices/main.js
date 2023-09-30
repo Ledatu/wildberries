@@ -552,7 +552,7 @@ const buildXlsx = (data, campaign) => {
     const profit_today = !stock
       ? 0
       : (campaign == "TKS" ? expences : profit) * per_day;
-    profit_trend.current += profit_today;
+    profit_trend.current += isNaN(profit_today) ? 0 : profit_today;
 
     new_data.push([
       vendorCode,
@@ -619,7 +619,7 @@ const buildXlsx = (data, campaign) => {
     "%ДРР",
     "%ДРР/АРТ неделя",
     "Рек. сегодня",
-    `${profit_trend.current} Профит сегодня`,
+    `${Math.round(profit_trend.current)} Профит сегодня`,
   ];
 
   // -------------------------
