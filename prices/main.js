@@ -1816,7 +1816,7 @@ const sendTgBotTrendMessage = (hour_key) =>
     );
     hour_key = String('00' + String(parseInt(hour_key)+1)).slice(-2);
     const campaignNames = {
-      mayusha: `Маюша🐝${Array(25).fill(' ').join('')}#${new Date().toLocaleDateString('ru-RU', {weekday: 'short'}).toUpperCase()}_${hour_key}`,
+      mayusha: `Маюша🐝${Array(22).fill(' ').join('')}#${new Date().toLocaleDateString('ru-RU', {weekday: 'short'}).toUpperCase()}_${hour_key}`,
       delicatus: "Деликатус🇸🇪",
       TKS: "Текстиль🏭",
     };
@@ -1855,7 +1855,7 @@ const sendTgBotTrendMessage = (hour_key) =>
     }
     const bot = new TelegramBot(tg.token);
     bot.sendMessage(tg.chatIds.dev, text);
-    bot.sendMessage(tg.chatIds.prod, text);
+    // bot.sendMessage(tg.chatIds.prod, text);
     delete bot;
     // jsonData.push(mask_array.join("_"));
     
