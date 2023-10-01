@@ -1804,7 +1804,7 @@ const generateGeneralMaskFormsAndWriteToJSON = () =>
       });
   });
 
-const sendTgBotTrendMessage = () =>
+const sendTgBotTrendMessage = (hour_key) =>
   new Promise((resolve, reject) => {
     const campaigns = JSON.parse(
       afs.readFileSync(path.join(__dirname, "files", "campaigns.json"))
@@ -1814,8 +1814,9 @@ const sendTgBotTrendMessage = () =>
         path.join(__dirname, "../secrets/telegram", "secret.json")
       )
     );
+    hour_key = String('00' + String(parseInt(hour_key)+1)).slice(-2);
     const campaignNames = {
-      mayusha: "Маюша🐝",
+      mayusha: `Маюша🐝${Array(25).fill(' ').join('')}#${new Date().toLocaleDateString('ru-RU', {weekday: 'short'}).toUpperCase()}_${hour_key}`,
       delicatus: "Деликатус🇸🇪",
       TKS: "Текстиль🏭",
     };
@@ -1857,6 +1858,7 @@ const sendTgBotTrendMessage = () =>
     bot.sendMessage(tg.chatIds.prod, text);
     delete bot;
     // jsonData.push(mask_array.join("_"));
+    
   });
 
 const updateStorageCost = (storageCostData) =>

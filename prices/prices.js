@@ -171,7 +171,7 @@ const calcAndSendTrendsToTg = async (hour_key) => {
   campaigns.forEach(async (campaign) => {
     promises.push(calcStatsTrendsAndWtriteToJSON(campaign));
   });
-  Promise.all(promises).then(async () => await sendTgBotTrendMessage());
+  Promise.all(promises).then(async () => await sendTgBotTrendMessage(hour_key));
 };
 
 const writeSpp = async () => {

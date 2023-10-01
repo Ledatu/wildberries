@@ -184,4 +184,5 @@ const a = async () => {
 // calcAndSendTrendsToTg('11')
 // fetchAdverts()
 // getPrices()
-writeSppToDataSpreadsheet()
+// writeSppToDataSpreadsheet()
+calcAndSendTrendsToTg('11')
