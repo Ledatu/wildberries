@@ -1855,7 +1855,7 @@ const sendTgBotTrendMessage = (hour_key) =>
     }
     const bot = new TelegramBot(tg.token);
     bot.sendMessage(tg.chatIds.dev, text);
-    // bot.sendMessage(tg.chatIds.prod, text);
+    bot.sendMessage(tg.chatIds.prod, text);
     delete bot;
     // jsonData.push(mask_array.join("_"));
     
