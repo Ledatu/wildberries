@@ -176,7 +176,7 @@ const calcAndSendTrendsToTg = async (hour_key) => {
 
 const writeSpp = async () => {
   // await fetchDataAndWriteToJSON()
-  // await fetchSpp();
+  await fetchSpp();
   campaigns.forEach(async (campaign) => {
     Promise.all([await writeSppToDataSpreadsheet(campaign)])
       .then(async () => {

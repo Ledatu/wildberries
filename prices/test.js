@@ -183,4 +183,5 @@ const a = async () => {
 // sendTgBotTrendMessage()
 // calcAndSendTrendsToTg('11')
 // fetchAdverts()
-getPrices()
+// getPrices()
+writeSppToDataSpreadsheet()
