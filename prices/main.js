@@ -410,7 +410,7 @@ const getSales = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
-const buildXlsx = (data, campaign, rewriteProfit) => {
+const buildXlsx = (data, campaign, rewriteProfit = false) => {
   const vendorCodes = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "files", campaign, "vendorCodes.json")
@@ -538,6 +538,7 @@ const buildXlsx = (data, campaign, rewriteProfit) => {
       expences -
       prime_cost +
       roz_price;
+    // console.log(vendorCode, profit, ad, commission, delivery, storageCostForArt, tax, expences, prime_cost, roz_price);
     const roi = profit / (prime_cost + expences);
     const rentabelnost = profit / spp_price;
 
@@ -1213,9 +1214,10 @@ const writeSalesToJson = (data, campaign, date) => {
     prevMonday.setDate(
       prevMonday.getDate() - 7 - ((prevMonday.getDay() + 6) % 7)
     );
+    // console.log('Last monday:', prevMonday);
     for (let i = 0; i < 7; i++) {
       // last full week
-      const cur_date = new Date();
+      const cur_date = new Date(prevMonday);
       cur_date.setDate(prevMonday.getDate() + i);
       const str_date = cur_date
         .toLocaleDateString("ru-RU")
