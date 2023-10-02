@@ -625,7 +625,10 @@ const buildXlsx = (data, campaign, rewriteProfit = false) => {
 
   // -------------------------
   const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
-  if (["05", "08", "11", "14", "17", "20", "23"].includes(hour_key) && rewriteProfit) 
+  if (
+    ["05", "08", "11", "14", "17", "20", "23"].includes(hour_key) &&
+    rewriteProfit
+  )
     afs.writeFileSync(path_profit_trend, JSON.stringify(profit_trend));
   // -------------------------
 
@@ -655,6 +658,14 @@ const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
   const jsonDataFull = {};
   data.forEach((item) => {
+    // for (const [index, size_data] of Object.entries(item.sizes)) {
+    //   const size = size_data.techSize;
+    //   if (size != "0") {
+    //     if (!(item.nmID in jsonData)) jsonData[item.nmID] = [];
+    //     jsonData[item.nmID].push(item.vendorCode.replace(/\s/g, ""));
+    //   } else {
+    //   }
+    // }
     jsonData[item.nmID] = item.vendorCode.replace(/\s/g, "");
   });
   data.forEach((item) => {
@@ -1814,7 +1825,7 @@ const sendTgBotTrendMessage = (hour_key) =>
         path.join(__dirname, "../secrets/telegram", "secret.json")
       )
     );
-    hour_key = String('00' + String(parseInt(hour_key)+1)).slice(-2);
+    hour_key = String("00" + String(parseInt(hour_key) + 1)).slice(-2);
     const campaignNames = {
       mayusha: "Маюша🐝",
       delicatus: "Деликатус🇸🇪",
@@ -1851,16 +1862,20 @@ const sendTgBotTrendMessage = (hour_key) =>
       )}\n• Расход на рекламу: ${jsonData.sum_advert.replace(
         "*",
         "р."
-      )}\n• ДРР: ${jsonData.drr.replace(" *", "%")}\n• Профит: ${jsonData.profit.replace("*", "р.")}\n\n`;
+      )}\n• ДРР: ${jsonData.drr.replace(
+        " *",
+        "%"
+      )}\n• Профит: ${jsonData.profit.replace("*", "р.")}\n\n`;
     }
-    text += `#метрики #в${hour_key} #${new Date().toLocaleDateString('ru-RU', {weekday: 'short'})}${hour_key}`
+    text += `#метрики #в${hour_key} #${new Date().toLocaleDateString("ru-RU", {
+      weekday: "short",
+    })}${hour_key}`;
 
     const bot = new TelegramBot(tg.token);
     bot.sendMessage(tg.chatIds.dev, text);
     bot.sendMessage(tg.chatIds.prod, text);
     delete bot;
     // jsonData.push(mask_array.join("_"));
-    
   });
 
 const updateStorageCost = (storageCostData) =>

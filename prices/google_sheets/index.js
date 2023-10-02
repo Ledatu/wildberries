@@ -558,6 +558,7 @@ async function fetchDataAndWriteToJSON(auth) {
 
     const data = {};
     rows.forEach((row) => {
+      if (row[0] == "") return;
       data[row[0]] = {
         barcode: row[1],
         multiplicity: Math.abs(Number(row[2] ?? 0)),
@@ -1287,20 +1288,20 @@ function updateFactStatsByRK(auth, campaign) {
           .toLocaleDateString("ru-RU")
           .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
           .slice(0, 10);
-          
-          const nms_to_sum_orders = [];
-          const generalMaskOfRK = advertNames[advertId]
+
+        const nms_to_sum_orders = [];
+        const generalMaskOfRK = advertNames[advertId]
           .replace(/\s/, "")
           .split("/")[0];
-          if (generalMasks.includes(generalMaskOfRK)) {
-            // if (generalMaskOfRK == 'ПРПЭ_200') console.log(date_range);
-            // console.log(advertNames[advertId], generalMaskOfRK, nms_to_sum_orders, generalMasks.includes(generalMaskOfRK));
-            // const mask = advertNames[advertId].split("/")[0];
-            for (const [art, art_data] of Object.entries(artsData)) {
-              const generalMask = getGeneralMaskFromVendorCode(art);
-              if (generalMask != generalMaskOfRK) continue;
-              // console.log(generalMask, generalMaskOfRK);
-              if (!nms_to_sum_orders.includes(art)) nms_to_sum_orders.push(art);
+        if (generalMasks.includes(generalMaskOfRK)) {
+          // if (generalMaskOfRK == 'ПРПЭ_200') console.log(date_range);
+          // console.log(advertNames[advertId], generalMaskOfRK, nms_to_sum_orders, generalMasks.includes(generalMaskOfRK));
+          // const mask = advertNames[advertId].split("/")[0];
+          for (const [art, art_data] of Object.entries(artsData)) {
+            const generalMask = getGeneralMaskFromVendorCode(art);
+            if (generalMask != generalMaskOfRK) continue;
+            // console.log(generalMask, generalMaskOfRK);
+            if (!nms_to_sum_orders.includes(art)) nms_to_sum_orders.push(art);
           }
         } else if (!artsData[advertNames[advertId]]) {
           const rkStat = advertStatsMpManager[advertId];
@@ -1311,15 +1312,15 @@ function updateFactStatsByRK(auth, campaign) {
             if (stat_date != str_date) continue;
             // console.log(vendorCode, artData.vendorCode);
             if (!nms_to_sum_orders.includes(vendorCode))
-            nms_to_sum_orders.push(vendorCode);
+              nms_to_sum_orders.push(vendorCode);
+          }
+        } else {
+          nms_to_sum_orders.push(advertNames[advertId]);
         }
-      } else {
-        nms_to_sum_orders.push(advertNames[advertId]);
-      }
-      
-      // console.log(advertNames[advertId], nms_to_sum_orders, generalMasks, advertNames[advertId].split("/")[0], generalMasks.includes(advertNames[advertId].split("/")[0]));
-      if (!orders[str_date]) continue;
-      // console.log(str_date);
+
+        // console.log(advertNames[advertId], nms_to_sum_orders, generalMasks, advertNames[advertId].split("/")[0], generalMasks.includes(advertNames[advertId].split("/")[0]));
+        if (!orders[str_date]) continue;
+        // console.log(str_date);
         for (const [art, value] of Object.entries(orders[str_date])) {
           if (!nms_to_sum_orders.includes(art)) continue;
           result.orders += value;
@@ -2148,7 +2149,7 @@ async function copyPricesToDataSpreadsheet(auth) {
       const mask = getGeneralMaskFromVendorCode(row[0]);
       if (row[0] == "") return;
       // console.log(mask, row[0]);
-      data.push([artPrices[mask].rc]);
+      data.push([artPrices[mask] ? artPrices[mask].rc : 0]);
     });
     await sheets.spreadsheets.values.clear({
       spreadsheetId: destinationSpreadsheetId,
