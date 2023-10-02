@@ -1350,7 +1350,7 @@ function updateFactStatsByRK(auth, campaign) {
       // days before today
       { from: 0, to: 0 },
       { from: 1, to: 1 },
-      { from: 8, to: 2 },
+      { from: 7, to: 1 },
     ];
 
     // const formulas_to_concat = [];
