@@ -657,15 +657,25 @@ const writeWarehousesToJson = (data, campaign) => {
 const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
   const jsonDataFull = {};
+  const jsonDataBarcodes = { direct: {}, reverse: {} };
+  const jsonDataBarcodesFull = { };
   data.forEach((item) => {
-    // for (const [index, size_data] of Object.entries(item.sizes)) {
-    //   const size = size_data.techSize;
-    //   if (size != "0") {
-    //     if (!(item.nmID in jsonData)) jsonData[item.nmID] = [];
-    //     jsonData[item.nmID].push(item.vendorCode.replace(/\s/g, ""));
-    //   } else {
-    //   }
-    // }
+    for (const [index, size_data] of Object.entries(item.sizes)) {
+      const size = size_data.techSize;
+      const art =
+        item.vendorCode.replace(/\s/g, "") + (size != "0" ? `_${size}` : "");
+      jsonDataBarcodes.direct[art] = size_data.skus[0];
+      jsonDataBarcodes.reverse[size_data.skus[0]] = art;
+      jsonDataBarcodesFull[art] = {
+        object: item.object,
+        brand: item.brand,
+        size: size,
+        color: item.colors[0],
+        barcode: size_data.skus[0],
+        nmId: item.nmID,
+        brand_art: item.vendorCode.replace(/\s/g, ""),
+      };
+    }
     jsonData[item.nmID] = item.vendorCode.replace(/\s/g, "");
   });
   data.forEach((item) => {
@@ -676,12 +686,44 @@ const writeVendorCodeToJson = (data, campaign) => {
       colors: item.colors,
     };
   });
+
+  // const sheet_data = [];
+  // for (const [art, barcode] of Object.entries(jsonDataBarcodes)) {
+  //   sheet_data.push([art, barcode]);
+  // }
+  // sheet_data.sort((a, b) => {
+  //   if (a[0] < b[0]) return -1;
+  //   if (a[0] > b[0]) return 1;
+  //   return 0;
+  // });
+
   fs.writeFile(
     path.join(__dirname, "files", campaign, "vendorCodesFull.json"),
     JSON.stringify(jsonDataFull)
   )
     .then(() => console.log("vendorCodesFull.json created."))
     .catch((error) => console.error(error));
+  fs.writeFile(
+    path.join(__dirname, "files", campaign, "artsBarcodes.json"),
+    JSON.stringify(jsonDataBarcodes)
+    // xlsx.build([{ name: "a", data: sheet_data }])
+  )
+    .then(() => console.log("artsBarcodes.json created."))
+    .catch((error) => console.error(error));
+  fs.writeFile(
+    path.join(__dirname, "files", campaign, "artsBarcodesFull.json"),
+    JSON.stringify(jsonDataBarcodesFull)
+    // xlsx.build([{ name: "a", data: sheet_data }])
+  )
+    .then(() => console.log("artsBarcodes.json created."))
+    .catch((error) => console.error(error));
+  // fs.writeFile(
+  //   path.join(__dirname, "files", campaign, "artsBarcodes.xlsx"),
+  //   // JSON.stringify(jsonDataBarcodes)
+  //   xlsx.build([{ name: "a", data: sheet_data }])
+  // )
+  //   .then(() => console.log("artsBarcodes.xlsx created."))
+  //   .catch((error) => console.error(error));
   return fs
     .writeFile(
       path.join(__dirname, "files", campaign, "vendorCodes.json"),
@@ -749,6 +791,11 @@ const writeStocksToJson = async (data, campaign, date) => {
     .then(() => console.log("stocks.json created."))
     .catch((error) => console.error(error));
 
+  const artsBarcodes = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "artsBarcodes.json")
+    )
+  );
   const stocks = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
   );
@@ -761,7 +808,7 @@ const writeStocksToJson = async (data, campaign, date) => {
   if (Object.keys(jsonData).length == 0) {
     if (data && data.length) {
       data.forEach((item) => {
-        const supplierArticle = item.supplierArticle.replace(/\s/g, "");
+        const supplierArticle = artsBarcodes.reverse[item.barcode];
         if (supplierArticle in jsonData)
           jsonData[supplierArticle] += item.quantity;
         else jsonData[supplierArticle] = item.quantity;
@@ -795,35 +842,23 @@ const writeOrdersToJson = (data, campaign, date) => {
   const orderSumJsonDataByNow = { today: {}, yesterday: {} };
   const byDayCampaignSum = {};
 
-  const vendorCodes = JSON.parse(
+  const artsBarcodes = JSON.parse(
     afs.readFileSync(
-      path.join(__dirname, "files", campaign, "vendorCodes.json")
+      path.join(__dirname, "files", campaign, "artsBarcodes.json")
     )
   );
 
   const excluded = { excluded: [] };
   data.forEach((item) => {
-    const supplierArticle = item.supplierArticle.replace(/\s/g, "");
+    const supplierArticle = artsBarcodes.reverse[item.barcode];
+    // console.log(supplierArticle);
     const get_item_price = () => {
       return item.totalPrice * (1 - item.discountPercent / 100);
     };
-    const get_normalized_price = (
-      cur_count,
-      cur_sum,
-      log = false,
-      dop = ""
-    ) => {
+    const get_normalized_price = (cur_count, cur_sum) => {
       const price = get_item_price();
       const res_if_violated = cur_count ? cur_sum / cur_count : 500;
-      if (log && supplierArticle.includes("ПР_90")) {
-        console.log(
-          dop,
-          supplierArticle,
-          price <= 3000 ? price : res_if_violated
-        );
-      }
-      if (price <= 3000) return price;
-      // console.log(item, price);
+      if (price <= 4000) return price;
       return res_if_violated;
     };
 
@@ -848,16 +883,16 @@ const writeOrdersToJson = (data, campaign, date) => {
 
     if (!(order_date_string in jsonData)) {
       jsonData[order_date_string] = {};
-      for (key in vendorCodes) {
-        jsonData[order_date_string][vendorCodes[key]] = 0;
+      for (const art in artsBarcodes.direct) {
+        jsonData[order_date_string][art] = 0;
       }
       // console.log(jsonData[order_date_string]);
     }
 
     if (!(order_date_string in orderSumJsonData)) {
       orderSumJsonData[order_date_string] = {};
-      for (key in vendorCodes) {
-        orderSumJsonData[order_date_string][vendorCodes[key]] = 0;
+      for (const art in artsBarcodes.direct) {
+        orderSumJsonData[order_date_string][art] = 0;
       }
       // console.log(orderSumJsonData[order_date_string]);
     }
@@ -937,7 +972,7 @@ const writeOrdersToJson = (data, campaign, date) => {
   fs.writeFile(
     path.join(__dirname, "files", campaign, "excluded.json"),
     JSON.stringify(excluded)
-  ).then(() => console.log("excluded.xlsx created."));
+  ).then(() => console.log(campaign, "excluded.xlsx created."));
   return Promise.all([
     fs.writeFile(
       path.join(__dirname, "files", campaign, "orders by day.json"),
@@ -960,7 +995,7 @@ const writeOrdersToJson = (data, campaign, date) => {
       JSON.stringify(byDayCampaignSum)
     ),
   ])
-    .then(() => console.log("orders by days.json created."))
+    .then(() => console.log(campaign, "orders by days.json created."))
     .catch((error) => console.error(error));
 };
 
@@ -1129,35 +1164,22 @@ const writeSalesToJson = (data, campaign, date) => {
   const orderSumJsonDataByNow = { today: {}, yesterday: {} };
   const byDayCampaignSum = {};
 
-  const vendorCodes = JSON.parse(
+  const artsBarcodes = JSON.parse(
     afs.readFileSync(
-      path.join(__dirname, "files", campaign, "vendorCodes.json")
+      path.join(__dirname, "files", campaign, "artsBarcodes.json")
     )
   );
 
   const excluded = { excluded: [] };
   data.forEach((item) => {
-    const supplierArticle = item.supplierArticle.replace(/\s/g, "");
+    const supplierArticle = artsBarcodes.reverse[item.barcode];
     const get_item_price = () => {
       return item.totalPrice * (1 - item.discountPercent / 100);
     };
-    const get_normalized_price = (
-      cur_count,
-      cur_sum,
-      log = false,
-      dop = ""
-    ) => {
+    const get_normalized_price = (cur_count, cur_sum) => {
       const price = get_item_price();
       const res_if_violated = cur_count ? cur_sum / cur_count : 500;
-      if (log && supplierArticle.includes("ПР_90")) {
-        console.log(
-          dop,
-          supplierArticle,
-          price <= 3000 ? price : res_if_violated
-        );
-      }
-      if (price <= 3000) return price;
-      // console.log(item, price);
+      if (price <= 4000) return price;
       return res_if_violated;
     };
 
@@ -1182,16 +1204,16 @@ const writeSalesToJson = (data, campaign, date) => {
 
     if (!(order_date_string in jsonData)) {
       jsonData[order_date_string] = {};
-      for (key in vendorCodes) {
-        jsonData[order_date_string][vendorCodes[key]] = 0;
+      for (const art in artsBarcodes.direct) {
+        jsonData[order_date_string][art] = 0;
       }
       // console.log(jsonData[order_date_string]);
     }
 
     if (!(order_date_string in orderSumJsonData)) {
       orderSumJsonData[order_date_string] = {};
-      for (key in vendorCodes) {
-        orderSumJsonData[order_date_string][vendorCodes[key]] = 0;
+      for (const art in artsBarcodes.direct) {
+        orderSumJsonData[order_date_string][art] = 0;
       }
       // console.log(orderSumJsonData[order_date_string]);
     }
@@ -1733,6 +1755,12 @@ const getAdvertStatByDayAndWriteToJSONMpManager = async (campaign) => {
 
 const writeDetailedByPeriodToJson = (data, campaign) =>
   new Promise((resolve, reject) => {
+    const artsBarcodes = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "artsBarcodes.json")
+      )
+    );
+
     const jsonData = {};
     if (data) {
       jsonData["date"] = data
@@ -1750,7 +1778,7 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
         )
           return;
 
-        const type = getMaskFromVendorCode(item.sa_name);
+        const type = getMaskFromVendorCode(artsBarcodes.reverse[item.barcode]);
         if (!(type in jsonData)) {
           jsonData[type] = { buyout: 0, delivery: 0 };
         }

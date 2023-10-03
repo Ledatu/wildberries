@@ -3,7 +3,7 @@ const {
   exportTZToXlsx,
   fetchCurrentZakazAndWriteToXLSX,
 } = require("./google_sheets/index");
-const { generateNewTags } = require("./main");
+const { generateNewTags, autoGenerateNewTags } = require("./main");
 const {
   qrGeneration,
   tagsGeneration,
@@ -18,5 +18,6 @@ const {
 // exportTZToXlsx()
 // exportAll()
 // newTagsGeneration();
-autofillCurrent("delicatus ПР 06 МК ТУЛА");
+// autofillCurrent("delicatus ПР 06 МК ТУЛА");
+autoGenerateNewTags('TKS', 'Amaze wear');
 // exportAll()

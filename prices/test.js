@@ -107,9 +107,11 @@ const a = async () => {
 // a();
 
 // fetchStocksForLowRatingArts()
+
 // fetchCardsAndWriteToJSON("mayusha");
 // fetchCardsAndWriteToJSON("delicatus");
-// fetchCardsAndWriteToJSON("TKS");
+fetchCardsAndWriteToJSON("TKS");
+
 // updateLowRatingStocksSheet()
 // updateAdvertActivity()
 // calcOrdersFromDetailedByPeriodAndWriteToJSON("mayusha");
@@ -127,9 +129,12 @@ const a = async () => {
 // fetchAdvertStatsAndWriteToJson("mayusha");
 // getAdvertStatByMaskByDayAndWriteToJSON('TKS')
 // updatePlanFact('mayusha')
-// fetchOrdersAndWriteToJSON("TKS");
-// fetchNewPricesAndWriteToJSON("delicatus");
+
 // fetchOrdersAndWriteToJSON("mayusha");
+// fetchOrdersAndWriteToJSON("delicatus");
+// fetchOrdersAndWriteToJSON("TKS");
+
+// fetchNewPricesAndWriteToJSON("delicatus");
 // updatePlanFact('delicatus')
 // fetchByNowStats()
 // updateAutoAdvertsInCampaign('delicatus')
@@ -185,4 +190,4 @@ const a = async () => {
 // fetchAdverts()
 // getPrices()
 // writeSppToDataSpreadsheet()
-calcAndSendTrendsToTg('11')
+// calcAndSendTrendsToTg('11')

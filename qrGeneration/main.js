@@ -7,6 +7,7 @@ const archiver = require("archiver");
 const { Canvas, loadImage } = require("canvas");
 const fontkit = require("@pdf-lib/fontkit"); // <= here is the Most Important Thing.
 const JsBarcode = require("jsbarcode");
+const { type } = require("os");
 /**
  * @param {String} sourceDir: /some/folder/to/compress
  * @param {String} outPath: /path/to/created.zip
@@ -164,6 +165,156 @@ async function generateNewTags() {
         );
       }
     }
+    resolve();
+  });
+}
+
+async function autoGenerateNewTags(campaign, brand) {
+  return new Promise(async (resolve, reject) => {
+    const generateBarcode = (value, font) => {
+      const canvas = new Canvas(340 * 10, 220 * 10, "image");
+      JsBarcode(canvas, value, {
+        format: "EAN13",
+        marginLeft: 50,
+        marginBottom: 50,
+        height: 50 * 10,
+        width: 22,
+        fontSize: 250,
+        font: font,
+        textMargin: 0,
+      });
+      return canvas.toBuffer();
+    };
+
+    const makePdf = async (
+      campaign,
+      brand_art,
+      color,
+      type,
+      barcode,
+      size,
+      logo,
+      art,
+    ) => {
+      const pdfDoc = await PDFDocument.create();
+      pdfDoc.registerFontkit(fontkit);
+      const page = pdfDoc.addPage([169, 113]);
+      const openSans = await pdfDoc.embedFont(openSansBytes);
+
+      const canvas = new Canvas(logo.width, logo.height);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(logo, 0, 0);
+      const pngDataUrl = canvas.toDataURL("image/png");
+      const pngBytes = Uint8Array.from(atob(pngDataUrl.split(",")[1]), (c) =>
+        c.charCodeAt(0)
+      );
+      const pngImageEmbed = await pdfDoc.embedPng(pngBytes);
+      const scalars = {
+        // mayusha: pngImageEmbed.scale(0.075),
+        // TKS: pngImageEmbed.scale(0.06),
+        // delicatus: pngImageEmbed.scale(0.05),
+        mayusha: { width: 90, height: 37.5 },
+        delicatus: { width: 64, height: 26.65 },
+        TKS: { width: 76.8, height: 31.98 },
+        "Amaze wear": pngImageEmbed.scale(0.05),
+      };
+      const scalar = scalars[campaign];
+      page.drawImage(pngImageEmbed, {
+        x: (169 - scalar.width) / 2,
+        y: 113 - scalar.height + (campaign != "delicatus" && campaign != 'Amaze wear' ? 4 : 0),
+        width: scalar.width,
+        height: scalar.height,
+      });
+
+      const buffer = await generateBarcode(barcode, openSans);
+      const barcodeJpg = await pdfDoc.embedPng(buffer);
+      const barcodeDims = barcodeJpg.scale(0.65 / 10);
+      page.drawImage(barcodeJpg, {
+        x: 0,
+        y: 0,
+        width: 149,
+        height: barcodeDims.height,
+      });
+
+      const fontSizeBig = 14;
+      const type_width = openSans.widthOfTextAtSize(type, fontSizeBig);
+      page.drawText(type, {
+        x: (169 - type_width) / 2,
+        y: 65 + 9,
+        size: fontSizeBig,
+        lineHeight: 9,
+        font: openSans,
+      });
+
+      const fontSizeVeryBig = 42;
+      const size_width = openSans.widthOfTextAtSize(size, fontSizeVeryBig);
+      page.drawText(size, {
+        x: 169 - size_width - 5,
+        y: 78,
+        size: fontSizeVeryBig,
+        lineHeight: 9,
+        font: openSans,
+      });
+
+      const fontSize = 8;
+      const art_text = "АРТИКУЛ: " + brand_art;
+      const art_text_width = openSans.widthOfTextAtSize(art_text, fontSize);
+      page.drawText(art_text, {
+        x: (169 - art_text_width) / 2,
+        y: 65,
+        size: fontSize,
+        lineHeight: 9,
+        font: openSans,
+      });
+
+      const col_text = "ЦВЕТ: " + color + (size != '0' ? `  РАЗМЕР: ${size}` : '');
+      const col_text_width = openSans.widthOfTextAtSize(col_text, fontSize +2 );
+      page.drawText(col_text, {
+        x: (169 - col_text_width) / 2,
+        y: 65 - (fontSize +2),
+        size: fontSize + 2,
+        lineHeight: 9,
+        font: openSans,
+      });
+
+      const filepath = path.join(__dirname, "files", "tags", `${art}.pdf`);
+      const pdfBytes = await pdfDoc.save();
+      console.log(filepath);
+      fs.writeFileSync(filepath, pdfBytes);
+    };
+
+    const openSansBytes = fs.readFileSync(
+      path.join(__dirname, "files", "OpenSans_Condensed-Bold.ttf")
+    );
+    const artsBarcodesFull = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          __dirname,
+          "../prices/files",
+          campaign,
+          "artsBarcodesFull.json"
+        )
+      )
+    );
+
+    const logo = await loadImage(
+      path.join(__dirname, "files", "logos", `${brand}.jpg`)
+    );
+
+    for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+      if (art_data.brand != brand) continue;
+      await makePdf(
+        brand,
+        art_data.brand_art.toUpperCase(),
+        art_data.color.toUpperCase(),
+        art_data.object.toUpperCase(),
+        art_data.barcode,
+        art_data.size,
+        logo,
+        art
+      );
+    }
+
     resolve();
   });
 }
@@ -407,4 +558,5 @@ module.exports = {
   generateTags,
   generateNewTags,
   autofillAndWriteToXlsx,
+  autoGenerateNewTags,
 };
