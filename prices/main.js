@@ -411,14 +411,10 @@ const getSales = (authToken, params) => {
 };
 
 const buildXlsx = (campaign, rewriteProfit = false) => {
-  const vendorCodes = JSON.parse(
+
+  const artsBarcodesFull = JSON.parse(
     afs.readFileSync(
-      path.join(__dirname, "files", campaign, "vendorCodes.json")
-    )
-  );
-  const vendorCodesFull = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "files", campaign, "vendorCodesFull.json")
+      path.join(__dirname, "files", campaign, "artsBarcodesFull.json")
     )
   );
   const prices = JSON.parse(
