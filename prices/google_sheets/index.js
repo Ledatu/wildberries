@@ -104,7 +104,7 @@ async function writePrices(auth, campaign) {
       range: `${brand}!1:1000`,
     });
   
-    await update_data(data[index].data, brand);
+    await update_data(xlsx_data[index].data, brand);
   }
   // console.log(data);
 
