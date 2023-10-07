@@ -103,7 +103,7 @@ async function writePrices(auth, campaign) {
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `${brand}!1:1000`,
     });
-  
+  console.log(index, brand, xlsx_data[index]);
     await update_data(xlsx_data[index].data, brand);
   }
   // console.log(data);
