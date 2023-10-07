@@ -2130,7 +2130,7 @@ const updatePrices = async (campaign) => {
   fs.rm(newPricesPath);
 };
 
-const fetchPricesAndWriteToJSON = (campaign) => {
+const fetchPricesAndWriteToJSON = (campaign) => new Promise(async (resolve, reject) => {
   const authToken = getAuthToken("api-token", campaign);
   return getInfo(authToken)
     .then((data) => {
@@ -2143,11 +2143,11 @@ const fetchPricesAndWriteToJSON = (campaign) => {
           path.join(__dirname, "files", campaign, "prices.json"),
           JSON.stringify(jsonData)
         )
-        .then(() => console.log("prices.json created."))
+        .then(() => { console.log("prices.json created."); resolve() })
         .catch((error) => console.error(error));
     })
     .catch((error) => console.error(error));
-};
+});
 
 const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
   return fetchPricesAndWriteToJSON()

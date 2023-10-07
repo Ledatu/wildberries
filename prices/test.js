@@ -108,9 +108,9 @@ const a = async () => {
 
 // fetchStocksForLowRatingArts()
 
-fetchCardsAndWriteToJSON("mayusha");
-fetchCardsAndWriteToJSON("delicatus");
-fetchCardsAndWriteToJSON("TKS");
+// fetchCardsAndWriteToJSON("mayusha");
+// fetchCardsAndWriteToJSON("delicatus");
+// fetchCardsAndWriteToJSON("TKS");
 
 // updateLowRatingStocksSheet()
 // updateAdvertActivity()
@@ -188,6 +188,6 @@ fetchCardsAndWriteToJSON("TKS");
 // sendTgBotTrendMessage()
 // calcAndSendTrendsToTg('11')
 // fetchAdverts()
-// getPrices()
+getPrices()
 // writeSppToDataSpreadsheet()
 // calcAndSendTrendsToTg('11')
