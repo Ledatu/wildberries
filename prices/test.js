@@ -53,6 +53,7 @@ const {
   fetchAdvertStatsAndWriteToJsonMpManagerLog,
   calcStatsTrendsAndWtriteToJSON,
   sendTgBotTrendMessage,
+  fetchDataAndWriteToXlsx,
 } = require("./main");
 const {
   getPrices,
@@ -188,6 +189,7 @@ const a = async () => {
 // sendTgBotTrendMessage()
 // calcAndSendTrendsToTg('11')
 // fetchAdverts()
-getPrices()
+// getPrices()
+fetchDataAndWriteToXlsx('TKS')
 // writeSppToDataSpreadsheet()
 // calcAndSendTrendsToTg('11')

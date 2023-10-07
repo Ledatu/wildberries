@@ -585,7 +585,7 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
       profit_today,
     ]);
   };
-  // console.log(new_data);
+  console.log(brand_sheets);
 
   const xlsx_data = []
   for (const [brand, brand_sheet] in Object.entries(brand_sheets)) {
