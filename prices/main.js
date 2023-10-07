@@ -486,7 +486,7 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
     .toISOString()
     .slice(0, 10);
   const brand_sheets = {}
-  for (const [art, art_data] of Object.entries(vendorCodesFull)) {
+  for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
     const brand = art_data.brand
     if (!(brand in brand_sheets)) brand_sheets[brand] = [[]]
     let vendorCode = art;
