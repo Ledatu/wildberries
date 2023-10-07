@@ -410,7 +410,7 @@ const getSales = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
-const buildXlsx = (campaign, rewriteProfit = false) => {
+const buildXlsx = (campaign, rewriteProfit = false) => new Promise((resolve, reject) => {
   const artsBarcodesFull = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "files", campaign, "artsBarcodesFull.json")
@@ -649,7 +649,7 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
     )
     .then(() => {console.log("data.xlsx created."); resolve()})
     .catch((error) => console.error(error));
-};
+});
 
 const writeWarehousesToJson = (data, campaign) => {
   return fs
