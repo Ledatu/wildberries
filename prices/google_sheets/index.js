@@ -82,7 +82,7 @@ async function writePrices(auth, campaign) {
   const sheets = google.sheets({ version: "v4", auth });
   const brands = await JSON.parse(
     await fs.readFile(path.join(__dirname, "../files", "campaigns.json"))
-  ).brands;
+  ).brands[campaign];
   const update_data = async (data, brand) => {
     await sheets.spreadsheets.values.update({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",

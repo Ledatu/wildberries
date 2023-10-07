@@ -647,7 +647,7 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
       path.join(__dirname, "files", campaign, "data.xlsx"),
       xlsx.build(xlsx_data)
     )
-    .then(() => console.log("data.xlsx created."))
+    .then(() => {console.log("data.xlsx created."); resolve()})
     .catch((error) => console.error(error));
 };
 
@@ -2159,8 +2159,8 @@ const fetchPricesAndWriteToJSON = (campaign) =>
 
 const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
   return fetchPricesAndWriteToJSON(campaign)
-    .then(() => {
-      buildXlsx(campaign, rewriteProfit);
+    .then(async () => {
+      await buildXlsx(campaign, rewriteProfit);
     })
     .catch((error) => console.error(error));
 };
