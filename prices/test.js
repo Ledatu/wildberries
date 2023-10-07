@@ -18,6 +18,7 @@ const {
   genAllEqualTemplatesSheet,
   writeSppToDataSpreadsheet,
   calcAndWriteMinZakazToDataSpreadsheet,
+  writePrices,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -190,6 +191,8 @@ const a = async () => {
 // calcAndSendTrendsToTg('11')
 // fetchAdverts()
 // getPrices()
-fetchDataAndWriteToXlsx('TKS')
+// fetchDataAndWriteToXlsx('TKS')
+writePrices('TKS')
+// fetchDataAndWriteToXlsx('TKS')
 // writeSppToDataSpreadsheet()
 // calcAndSendTrendsToTg('11')
