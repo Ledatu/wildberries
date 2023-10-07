@@ -96,7 +96,7 @@ async function writePrices(auth, campaign) {
     path.join(__dirname, `../files/${campaign}/data.xlsx`)
   );
   for (const [index, data] of Object.entries(xlsx_data)) {
-    // console.log(data);
+    console.log(data.name);
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `${data.name}!1:1000`,
