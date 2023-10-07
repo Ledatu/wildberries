@@ -411,16 +411,13 @@ const getSales = (authToken, params) => {
 };
 
 const buildXlsx = (campaign, rewriteProfit = false) => {
-
   const artsBarcodesFull = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "files", campaign, "artsBarcodesFull.json")
     )
   );
   const prices = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "files", campaign, "prices.json")
-    )
+    afs.readFileSync(path.join(__dirname, "files", campaign, "prices.json"))
   );
   const fullWeekArtStats = JSON.parse(
     afs.readFileSync(
@@ -485,14 +482,16 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
   )
     .toISOString()
     .slice(0, 10);
-  const brand_sheets = {}
+  const brand_sheets = {};
   for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
-    const brand = art_data.brand
-    if (!(brand in brand_sheets)) brand_sheets[brand] = [[]]
+    const brand = art_data.brand;
+    if (!(brand in brand_sheets)) brand_sheets[brand] = [[]];
+    // console.log(brand_sheets[brand]);
     let vendorCode = art;
-    if (!vendorCode || !arts_data[vendorCode]) return;
-    el = prices[art_data.nmId]
+    if (!vendorCode || !arts_data[vendorCode]) continue;
+    el = prices[art_data.nmId];
 
+    // console.log(vendorCode, el);
     vendorCode = String(vendorCode);
     const per_day = orders[vendorCode];
     const stock = stocks["today"][vendorCode];
@@ -544,8 +543,8 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
         ? zakaz
         : mult * min_zakaz
       : zakaz > 0
-        ? zakaz
-        : 0;
+      ? zakaz
+      : 0;
 
     const profit_today = !stock
       ? 0
@@ -584,11 +583,18 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
       advert_sum_art_today,
       profit_today,
     ]);
-  };
-  console.log(brand_sheets);
+  }
+  // console.log(brand_sheets);
 
-  const xlsx_data = []
-  for (const [brand, brand_sheet] in Object.entries(brand_sheets)) {
+  const xlsx_data = [];
+  const brand_names = {
+    МАЮША: "МАЮША",
+    DELICATUS: "DELICATUS",
+    "Объединённая текстильная компания": "ОТК",
+    "Amaze wear": "Amaze wear",
+  };
+  for (const [brand, brand_sheet] of Object.entries(brand_sheets)) {
+    // console.log(brand, brand_sheet);
     brand_sheets[brand][0] = [
       "Артикул продавца",
       "ЗАКАЗАТЬ",
@@ -624,8 +630,9 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
 
     brand_sheets[brand] = sortData(brand_sheets[brand]); // Sort the data
 
-    xlsx_data.push({ name: brand, data: brand_sheets[brand] })
+    xlsx_data.push({ name: brand_names[brand], data: brand_sheet });
   }
+  console.log(xlsx_data);
   // -------------------------
   const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
   if (
@@ -635,13 +642,11 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
     afs.writeFileSync(path_profit_trend, JSON.stringify(profit_trend));
   // -------------------------
 
-  return xlsx.build(xlsx_data);
-};
-
-const writeDataToXlsx = (campaign, rewriteProfit = false) => {
-  const buffer = buildXlsx(campaign, rewriteProfit);
   return fs
-    .writeFile(path.join(__dirname, "files", campaign, "data.xlsx"), buffer)
+    .writeFile(
+      path.join(__dirname, "files", campaign, "data.xlsx"),
+      xlsx.build(xlsx_data)
+    )
     .then(() => console.log("data.xlsx created."))
     .catch((error) => console.error(error));
 };
@@ -1800,18 +1805,18 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
     // console.log(campaign, jsonData.date)
     return jsonData.date
       ? fs
-        .writeFile(
-          path.join(__dirname, "files", campaign, "detailedByPeriod.json"),
-          JSON.stringify(jsonData ?? {})
-        )
-        .then(() => {
-          console.log("detailedByPeriod.json created.");
-          resolve(jsonData);
-        })
-        .catch((error) => {
-          console.error(error);
-          reject(error);
-        })
+          .writeFile(
+            path.join(__dirname, "files", campaign, "detailedByPeriod.json"),
+            JSON.stringify(jsonData ?? {})
+          )
+          .then(() => {
+            console.log("detailedByPeriod.json created.");
+            resolve(jsonData);
+          })
+          .catch((error) => {
+            console.error(error);
+            reject(error);
+          })
       : resolve(undefined);
   });
 
@@ -1871,28 +1876,31 @@ const sendTgBotTrendMessage = (hour_key) =>
         )
       );
       for (const [metric, trend] of Object.entries(metricTrends.trend)) {
-        jsonData[metric] = `${Math.round(metricTrends.today[metric] * (metric == "drr" ? 100 : 1)) /
+        jsonData[metric] = `${
+          Math.round(metricTrends.today[metric] * (metric == "drr" ? 100 : 1)) /
           (metric == "drr" ? 100 : 1)
-          } * [${trend > 0 ? "+" : ""}${Math.round(trend * 100) / (metric == "drr" ? 100 : 1)
-          }%]`;
+        } * [${trend > 0 ? "+" : ""}${
+          Math.round(trend * 100) / (metric == "drr" ? 100 : 1)
+        }%]`;
       }
-      text += `Бренд: ${campaignNames[campaign]
-        }\nметрики:\n• Сумма заказов: ${jsonData.sum_orders.replace(
-          "*",
-          "р."
-        )}\n• Количество заказов: ${jsonData.orders.replace(
-          "*",
-          "шт."
-        )}\n• Средний чек: ${jsonData.avg_bill.replace(
-          "*",
-          "р."
-        )}\n• Расход на рекламу: ${jsonData.sum_advert.replace(
-          "*",
-          "р."
-        )}\n• ДРР: ${jsonData.drr.replace(
-          " *",
-          "%"
-        )}\n• Профит: ${jsonData.profit.replace("*", "р.")}\n\n`;
+      text += `Бренд: ${
+        campaignNames[campaign]
+      }\nметрики:\n• Сумма заказов: ${jsonData.sum_orders.replace(
+        "*",
+        "р."
+      )}\n• Количество заказов: ${jsonData.orders.replace(
+        "*",
+        "шт."
+      )}\n• Средний чек: ${jsonData.avg_bill.replace(
+        "*",
+        "р."
+      )}\n• Расход на рекламу: ${jsonData.sum_advert.replace(
+        "*",
+        "р."
+      )}\n• ДРР: ${jsonData.drr.replace(
+        " *",
+        "%"
+      )}\n• Профит: ${jsonData.profit.replace("*", "р.")}\n\n`;
     }
     text += `#метрики #в${hour_key} #${new Date().toLocaleDateString("ru-RU", {
       weekday: "short",
@@ -2126,29 +2134,33 @@ const updatePrices = async (campaign) => {
   fs.rm(newPricesPath);
 };
 
-const fetchPricesAndWriteToJSON = (campaign) => new Promise(async (resolve, reject) => {
-  const authToken = getAuthToken("api-token", campaign);
-  return getInfo(authToken)
-    .then((data) => {
-      const jsonData = {}
-      for (const [index, art_data] of Object.entries(data)) {
-        jsonData[art_data.nmId] = art_data;
-      }
-      return fs
-        .writeFile(
-          path.join(__dirname, "files", campaign, "prices.json"),
-          JSON.stringify(jsonData)
-        )
-        .then(() => { console.log("prices.json created."); resolve() })
-        .catch((error) => console.error(error));
-    })
-    .catch((error) => console.error(error));
-});
+const fetchPricesAndWriteToJSON = (campaign) =>
+  new Promise(async (resolve, reject) => {
+    const authToken = getAuthToken("api-token", campaign);
+    return getInfo(authToken)
+      .then((data) => {
+        const jsonData = {};
+        for (const [index, art_data] of Object.entries(data)) {
+          jsonData[art_data.nmId] = art_data;
+        }
+        return fs
+          .writeFile(
+            path.join(__dirname, "files", campaign, "prices.json"),
+            JSON.stringify(jsonData)
+          )
+          .then(() => {
+            console.log("prices.json created.");
+            resolve();
+          })
+          .catch((error) => console.error(error));
+      })
+      .catch((error) => console.error(error));
+  });
 
 const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
   return fetchPricesAndWriteToJSON(campaign)
     .then(() => {
-      return writeDataToXlsx(campaign, rewriteProfit);
+      buildXlsx(campaign, rewriteProfit);
     })
     .catch((error) => console.error(error));
 };
@@ -2645,8 +2657,8 @@ const updateAdvertArtActivitiesAndGenerateNotIncluded = async (campaign) => {
       type == "standard"
         ? data.params[0].nms
         : type == "auto"
-          ? data.autoParams.nms
-          : data.unitedParams[0].nms;
+        ? data.autoParams.nms
+        : data.unitedParams[0].nms;
     // console.log(key, data, nms_temp);
     if (type == "standard") {
       const nms = [];
@@ -2723,8 +2735,8 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
       type == "standard"
         ? data.params[0].nms
         : type == "auto"
-          ? data.autoParams.nms
-          : data.unitedParams[0].nms;
+        ? data.autoParams.nms
+        : data.unitedParams[0].nms;
     if (type == "auto") {
       if (!artsData[key]) continue;
       console.log(key, data, nms_temp);
