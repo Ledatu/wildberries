@@ -2150,7 +2150,7 @@ const fetchPricesAndWriteToJSON = (campaign) => new Promise(async (resolve, reje
 });
 
 const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
-  return fetchPricesAndWriteToJSON()
+  return fetchPricesAndWriteToJSON(campaign)
     .then(() => {
       return buildXlsx(campaign, rewriteProfit);
     })
