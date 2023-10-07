@@ -80,7 +80,9 @@ async function authorize() {
 
 async function writePrices(auth, campaign) {
   const sheets = google.sheets({ version: "v4", auth });
-  
+  const brands = await JSON.parse(
+    await fs.readFile(path.join(__dirname, "../files", "campaigns.json"))
+  ).brands;
   const update_data = async (data, brand) => {
     await sheets.spreadsheets.values.update({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
@@ -95,14 +97,14 @@ async function writePrices(auth, campaign) {
   const xlsx_data = xlsx.parse(
     path.join(__dirname, `../files/${campaign}/data.xlsx`)
   );
-  for (const [index, data] of Object.entries(xlsx_data)) {
-    console.log(data.name);
+  for (const [index, brand] of Object.entries(brands)) {
+    // console.log(data.name);
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `${data.name}!1:1000`,
+      range: `${brand}!1:1000`,
     });
   
-    await update_data(data.data, data.name);
+    await update_data(data[index].data, brand);
   }
   // console.log(data);
 
