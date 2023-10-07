@@ -98,10 +98,10 @@ async function writePrices(auth, campaign) {
   for (const [index, data] of Object.entries(xlsx_data)) {
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `${data.brand}!1:1000`,
+      range: `${data.name}!1:1000`,
     });
   
-    await update_data(data.data, data.brand);
+    await update_data(data.data, data.name);
   }
   // console.log(data);
 
