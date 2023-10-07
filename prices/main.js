@@ -410,10 +410,20 @@ const getSales = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
-const buildXlsx = (data, campaign, rewriteProfit = false) => {
+const buildXlsx = (campaign, rewriteProfit = false) => {
   const vendorCodes = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "files", campaign, "vendorCodes.json")
+    )
+  );
+  const vendorCodesFull = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "vendorCodesFull.json")
+    )
+  );
+  const prices = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "prices.json")
     )
   );
   const fullWeekArtStats = JSON.parse(
@@ -472,9 +482,6 @@ const buildXlsx = (data, campaign, rewriteProfit = false) => {
   const arts_data = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files/data.json"))
   );
-  const ads = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", campaign, "ads.json"))
-  );
   const today_date_str = new Date(
     new Date()
       .toLocaleDateString("ru-RU")
@@ -482,10 +489,14 @@ const buildXlsx = (data, campaign, rewriteProfit = false) => {
   )
     .toISOString()
     .slice(0, 10);
-  let new_data = [[]];
-  data.forEach((el) => {
-    let vendorCode = vendorCodes[el.nmId];
+  const brand_sheets = {}
+  for (const [art, art_data] of Object.entries(vendorCodesFull)) {
+    const brand = art_data.brand
+    if (!(brand in brand_sheets)) brand_sheets[brand] = [[]]
+    let vendorCode = art;
     if (!vendorCode || !arts_data[vendorCode]) return;
+    el = prices[art_data.nmId]
+
     vendorCode = String(vendorCode);
     const per_day = orders[vendorCode];
     const stock = stocks["today"][vendorCode];
@@ -506,16 +517,6 @@ const buildXlsx = (data, campaign, rewriteProfit = false) => {
     const expences =
       campaign == "TKS" ? spp_price * 0.07 : arts_data[vendorCode].expences;
     const prime_cost = arts_data[vendorCode].prime_cost;
-
-    // ads
-    const find_ad = () => {
-      for (const code in ads) {
-        if (vendorCode.match(code.replace("+", "\\+"))) return ads[code].ads;
-      }
-      return 0;
-    };
-    // const ad = find_ad(); //analytics ad
-    // const drr = ad / spp_price;
 
     const ad = spp_price * (arts_data[vendorCode].ad / 100);
     const drr = ad / spp_price;
@@ -547,15 +548,15 @@ const buildXlsx = (data, campaign, rewriteProfit = false) => {
         ? zakaz
         : mult * min_zakaz
       : zakaz > 0
-      ? zakaz
-      : 0;
+        ? zakaz
+        : 0;
 
     const profit_today = !stock
       ? 0
       : (campaign == "TKS" ? expences : profit) * per_day;
     profit_trend.current += isNaN(profit_today) ? 0 : profit_today;
 
-    new_data.push([
+    brand_sheets[brand].push([
       vendorCode,
       realZakaz,
       el.price,
@@ -587,42 +588,48 @@ const buildXlsx = (data, campaign, rewriteProfit = false) => {
       advert_sum_art_today,
       profit_today,
     ]);
-  });
+  };
   // console.log(new_data);
 
-  new_data[0] = [
-    "Артикул продавца",
-    "ЗАКАЗАТЬ",
-    "Текущая розн. цена (до скидки)",
-    "Текущая скидка на сайте, %",
-    "Цена со скидкой",
-    "%CПП",
-    "Цена СПП",
-    "Профит",
-    "Остаток",
-    "Заказов/7",
-    "Заказов/1",
-    "Оборачиваемость",
-    "Рентабельность",
-    "ROI",
-    "Новый ROI",
-    "Новая РЦ",
-    "Новая РЦ с СПП",
-    "Новая WB цена",
-    "",
-    "Себестоимость",
-    "Коммисия",
-    "Логистика",
-    "Хранение",
-    "Налоги",
-    "Расходы",
-    "Реклама",
-    "%ДРР",
-    "%ДРР/АРТ неделя",
-    "Рек. сегодня",
-    `${Math.round(profit_trend.current)} Профит сегодня`,
-  ];
+  const xlsx_data = []
+  for (const [brand, brand_sheet] in Object.entries(brand_sheets)) {
+    brand_sheets[brand][0] = [
+      "Артикул продавца",
+      "ЗАКАЗАТЬ",
+      "Текущая розн. цена (до скидки)",
+      "Текущая скидка на сайте, %",
+      "Цена со скидкой",
+      "%CПП",
+      "Цена СПП",
+      "Профит",
+      "Остаток",
+      "Заказов/7",
+      "Заказов/1",
+      "Оборачиваемость",
+      "Рентабельность",
+      "ROI",
+      "Новый ROI",
+      "Новая РЦ",
+      "Новая РЦ с СПП",
+      "Новая WB цена",
+      "",
+      "Себестоимость",
+      "Коммисия",
+      "Логистика",
+      "Хранение",
+      "Налоги",
+      "Расходы",
+      "Реклама",
+      "%ДРР",
+      "%ДРР/АРТ неделя",
+      "Рек. сегодня",
+      `${Math.round(profit_trend.current)} Профит сегодня`,
+    ];
 
+    brand_sheets[brand] = sortData(brand_sheets[brand]); // Sort the data
+
+    xlsx_data.push({ name: brand, data: brand_sheets[brand] })
+  }
   // -------------------------
   const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
   if (
@@ -632,8 +639,7 @@ const buildXlsx = (data, campaign, rewriteProfit = false) => {
     afs.writeFileSync(path_profit_trend, JSON.stringify(profit_trend));
   // -------------------------
 
-  new_data = sortData(new_data); // Sort the data
-  return xlsx.build([{ name: "Общий отчёт", data: new_data }]);
+  return xlsx.build(xlsx_data);
 };
 
 const writeDataToXlsx = (data, campaign, rewriteProfit = false) => {
@@ -658,7 +664,7 @@ const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
   const jsonDataFull = {};
   const jsonDataBarcodes = { direct: {}, reverse: {} };
-  const jsonDataBarcodesFull = { };
+  const jsonDataBarcodesFull = {};
   data.forEach((item) => {
     for (const [index, size_data] of Object.entries(item.sizes)) {
       const size = size_data.techSize;
@@ -1798,18 +1804,18 @@ const writeDetailedByPeriodToJson = (data, campaign) =>
     // console.log(campaign, jsonData.date)
     return jsonData.date
       ? fs
-          .writeFile(
-            path.join(__dirname, "files", campaign, "detailedByPeriod.json"),
-            JSON.stringify(jsonData ?? {})
-          )
-          .then(() => {
-            console.log("detailedByPeriod.json created.");
-            resolve(jsonData);
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(error);
-          })
+        .writeFile(
+          path.join(__dirname, "files", campaign, "detailedByPeriod.json"),
+          JSON.stringify(jsonData ?? {})
+        )
+        .then(() => {
+          console.log("detailedByPeriod.json created.");
+          resolve(jsonData);
+        })
+        .catch((error) => {
+          console.error(error);
+          reject(error);
+        })
       : resolve(undefined);
   });
 
@@ -1869,31 +1875,28 @@ const sendTgBotTrendMessage = (hour_key) =>
         )
       );
       for (const [metric, trend] of Object.entries(metricTrends.trend)) {
-        jsonData[metric] = `${
-          Math.round(metricTrends.today[metric] * (metric == "drr" ? 100 : 1)) /
+        jsonData[metric] = `${Math.round(metricTrends.today[metric] * (metric == "drr" ? 100 : 1)) /
           (metric == "drr" ? 100 : 1)
-        } * [${trend > 0 ? "+" : ""}${
-          Math.round(trend * 100) / (metric == "drr" ? 100 : 1)
-        }%]`;
+          } * [${trend > 0 ? "+" : ""}${Math.round(trend * 100) / (metric == "drr" ? 100 : 1)
+          }%]`;
       }
-      text += `Бренд: ${
-        campaignNames[campaign]
-      }\nметрики:\n• Сумма заказов: ${jsonData.sum_orders.replace(
-        "*",
-        "р."
-      )}\n• Количество заказов: ${jsonData.orders.replace(
-        "*",
-        "шт."
-      )}\n• Средний чек: ${jsonData.avg_bill.replace(
-        "*",
-        "р."
-      )}\n• Расход на рекламу: ${jsonData.sum_advert.replace(
-        "*",
-        "р."
-      )}\n• ДРР: ${jsonData.drr.replace(
-        " *",
-        "%"
-      )}\n• Профит: ${jsonData.profit.replace("*", "р.")}\n\n`;
+      text += `Бренд: ${campaignNames[campaign]
+        }\nметрики:\n• Сумма заказов: ${jsonData.sum_orders.replace(
+          "*",
+          "р."
+        )}\n• Количество заказов: ${jsonData.orders.replace(
+          "*",
+          "шт."
+        )}\n• Средний чек: ${jsonData.avg_bill.replace(
+          "*",
+          "р."
+        )}\n• Расход на рекламу: ${jsonData.sum_advert.replace(
+          "*",
+          "р."
+        )}\n• ДРР: ${jsonData.drr.replace(
+          " *",
+          "%"
+        )}\n• Профит: ${jsonData.profit.replace("*", "р.")}\n\n`;
     }
     text += `#метрики #в${hour_key} #${new Date().toLocaleDateString("ru-RU", {
       weekday: "short",
@@ -2127,11 +2130,29 @@ const updatePrices = async (campaign) => {
   fs.rm(newPricesPath);
 };
 
-const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
+const fetchPricesAndWriteToJSON = (campaign) => {
   const authToken = getAuthToken("api-token", campaign);
   return getInfo(authToken)
     .then((data) => {
-      return writeDataToXlsx(data, campaign, rewriteProfit);
+      const jsonData = {}
+      for (const [index, art_data] of Object.entries(data)) {
+        jsonData[art_data.nmId] = art_data;
+      }
+      return fs
+        .writeFile(
+          path.join(__dirname, "files", campaign, "prices.json"),
+          JSON.stringify(jsonData)
+        )
+        .then(() => console.log("prices.json created."))
+        .catch((error) => console.error(error));
+    })
+    .catch((error) => console.error(error));
+};
+
+const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
+  return fetchPricesAndWriteToJSON()
+    .then(() => {
+      return buildXlsx(campaign, rewriteProfit);
     })
     .catch((error) => console.error(error));
 };
@@ -2319,7 +2340,7 @@ const createNewRKs = async () => {
       seller_ids[seller_id] = campaign;
 
     const RKsToCreate = JSON.parse(
-      afs.readFileSync(path.join(__dirname, "files/RKsToCreate.json"))
+      afs.readFileSync(path.join(__dirname, "files/RKаsToCreate.json"))
     );
 
     const rk_types = { Авто: 8 };
@@ -2628,8 +2649,8 @@ const updateAdvertArtActivitiesAndGenerateNotIncluded = async (campaign) => {
       type == "standard"
         ? data.params[0].nms
         : type == "auto"
-        ? data.autoParams.nms
-        : data.unitedParams[0].nms;
+          ? data.autoParams.nms
+          : data.unitedParams[0].nms;
     // console.log(key, data, nms_temp);
     if (type == "standard") {
       const nms = [];
@@ -2706,8 +2727,8 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
       type == "standard"
         ? data.params[0].nms
         : type == "auto"
-        ? data.autoParams.nms
-        : data.unitedParams[0].nms;
+          ? data.autoParams.nms
+          : data.unitedParams[0].nms;
     if (type == "auto") {
       if (!artsData[key]) continue;
       console.log(key, data, nms_temp);

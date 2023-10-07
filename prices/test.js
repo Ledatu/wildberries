@@ -108,8 +108,8 @@ const a = async () => {
 
 // fetchStocksForLowRatingArts()
 
-// fetchCardsAndWriteToJSON("mayusha");
-// fetchCardsAndWriteToJSON("delicatus");
+fetchCardsAndWriteToJSON("mayusha");
+fetchCardsAndWriteToJSON("delicatus");
 fetchCardsAndWriteToJSON("TKS");
 
 // updateLowRatingStocksSheet()

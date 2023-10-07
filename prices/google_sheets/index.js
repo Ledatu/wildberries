@@ -79,10 +79,12 @@ async function authorize() {
 }
 
 async function writePrices(auth, campaign) {
-  const update_data = async (data) => {
+  const sheets = google.sheets({ version: "v4", auth });
+  
+  const update_data = async (data, brand) => {
     await sheets.spreadsheets.values.update({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `${campaign}!1:1000`,
+      range: `${brand}!1:1000`,
       valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
       resource: {
         values: data,
@@ -90,18 +92,20 @@ async function writePrices(auth, campaign) {
     });
   };
 
-  const data = xlsx.parse(
+  const xlsx_data = xlsx.parse(
     path.join(__dirname, `../files/${campaign}/data.xlsx`)
-  )[0]["data"];
+  );
+  for (const [index, data] of Object.entries(xlsx_data)) {
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
+      range: `${data.brand}!1:1000`,
+    });
+  
+    await update_data(data.data, data.brand);
+  }
   // console.log(data);
-  const sheets = google.sheets({ version: "v4", auth });
 
-  await sheets.spreadsheets.values.clear({
-    spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-    range: `${campaign}!1:1000`,
-  });
-
-  await update_data(data);
+  
   console.log(`Prices data written to the google sheets.`);
 }
 
