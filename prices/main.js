@@ -642,8 +642,8 @@ const buildXlsx = (campaign, rewriteProfit = false) => {
   return xlsx.build(xlsx_data);
 };
 
-const writeDataToXlsx = (data, campaign, rewriteProfit = false) => {
-  const buffer = buildXlsx(data, campaign, rewriteProfit);
+const writeDataToXlsx = (campaign, rewriteProfit = false) => {
+  const buffer = buildXlsx(campaign, rewriteProfit);
   return fs
     .writeFile(path.join(__dirname, "files", campaign, "data.xlsx"), buffer)
     .then(() => console.log("data.xlsx created."))
@@ -2152,7 +2152,7 @@ const fetchPricesAndWriteToJSON = (campaign) => new Promise(async (resolve, reje
 const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
   return fetchPricesAndWriteToJSON(campaign)
     .then(() => {
-      return buildXlsx(campaign, rewriteProfit);
+      return writeDataToXlsx(campaign, rewriteProfit);
     })
     .catch((error) => console.error(error));
 };
