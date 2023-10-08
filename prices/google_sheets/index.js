@@ -97,14 +97,18 @@ async function writePrices(auth, campaign) {
   const xlsx_data = xlsx.parse(
     path.join(__dirname, `../files/${campaign}/data.xlsx`)
   );
-  for (const [index, brand] of Object.entries(brands)) {
+  const json_data = {}
+  for (let i = 0; i < xlsx_data.length; i++) {
+    json_data[xlsx_data[i].name] = xlsx_data[i].data;
+  }
+  for (const [brand, sheet_data] of Object.entries(json_data)) {
     // console.log(data.name);
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `${brand}!1:1000`,
     });
-  console.log(index, brand, xlsx_data[index]);
-    await update_data(xlsx_data[index].data, brand);
+  // console.log(brand, sheet_data);
+    await update_data(sheet_data, brand);
   }
   // console.log(data);
 
