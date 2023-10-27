@@ -97,7 +97,7 @@ async function writePrices(auth, campaign) {
   const xlsx_data = xlsx.parse(
     path.join(__dirname, `../files/${campaign}/data.xlsx`)
   );
-  const json_data = {}
+  const json_data = {};
   for (let i = 0; i < xlsx_data.length; i++) {
     json_data[xlsx_data[i].name] = xlsx_data[i].data;
   }
@@ -107,12 +107,11 @@ async function writePrices(auth, campaign) {
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `${brand}!1:1000`,
     });
-  // console.log(brand, sheet_data);
+    // console.log(brand, sheet_data);
     await update_data(sheet_data, brand);
   }
   // console.log(data);
 
-  
   console.log(`Prices data written to the google sheets.`);
 }
 
@@ -227,9 +226,9 @@ async function writeDrrToDataSpreadsheet(auth) {
 
         if (row[4] != seller_ids[campaign]) continue;
 
-        const type = getMaskFromVendorCode(row[0]);
+        const type = getMaskFromVendorCode(row[0]).slice(0, 2);
         // console.log(type);
-        data[i][0] = drr[type] ?? 0;
+        data[i][0] = drr[type].drr ?? 0;
         // console.log(campaign, type, data[i]);
       }
     }
@@ -430,51 +429,106 @@ async function pivotOrders(auth, campaign) {
   });
 }
 
-async function fetchNewPricesAndWriteToJSON(auth, campaign) {
+async function fetchNewPricesAndWriteToJSON(auth, brand) {
   return new Promise(async (resolve, reject) => {
-    const objectFlip = (obj) => {
-      const ret = {};
-      Object.keys(obj).forEach((key) => {
-        ret[obj[key]] = Number(key);
-      });
-      return ret;
-    };
-
     const sheets = google.sheets({ version: "v4", auth });
-    const nmIds = objectFlip(
-      JSON.parse(
-        await fs.readFile(
-          path.join(__dirname, `../files/${campaign}/vendorCodes.json`)
-        )
+    const brands = JSON.parse(
+      await fs.readFile(path.join(__dirname, `../files/campaigns.json`))
+    ).brands;
+    let campaign = undefined;
+    for (const [camp, brands_array] of Object.entries(brands)) {
+      if (brands_array.includes(brand)) {
+        campaign = camp;
+        break;
+      }
+    }
+    if (!campaign) {
+      return 0;
+      resolve();
+    }
+    const artsBarcodesFull = JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, `../files/${campaign}/artsBarcodesFull.json`)
       )
     );
 
-    // console.log(data);
+    const jsonData = {};
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `${campaign}!A2:R`,
+      range: `${brand}!A2:R`,
       // valueRenderOption: "UNFORMATTED_VALUE",
     });
 
     const rows = res.data.values;
-    const data = [];
     rows.forEach((row) => {
       if (row[17] == "" || !row[17]) return;
       const new_price = Number(
         row[17].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
-      if (!new_price || new_price > 20000 || new_price < 4500) return;
+      if (!new_price || new_price > 200000 || new_price < 4500) return;
       const roi = Number(
         row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
       if (roi < -30) return;
-      data.push({ nmId: nmIds[row[0]], price: new_price });
+      // console.log(row[0], artsBarcodesFull[row[0]]);
+      jsonData[artsBarcodesFull[row[0]].nmId] = new_price;
     });
+    const data = [];
+    for (const [nmId, new_price] of Object.entries(jsonData)) {
+      data.push({ nmId: parseInt(nmId), price: new_price });
+    }
+    console.log(data);
 
     writeDataToFile(
       data,
       path.join(__dirname, `../files/${campaign}/newPrices.json`)
     ).then((pr) => resolve());
+  });
+}
+
+async function fetchAutoPriceRulesAndWriteToJSON(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const jsonData = {};
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
+      range: `РОБОТ ЦЕН!1:1000`,
+      // valueRenderOption: "UNFORMATTED_VALUE",
+    });
+    const rows = res.data.values;
+
+    const label_row = rows[0];
+    const turn_row = rows[1];
+
+    const brand_index = label_row.indexOf("БРЕНД");
+    const generalMask_index = label_row.indexOf("АРТИКУЛЫ");
+    const schedule_index = label_row.indexOf(
+      "Расписание проверки и корректировки цен"
+    );
+
+    jsonData.turn = turn_row.slice(generalMask_index + 1, schedule_index - 1);
+    for (let i = 2; i < rows.length; i++) {
+      const row = rows[i];
+      const brand = row[brand_index];
+      if (!(brand in jsonData)) jsonData[brand] = {};
+
+      const generalMask = row[generalMask_index];
+      if (!(generalMask in jsonData[brand])) jsonData[brand][generalMask] = {};
+
+      for (let j = generalMask_index + 1; j < schedule_index - 1; j++) {
+        jsonData[brand][generalMask][turn_row[j]] = parseFloat(
+          row[j].replace("%", "").replace(",", ".").replace(/\s/g, "")
+        );
+      }
+    }
+
+    // console.log(jsonData);
+
+    writeDataToFile(
+      jsonData,
+      path.join(__dirname, `../files/autoPriceRules.json`)
+    ).then(() => resolve());
   });
 }
 
@@ -652,48 +706,50 @@ async function fetchHandStocks(auth, campaign) {
 }
 
 function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
+    const brands = JSON.parse(
+      await fs.readFile(path.join(__dirname, `../files/campaigns.json`))
+    ).brands[campaign];
 
-    sheets.spreadsheets.values
-      .get({
+    // console.log(data);
+    const data = {};
+    for (const [index, brand] of Object.entries(brands)) {
+      const res = await sheets.spreadsheets.values.get({
         spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-        range: `${campaign}!A2:Q`,
-      })
-      .then((res) => {
-        const rows = res.data.values;
-        // console.log(rows);
-        const data = {};
-        rows.forEach((row) => {
-          if (!row.slice(14).length) return;
-          data[row[0]] = {
-            roi: Number(
-              row[14]
-                ? row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
-                : 0
-            ),
-            roz_price: Number(
-              row[15]
-                ? row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
-                : 0
-            ),
-            spp_price: Number(
-              row[16]
-                ? row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
-                : 0
-            ),
-          };
-        });
-
-        writeDataToFile(
-          data,
-          path.join(__dirname, `../files/${campaign}/enteredValues.json`)
-        ).then((pr) => resolve());
-      })
-      .catch((err) => {
-        console.log(`The API returned an error: ${err}`);
-        reject(err);
+        range: `${brand}!A2:Q`,
       });
+
+      const rows = res.data.values;
+
+      if (!(brand in data)) data[brand] = {};
+
+      rows.forEach((row) => {
+        // console.log(row);
+        if (!row.slice(14).length) return;
+        data[brand][row[0]] = {
+          roi: Number(
+            row[14]
+              ? row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
+              : 0
+          ),
+          roz_price: Number(
+            row[15]
+              ? row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
+              : 0
+          ),
+          spp_price: Number(
+            row[16]
+              ? row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
+              : 0
+          ),
+        };
+      });
+    }
+    writeDataToFile(
+      data,
+      path.join(__dirname, `../files/${campaign}/enteredValues.json`)
+    ).then(() => resolve());
   });
 }
 
@@ -807,10 +863,12 @@ function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
 function updatePlanFact(auth, campaign) {
   return new Promise(async (resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
-
-    const vendorCodes = await JSON.parse(
+    const brands = JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files", "campaigns.json"))
+    ).brands[campaign];
+    const artsBarcodesFull = await JSON.parse(
       await fs.readFile(
-        path.join(__dirname, "../files", campaign, "vendorCodes.json")
+        path.join(__dirname, "../files", campaign, "artsBarcodesFull.json")
       )
     );
     const sum_orders = await JSON.parse(
@@ -818,9 +876,20 @@ function updatePlanFact(auth, campaign) {
         path.join(__dirname, "../files", campaign, "sum of orders by day.json")
       )
     );
+
     const orders = await JSON.parse(
       await fs.readFile(
         path.join(__dirname, "../files", campaign, "orders by day.json")
+      )
+    );
+    const stocks = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "stocks.json")
+      )
+    );
+    const avg_orders = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "orders.json")
       )
     );
     const byDayCampaignSum = await JSON.parse(
@@ -843,23 +912,14 @@ function updatePlanFact(auth, campaign) {
     const spIds = {
       mayusha: "Факт Маюша",
       delicatus: "Факт Delicatus",
-      TKS: "Факт TKS",
+      TKS: "Факт ОТК",
+      TKS: "Факт Amaze Wear",
     };
     if (!(campaign in spIds)) {
       resolve();
       return;
     }
 
-    const orders_by_now = await JSON.parse(
-      await fs.readFile(
-        path.join(__dirname, "../files", campaign, "orders by now.json")
-      )
-    );
-    const sum_orders_by_now = await JSON.parse(
-      await fs.readFile(
-        path.join(__dirname, "../files", campaign, "sum of orders by now.json")
-      )
-    );
     const get_proper_mask = (temp_mask) => {
       const mask_splitted = temp_mask.split("_");
       if (campaign != "delicatus" || !temp_mask.includes("КПБ"))
@@ -870,31 +930,7 @@ function updatePlanFact(auth, campaign) {
       return mask_splitted.join("_");
     };
 
-    const byNow = {};
-    for (const [id, art] of Object.entries(vendorCodes)) {
-      const mask = get_proper_mask(getMaskFromVendorCode(art));
-      // console.log(mask, art);
-      if (!(mask in byNow))
-        byNow[mask] = {
-          orders_today: 0,
-          orders_yesterday: 0,
-          sum_orders_today: 0,
-          sum_orders_yesterday: 0,
-        };
-
-      // console.log(
-      //   art,
-      //   orders_by_now.today[art],
-      //   orders_by_now.yesterday[art],
-      //   sum_orders_by_now.today[art],
-      //   sum_orders_by_now.yesterday[art]
-      // );
-      byNow[mask].orders_today += orders_by_now.today[art] ?? 0;
-      byNow[mask].orders_yesterday += orders_by_now.yesterday[art] ?? 0;
-      byNow[mask].sum_orders_today += sum_orders_by_now.today[art] ?? 0;
-      byNow[mask].sum_orders_yesterday += sum_orders_by_now.yesterday[art] ?? 0;
-    }
-    console.log(byNow);
+    // console.log(byNow);
     // const fact_res = await sheets.spreadsheets.values.get({
     // spreadsheetId: spIds[campaign],
     // range: "Факт!A3:A",
@@ -902,7 +938,7 @@ function updatePlanFact(auth, campaign) {
     // const fact = fact_res.data.values;
     const unique_params_res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      range: `${spIds[campaign]}!2:2`,
+      range: "Факт Маюша!2:2",
     });
     const unique_params_temp = unique_params_res.data.values[0];
     const unique_params = [];
@@ -919,268 +955,370 @@ function updatePlanFact(auth, campaign) {
       СРС: { name: "cpc", formula: "СРЗНАЧ" },
       СРМ: { name: "cpm", formula: "СРЗНАЧ" },
       Расход: { name: "sum", formula: "СУММ" },
+      "Остаток/шт": { name: "stocks", formula: "СЧЁТ" },
       "Заказы/шт": { name: "orders", formula: "СУММ" },
       "Ср. чек": { name: "avg_bill", formula: "СРЗНАЧ" },
       "Заказы/Р": { name: "sum_orders", formula: "СУММ" },
       "ДРР%": { name: "drr", formula: "СРЗНАЧ" },
     };
+    const brand_names = {
+      МАЮША: "МАЮША",
+      DELICATUS: "DELICATUS",
+      "Объединённая текстильная компания": "ОТК",
+      "Amaze wear": "Amaze wear",
+    };
 
-    const sheet_data = [
-      ["ДАТА"].concat(Array(unique_params.length)),
-      [""],
-      ["саммари"],
-    ];
-    const dates_datas = {};
-    const all_masks = [campaign];
-    for (const [id, art] of Object.entries(vendorCodes)) {
-      // const mask = get_proper_mask(getMaskFromVendorCode(art));
+    const stocksRatio = { all: { byBrand: {} }, byDate: { byBrand: {} } };
+    for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
       const mask = getMaskFromVendorCode(art);
-      if (all_masks.includes(mask)) continue;
-      all_masks.push(mask);
+      if (!(mask in stocksRatio.all)) stocksRatio.all[mask] = 0;
+      stocksRatio.all[mask] += 1;
+
+      const brand = brand_names[art_data.brand];
+      if (!(brand in stocksRatio.all.byBrand))
+        stocksRatio.all.byBrand[brand] = 0;
+      stocksRatio.all.byBrand[brand] += 1;
     }
-    all_masks.sort();
-    // if (all_masks[0] == "НАМАТРАСНИК") all_masks.push(all_masks.shift());
-    console.log(all_masks);
-    for (let i = 0; i < all_masks.length; i++) {
-      sheet_data[1] = sheet_data[1].concat(unique_params);
-      //// formulas
-      const formulas_to_concat = [];
-      for (let j = 0; j < unique_params.length; j++) {
-        const index_of_column = i * unique_params.length + j + 2;
-        const column_name = indexToColumn(index_of_column);
-        formulas_to_concat.push(
-          `=${
-            param_map[unique_params[j]].formula
-          }(${column_name}4:${column_name})`
-        );
+
+    const avg_drr_by_mask = {};
+    const jsonDataDrr = {};
+    const json_sheet_data = {};
+    const promises = [];
+    for (const [index, brand] of Object.entries(brands)) {
+      const sheet_data = [
+        ["ДАТА"].concat(Array(unique_params.length)),
+        [""],
+        ["саммари"],
+      ];
+      const dates_datas = {};
+      const all_masks = [];
+      for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+        // const mask = get_proper_mask(getMaskFromVendorCode(art));
+        if (brand_names[art_data.brand] != brand) continue;
+        const mask = getMaskFromVendorCode(art);
+        if (all_masks.includes(mask)) continue;
+        all_masks.push(mask);
       }
-      sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
-      if (all_masks[i] == campaign) continue;
-
-      const mask = all_masks[i];
-      const dates = advertStatsByMaskByDay[mask];
-      if (mask != all_masks[i]) continue;
-      sheet_data[0] = sheet_data[0].concat(
-        [mask].concat(Array(unique_params.length - 1))
-      );
-      // sheet_data[0].concat(new Array(8));
-      // continue;
-
-      if (!dates) {
-        const cur_date = new Date();
-        cur_date.setDate(cur_date.getDate() + 1);
-        for (let i = 0; i < 31; i++) {
-          cur_date.setDate(cur_date.getDate() - 1);
-          const str_date = cur_date
-            .toLocaleDateString("ru-RU")
-            .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-            .slice(0, 10);
-          // console.log(str_date);
-          if (!(str_date in dates_datas)) dates_datas[str_date] = {};
-          dates_datas[str_date][mask] = Array(unique_params.length);
+      all_masks.sort();
+      all_masks.unshift(brand);
+      // if (all_masks[0] == "НАМАТРАСНИК") all_masks.push(all_masks.shift());
+      console.log(all_masks);
+      for (let i = 0; i < all_masks.length; i++) {
+        sheet_data[1] = sheet_data[1].concat(unique_params);
+        //// formulas
+        const formulas_to_concat = [];
+        for (let j = 0; j < unique_params.length; j++) {
+          const index_of_column = i * unique_params.length + j + 2;
+          const column_name = indexToColumn(index_of_column);
+          formulas_to_concat.push(
+            `=${
+              param_map[unique_params[j]].formula
+            }(${column_name}4:${column_name})`
+          );
         }
-        continue;
-      }
+        sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
+        if (all_masks[i] == brand) continue;
 
-      for (const [date, dateData] of Object.entries(dates)) {
-        if (new Date().getDate() - 31 > new Date(date).getDate()) continue;
-        dateData.sum_orders = 0;
-        dateData.orders = 0;
-        // console.log(date, mask, dateData);
-        if (!sum_orders[date]) {
-          // dates_datas[date] = {};
+        const mask = all_masks[i];
+        const dates = advertStatsByMaskByDay[mask];
+        if (mask != all_masks[i]) continue;
+        sheet_data[0] = sheet_data[0].concat(
+          [mask].concat(Array(unique_params.length - 1))
+        );
+        // sheet_data[0].concat(new Array(8));
+        // continue;
+
+        if (!dates) {
+          const cur_date = new Date();
+          cur_date.setDate(cur_date.getDate() + 1);
+          for (let i = 0; i < 31; i++) {
+            cur_date.setDate(cur_date.getDate() - 1);
+            const str_date = cur_date
+              .toLocaleDateString("ru-RU")
+              .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+              .slice(0, 10);
+            // console.log(str_date);
+            if (!(str_date in dates_datas)) dates_datas[str_date] = {};
+            dates_datas[str_date][mask] = Array(unique_params.length);
+          }
           continue;
         }
 
-        if (!(date in dates_datas)) dates_datas[date] = {};
-
-        for (const [art, sum] of Object.entries(sum_orders[date])) {
-          if (!art.includes(get_proper_mask(mask))) continue;
-          // console.log(art, mask, sum);
-          dateData.sum_orders += sum;
-        }
-        for (const [art, count] of Object.entries(orders[date])) {
-          if (!art.includes(get_proper_mask(mask))) continue;
-          // console.log(art, mask, sum);
-          dateData.orders += count;
-        }
-        dateData.drr = dateData.sum / dateData.sum_orders;
-        dateData.avg_bill = dateData.sum_orders / dateData.orders;
-
-        const to_push = Array(unique_params.length);
-        for (let j = 0; j < unique_params.length; j++) {
-          to_push[j] = dateData[param_map[unique_params[j]].name];
-        }
-        // if (mask == "КПБ_2_СТРАЙП") console.log(mask, to_push);
-        dates_datas[date][mask] = to_push;
-        // console.log(mask, fact[i], to_push);
-      }
-    }
-    console.log(dates_datas);
-
-    const avg_drr_by_mask = {};
-
-    const cur_date = new Date();
-    cur_date.setDate(cur_date.getDate() + 1);
-    for (let i = 0; i < 31; i++) {
-      cur_date.setDate(cur_date.getDate() - 1);
-      const str_date = cur_date
-        .toLocaleDateString("ru-RU")
-        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-        .slice(0, 10);
-      // console.log(str_date);
-
-      sheet_data.push([str_date]);
-      for (let j = 0; j < all_masks.length; j++) {
-        if (!dates_datas[str_date]) continue;
-        // save avg_drr
-        if (!(all_masks[j] in avg_drr_by_mask))
-          avg_drr_by_mask[all_masks[j]] = 0;
-        if (1 <= i && i < 8) {
-          // if (all_masks[j] == "ПРПЭ_120_DELICATUS")
-          //   console.log(str_date, dates_datas[str_date][all_masks[j]]);
-          if (dates_datas[str_date][all_masks[j]]) {
-            const date_drr =
-              dates_datas[str_date][all_masks[j]][
-                unique_params.indexOf("ДРР%")
-              ];
-            avg_drr_by_mask[all_masks[j]] += isFinite(date_drr) ? date_drr : 0;
+        for (const [date, dateData] of Object.entries(dates)) {
+          if (new Date().getDate() - 31 > new Date(date).getDate()) continue;
+          dateData.sum_orders = 0;
+          dateData.orders = 0;
+          dateData.stocks = 0;
+          // console.log(date, mask, dateData);
+          if (!sum_orders[date]) {
+            // dates_datas[date] = {};
+            continue;
           }
+
+          if (!(date in dates_datas)) dates_datas[date] = {};
+
+          for (const [art, sum] of Object.entries(sum_orders[date])) {
+            if (!art.includes(get_proper_mask(mask))) continue;
+            // console.log(art, mask, sum);
+            dateData.sum_orders += sum;
+          }
+          for (const [art, count] of Object.entries(orders[date])) {
+            if (!art.includes(get_proper_mask(mask))) continue;
+            // console.log(art, mask, sum);
+            dateData.orders += count;
+          }
+
+          for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+            if (!art.includes(get_proper_mask(mask))) continue;
+
+            const was_present = Number(
+              stocks[date] ? avg_orders[art] <= (stocks[date][art] ?? 0) : 0
+            );
+            const _mask = getMaskFromVendorCode(art);
+            if (!(date in stocksRatio.byDate)) stocksRatio.byDate[date] = {};
+            if (!(_mask in stocksRatio.byDate[date]))
+              stocksRatio.byDate[date][_mask] = 0;
+            stocksRatio.byDate[date][_mask] += was_present;
+          }
+
+          dateData.stocks = `${stocksRatio.byDate[date][mask]}/${stocksRatio.all[mask]}`;
+          dateData.drr = dateData.sum / dateData.sum_orders;
+          dateData.avg_bill = dateData.sum_orders / dateData.orders;
+
+          const to_push = Array(unique_params.length);
+          for (let j = 0; j < unique_params.length; j++) {
+            to_push[j] = dateData[param_map[unique_params[j]].name];
+          }
+          // if (mask == "КПБ_2_СТРАЙП") console.log(mask, to_push);
+          dates_datas[date][mask] = to_push;
+          // console.log(mask, fact[i], to_push);
         }
-
-        sheet_data[sheet_data.length - 1] = sheet_data[
-          sheet_data.length - 1
-        ].concat(
-          dates_datas[str_date][all_masks[j]] ?? Array(unique_params.length)
-        );
       }
-    }
+      // console.log(dates_datas);
 
-    for (let j = 0; j < all_masks.length; j++) {
-      // console.log(avg_drr_by_mask[all_masks[j]]);
-      avg_drr_by_mask[all_masks[j]] /= 7;
-    }
+      const cur_date = new Date();
+      cur_date.setDate(cur_date.getDate() + 1);
+      for (let i = 0; i < 31; i++) {
+        cur_date.setDate(cur_date.getDate() - 1);
+        const str_date = cur_date
+          .toLocaleDateString("ru-RU")
+          .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+          .slice(0, 10);
+        // console.log(str_date);
 
-    console.log(avg_drr_by_mask);
-    const campaign_summary = [];
-    for (let i = 3; i < sheet_data.length; i++) {
-      if (!sheet_data[i]) continue;
-      const str_date = sheet_data[i][0];
-      if (!(str_date in advertStatsByMaskByDay[campaign]))
-        advertStatsByMaskByDay[campaign][str_date] = {
-          views: 0,
-          clicks: 0,
-          unique_users: 0,
-          sum: 0,
-          ctr: 0,
-          cpm: 0,
-          cpc: 0,
-          orders: 0,
-          avg_bill: 0,
-          sum_orders: 0,
-          drr: 0,
-        };
-      advertStatsByMaskByDay[campaign][str_date].orders = byDayCampaignSum[
-        str_date
-      ]
-        ? byDayCampaignSum[str_date].count
-        : 0;
-      advertStatsByMaskByDay[campaign][str_date].sum_orders = byDayCampaignSum[
-        str_date
-      ]
-        ? byDayCampaignSum[str_date].sum
-        : 0;
-      advertStatsByMaskByDay[campaign][str_date].drr =
-        advertStatsByMaskByDay[campaign][str_date].sum /
-        advertStatsByMaskByDay[campaign][str_date].sum_orders;
-      advertStatsByMaskByDay[campaign][str_date].avg_bill =
-        advertStatsByMaskByDay[campaign][str_date].sum_orders /
-        advertStatsByMaskByDay[campaign][str_date].orders;
+        sheet_data.push([str_date]);
+        for (let j = 0; j < all_masks.length; j++) {
+          if (!dates_datas[str_date]) continue;
+          // save avg_drr
+          // const generalMaskForDrr = all_masks[j].slice(0, 2);
+          const generalMaskForDrr = all_masks[j];
+          if (!(generalMaskForDrr in avg_drr_by_mask))
+            avg_drr_by_mask[generalMaskForDrr] = {
+              sum: 0,
+              sum_orders: 0,
+              drr: 0,
+            };
+          if (1 <= i && i < 31) {
+            // if (generalMaskForDrr == "ПРПЭ_120_DELICATUS")
+            //   console.log(str_date, dates_datas[str_date][generalMaskForDrr]);
+            if (dates_datas[str_date][all_masks[j]]) {
+              const date_sum_orders =
+                dates_datas[str_date][all_masks[j]][
+                  unique_params.indexOf("Заказы/Р")
+                ];
+              const date_sum =
+                dates_datas[str_date][all_masks[j]][
+                  unique_params.indexOf("Расход")
+                ];
+              avg_drr_by_mask[generalMaskForDrr].sum += isFinite(date_sum)
+                ? date_sum
+                : 0;
+              avg_drr_by_mask[generalMaskForDrr].sum_orders += isFinite(
+                date_sum_orders
+              )
+                ? date_sum_orders
+                : 0;
+              avg_drr_by_mask[generalMaskForDrr].drr = avg_drr_by_mask[
+                generalMaskForDrr
+              ].sum_orders
+                ? avg_drr_by_mask[generalMaskForDrr].sum /
+                  avg_drr_by_mask[generalMaskForDrr].sum_orders
+                : 0;
+            }
+          }
 
-      const to_push = [];
-      for (let j = 0; j < unique_params.length; j++) {
-        to_push.push(
-          advertStatsByMaskByDay[campaign][str_date][
-            param_map[unique_params[j]].name
-          ] ?? 0
-        );
+          sheet_data[sheet_data.length - 1] = sheet_data[
+            sheet_data.length - 1
+          ].concat(
+            dates_datas[str_date][all_masks[j]] ?? Array(unique_params.length)
+          );
+        }
       }
-      campaign_summary.push([""].concat(to_push));
+
+      for (const [mask, mask_data] of Object.entries(avg_drr_by_mask)) {
+        const generalMaskForDrr = mask.slice(0, 2);
+        if (!(generalMaskForDrr in jsonDataDrr))
+          jsonDataDrr[generalMaskForDrr] = {
+            sum: 0,
+            sum_orders: 0,
+            drr: 0,
+          };
+        jsonDataDrr[generalMaskForDrr].sum += mask_data.sum;
+        jsonDataDrr[generalMaskForDrr].sum_orders += mask_data.sum_orders;
+        jsonDataDrr[generalMaskForDrr].drr = jsonDataDrr[generalMaskForDrr]
+          .sum_orders
+          ? jsonDataDrr[generalMaskForDrr].sum /
+            jsonDataDrr[generalMaskForDrr].sum_orders
+          : 0;
+
+        jsonDataDrr[mask] = mask_data;
+      }
+
+      console.log(jsonDataDrr);
+      const campaign_summary = [[]];
+      if (brand in advertStatsByMaskByDay) {
+        for (let i = 3; i < sheet_data.length; i++) {
+          if (!sheet_data[i]) continue;
+          const str_date = sheet_data[i][0];
+          if (!(str_date in advertStatsByMaskByDay[brand]))
+            advertStatsByMaskByDay[brand][str_date] = {
+              views: 0,
+              clicks: 0,
+              unique_users: 0,
+              sum: 0,
+              ctr: 0,
+              cpm: 0,
+              cpc: 0,
+              stocks: 0,
+              orders: 0,
+              avg_bill: 0,
+              sum_orders: 0,
+              drr: 0,
+            };
+
+          for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+            const was_present = Number(
+              stocks[str_date]
+                ? avg_orders[art] <= (stocks[str_date][art] ?? 0)
+                : 0
+            );
+
+            const brand = brand_names[art_data.brand];
+            if (!(brand in stocksRatio.byDate.byBrand))
+              stocksRatio.byDate.byBrand[brand] = {};
+            if (!(str_date in stocksRatio.byDate.byBrand[brand]))
+              stocksRatio.byDate.byBrand[brand][str_date] = 0;
+            stocksRatio.byDate.byBrand[brand][str_date] += was_present;
+          }
+          advertStatsByMaskByDay[brand][str_date].stocks = `${
+            stocksRatio.byDate.byBrand[brand]
+              ? stocksRatio.byDate.byBrand[brand][str_date]
+              : 0
+          }/${stocksRatio.all.byBrand[brand]}`;
+          advertStatsByMaskByDay[brand][str_date].orders = byDayCampaignSum[
+            brand
+          ][str_date]
+            ? byDayCampaignSum[brand][str_date].count
+            : 0;
+          advertStatsByMaskByDay[brand][str_date].sum_orders = byDayCampaignSum[
+            brand
+          ][str_date]
+            ? byDayCampaignSum[brand][str_date].sum
+            : 0;
+          advertStatsByMaskByDay[brand][str_date].drr =
+            advertStatsByMaskByDay[brand][str_date].sum /
+            advertStatsByMaskByDay[brand][str_date].sum_orders;
+          advertStatsByMaskByDay[brand][str_date].avg_bill =
+            advertStatsByMaskByDay[brand][str_date].sum_orders /
+            advertStatsByMaskByDay[brand][str_date].orders;
+
+          const to_push = [];
+          for (let j = 0; j < unique_params.length; j++) {
+            to_push.push(
+              advertStatsByMaskByDay[brand][str_date][
+                param_map[unique_params[j]].name
+              ] ?? 0
+            );
+          }
+          campaign_summary.push([""].concat(to_push));
+        }
+      }
+
+      json_sheet_data[brand] = sheet_data;
+      writeDataToFile(
+        stocksRatio,
+        path.join(__dirname, "../files", campaign, "stocksRatio.json")
+      );
+      const spId = `Факт ${brand}`;
+      promises.push(
+        sheets.spreadsheets.values
+          .clear({
+            spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+            range: `${spId}!4:1000`,
+          })
+          .then(() =>
+            sheets.spreadsheets.values
+              .clear({
+                spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+                range: `${spId}!B4:K`,
+              })
+              .then(() =>
+                sheets.spreadsheets.values
+                  .update({
+                    spreadsheetId:
+                      "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+                    range: `${spId}!3:1000`,
+                    valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+                    resource: {
+                      values: campaign_summary,
+                    },
+                  })
+                  .then(() =>
+                    sheets.spreadsheets.values.update({
+                      spreadsheetId:
+                        "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+                      range: `${spId}!1:1000`,
+                      valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+                      resource: {
+                        values: sheet_data,
+                      },
+                    })
+                  )
+              )
+          )
+      );
     }
-    // const dynamic_res = await sheets.spreadsheets.values.get({
-    //   spreadsheetId: spIds[campaign],
-    //   range: "Динамика заказов!A2:A",
-    // });
-    // const dynamic = dynamic_res.data.values;
-    // for (const [mask, maskData] of Object.entries(byNow)) {
-    //   for (let i = 0; i < dynamic.length; i++) {
-    //     if (!mask.includes(fact[i][0])) continue;
-    //     const to_push = [
-    //       maskData.orders_today,
-    //       maskData.sum_orders_today,
-    //       maskData.orders_yesterday,
-    //       maskData.sum_orders_yesterday,
-    //       maskData.orders_today - maskData.orders_yesterday,
-    //       maskData.sum_orders_today - maskData.sum_orders_yesterday,
-    //     ];
-    //     dynamic[i] = dynamic[i].concat(to_push);
-    //     // console.log(mask, fact[i], to_push);
-    //   }
-    // }
-    // await sheets.spreadsheets.values.update({
-    //   spreadsheetId: spIds[campaign],
-    //   range: `Динамика заказов!2:1000`,
-    //   valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
-    //   resource: {
-    //     values: dynamic,
-    //   },
-    // });
-    // await sheets.spreadsheets.values.update({
-    //   spreadsheetId: spIds[campaign],
-    //   range: `Динамика заказов!I2`,
-    //   valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
-    //   resource: {
-    //     values: [
-    //       [
-    //         `ДАТА И ВРЕМЯ ОБНОВЛЕНИЯ ДАННЫХ:\n${new Date()
-    //           .toLocaleString("ru-RU")
-    //           .slice(0, 17)}`,
-    //       ],
-    //     ],
-    //   },
-    // });
     await writeDataToFile(
-      avg_drr_by_mask,
+      jsonDataDrr,
       path.join(__dirname, "../files", campaign, "avgDrrByMask.json")
     );
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      range: `${spIds[campaign]}!4:1000`,
-    });
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      range: `${spIds[campaign]}!4:1000`,
-      valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
-      resource: {
-        values: campaign_summary,
-      },
-    });
-    sheets.spreadsheets.values
-      .update({
-        spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-        range: `${spIds[campaign]}!1:1000`,
-        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
-        resource: {
-          values: sheet_data,
-        },
-      })
-      .then((pr) => resolve());
+    await Promise.all(promises).then((pr) => resolve());
   });
 }
 
 function updateFactStatsByRK(auth, campaign) {
   return new Promise(async (resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
+
+    const brands = JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files", "campaigns.json"))
+    ).brands[campaign];
+    const artsBarcodesFull = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "artsBarcodesFull.json")
+      )
+    );
+    const brand_names = {
+      МАЮША: "МАЮША",
+      DELICATUS: "DELICATUS",
+      "Объединённая текстильная компания": "ОТК",
+      "Amaze wear": "Amaze wear",
+    };
+    const std_brand_names = {
+      mayusha: "МАЮША",
+      delicatus: "DELICATUS",
+      TKS: "ОТК",
+    };
 
     const vendorCodes = await JSON.parse(
       await fs.readFile(
@@ -1198,6 +1336,16 @@ function updateFactStatsByRK(auth, campaign) {
     const orders = await JSON.parse(
       await fs.readFile(
         path.join(__dirname, "../files", campaign, "orders by day.json")
+      )
+    );
+    const stocks = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "stocks.json")
+      )
+    );
+    const stocksRatio = await JSON.parse(
+      await fs.readFile(
+        path.join(__dirname, "../files", campaign, "stocksRatio.json")
       )
     );
 
@@ -1228,19 +1376,9 @@ function updateFactStatsByRK(auth, campaign) {
       )
     );
 
-    const spIds = {
-      mayusha: "РК Маюша",
-      delicatus: "РК Delicatus",
-      TKS: "РК TKS",
-    };
-    if (!(campaign in spIds)) {
-      resolve();
-      return;
-    }
-
     const advert_infos_columns_res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      range: `${spIds[campaign]}!A1:D1`,
+      range: `РК МАЮША!A1:D1`,
     });
     const advert_infos_columns = advert_infos_columns_res.data.values[0];
     const infos_columns_map = {
@@ -1252,7 +1390,7 @@ function updateFactStatsByRK(auth, campaign) {
 
     const unique_params_res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      range: `${spIds[campaign]}!2:2`,
+      range: `РК МАЮША!2:2`,
     });
     const unique_params_temp = unique_params_res.data.values[0];
     const unique_params = [];
@@ -1270,6 +1408,7 @@ function updateFactStatsByRK(auth, campaign) {
       СРС: { name: "cpc", formula: "СРЗНАЧ" },
       СРМ: { name: "cpm", formula: "СРЗНАЧ" },
       Расход: { name: "sum", formula: "СУММ" },
+      "Остаток/шт": { name: "stocks", formula: "СРЗНАЧ" },
       "Заказы/шт": { name: "orders", formula: "СУММ" },
       "Ср. чек": { name: "avg_bill", formula: "СРЗНАЧ" },
       "Заказы/Р": { name: "sum_orders", formula: "СУММ" },
@@ -1284,14 +1423,16 @@ function updateFactStatsByRK(auth, campaign) {
         ctr: 0,
         cpm: 0,
         cpc: 0,
+        stocks: 0,
         orders: 0,
         avg_bill: 0,
         sum_orders: 0,
         drr: 0,
       };
       const rkData = advertStatsByDay[advertId];
-      if (!rkData) return result;
+      if (!rkData) return { rk_data: result, brand: undefined };
       const today_date = new Date();
+      const nms_to_sum_orders = [];
       for (let i = date_range.to; i <= date_range.from; i++) {
         const cur_date = new Date();
         cur_date.setDate(today_date.getDate() - i);
@@ -1300,7 +1441,6 @@ function updateFactStatsByRK(auth, campaign) {
           .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
           .slice(0, 10);
 
-        const nms_to_sum_orders = [];
         const generalMaskOfRK = advertNames[advertId]
           .replace(/\s/, "")
           .split("/")[0];
@@ -1311,6 +1451,7 @@ function updateFactStatsByRK(auth, campaign) {
           for (const [art, art_data] of Object.entries(artsData)) {
             const generalMask = getGeneralMaskFromVendorCode(art);
             if (generalMask != generalMaskOfRK) continue;
+            if (!(art in artsBarcodesFull)) continue;
             // console.log(generalMask, generalMaskOfRK);
             if (!nms_to_sum_orders.includes(art)) nms_to_sum_orders.push(art);
           }
@@ -1340,9 +1481,27 @@ function updateFactStatsByRK(auth, campaign) {
           if (!nms_to_sum_orders.includes(art)) continue;
           result.sum_orders += value;
         }
+        for (const [mask, count] of Object.entries(
+          stocksRatio.byDate[str_date]
+        )) {
+          if (
+            !(nms_to_sum_orders[0]
+              ? getMaskFromVendorCode(nms_to_sum_orders[0]) == mask
+              : false)
+          )
+            continue;
+          // console.log(art, mask, sum);
+          // if (getMaskFromVendorCode(nms_to_sum_orders[0]) == "КПБ_2+ЕВРО_МОНТЕ_ТКС")
+          //   console.log(nms_to_sum_orders, mask, count, str_date);
+          result.stocks += count;
+        }
 
         if (!rkData[str_date]) continue;
 
+        // if (
+        //   getMaskFromVendorCode(nms_to_sum_orders[0]) == "КПБ_2+ЕВРО_МОНТЕ_ТКС"
+        // )
+        // console.log(result.stocks, date_range, str_date);
         result.views += rkData[str_date].views ?? 0;
         result.clicks += rkData[str_date].clicks ?? 0;
         result.sum += rkData[str_date].sum ?? 0;
@@ -1351,13 +1510,31 @@ function updateFactStatsByRK(auth, campaign) {
         if (result.clicks) result.cpc = result.sum / result.clicks;
         // console.log(result);
       }
+
+      result.stocks = `${
+        parseInt(
+          Math.round(
+            (result.stocks / (date_range.from - date_range.to + 1)) * 10
+          )
+        ) / 10
+      }/${
+        nms_to_sum_orders[0]
+          ? stocksRatio.all[getMaskFromVendorCode(nms_to_sum_orders[0])]
+          : 0
+      }`;
+
       result.drr = result.sum / result.sum_orders;
       result.avg_bill = result.sum_orders / result.orders;
       // result.drr = result.sum_orders ? result.sum / result.sum_orders : 0;
-      // console.log(result);
-      return result;
+      // console.log(artsBarcodesFull[nms_to_sum_orders[0]], nms_to_sum_orders[0], nms_to_sum_orders, advertId);
+
+      return {
+        rk_data: result,
+        brand: nms_to_sum_orders.length
+          ? brand_names[artsBarcodesFull[nms_to_sum_orders[0]].brand]
+          : undefined,
+      };
     };
-    const sheet_data = [Array(4), Array(4)];
     const stat_date_ranges = [
       // days before today
       { from: 0, to: 0 },
@@ -1366,30 +1543,21 @@ function updateFactStatsByRK(auth, campaign) {
     ];
 
     // const formulas_to_concat = [];
-    const sheet_data_temp = [];
-    // for (let i = 0; i < stat_date_ranges.length; i++) {
-    //   for (let j = 0; j < unique_params.length; j++) {
-    //     const index_of_column = i * unique_params.length + j + 5;
-    //     const column_name = indexToColumn(index_of_column);
-    //     formulas_to_concat.push(
-    //       `=${
-    //         param_map[unique_params[j]].formula
-    //       }(${column_name}4:${column_name})`
-    //     );
-    //   }
-    //   sheet_data[1] = sheet_data[1].concat(unique_params);
-    // }
-    // sheet_data[2] = sheet_data[2].concat(formulas_to_concat);
+    const sheet_data_temp = {};
 
+    let brand = "";
     for (const [unused, rkData] of Object.entries(advertInfos)) {
       //// formulas
       let include_this_rk = false;
       let rkStatInRanges = [];
       for (let i = 0; i < stat_date_ranges.length; i++) {
-        const rkRangeDateData = calc_adv_stats_in_date_range(
+        const adv_stats = calc_adv_stats_in_date_range(
           rkData.advertId,
           stat_date_ranges[i]
         );
+        const rkRangeDateData = adv_stats.rk_data;
+        brand = adv_stats.brand ?? std_brand_names[campaign];
+        if (!(brand in sheet_data_temp)) sheet_data_temp[brand] = [];
         if (rkRangeDateData.sum != 0) include_this_rk = true;
         const to_push = Array(unique_params.length);
         for (let j = 0; j < to_push.length; j++) {
@@ -1410,7 +1578,7 @@ function updateFactStatsByRK(auth, campaign) {
       if (include_this_rk && [9, 11].includes(rkData.status)) {
         rkData.type = rk_type_map[rkData.type];
         rkData.status = rk_status_map[rkData.status];
-        sheet_data_temp.push(
+        sheet_data_temp[brand].push(
           [
             rkData[infos_columns_map[advert_infos_columns[0]]],
             rkData[infos_columns_map[advert_infos_columns[1]]],
@@ -1422,29 +1590,43 @@ function updateFactStatsByRK(auth, campaign) {
         );
       }
     }
-    sheet_data_temp.sort((a, b) => {
-      return b[0] - a[0];
-    });
 
-    for (let i = 0; i < sheet_data_temp.length; i++) {
-      sheet_data.push(sheet_data_temp[i]);
-      // console.log(sheet_data_temp[i].length);
+    const promises = [];
+    for (const [brand, _sheet] of Object.entries(sheet_data_temp)) {
+      _sheet.sort((a, b) => {
+        return b[0] - a[0];
+      });
+
+      const sheet_data = [Array(4), Array(4)];
+      for (let i = 0; i < _sheet.length; i++) {
+        sheet_data.push(_sheet[i]);
+        // console.log(sheet_data_temp[i].length);
+      }
+      for (let i = 0; i < stat_date_ranges.length; i++) {
+        sheet_data[1] = sheet_data[1].concat(unique_params);
+      }
+      // return;
+      const spId = `РК ${brand}`;
+
+      promises.push(
+        sheets.spreadsheets.values
+          .clear({
+            spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+            range: `${spId}!3:1000`,
+          })
+          .then(() =>
+            sheets.spreadsheets.values.update({
+              spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+              range: `${spId}!1:1000`,
+              valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+              resource: {
+                values: sheet_data,
+              },
+            })
+          )
+      );
     }
-    // return;
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-      range: `${spIds[campaign]}!3:1000`,
-    });
-    await sheets.spreadsheets.values
-      .update({
-        spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
-        range: `${spIds[campaign]}!1:1000`,
-        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
-        resource: {
-          values: sheet_data,
-        },
-      })
-      .then((pr) => resolve());
+    await Promise.all(promises).then(() => resolve());
   });
 }
 
@@ -1996,9 +2178,14 @@ function updateLowRatingStocksSheet(auth) {
           path.join(__dirname, "../files", campaign, "vendorCodesFull.json")
         )
       );
-      const spp_price_sheet = xlsx.parse(
-        path.join(__dirname, "../files", campaign, "data.xlsx")
-      )[0]["data"];
+      const xlsx_data = xlsx.parse(
+        path.join(__dirname, `../files/${campaign}/data.xlsx`)
+      );
+      let spp_price_sheet = [];
+      for (let i = 0; i < xlsx_data.length; i++) {
+        spp_price_sheet = spp_price_sheet.concat(xlsx_data[i].data);
+      }
+
       for (const [key, data] of Object.entries(artRatings)) {
         if (data.valuation >= 4.7) continue;
         // if (code.includes("НАМАТРАСНИК")) code.splice(1);
@@ -2235,24 +2422,33 @@ async function copyZakazToOtherSpreadsheet(auth) {
       const title = sourceSheet.properties.title;
       if (title == "Остатки руч.") continue;
       const sheet_data = await get_data(title);
+      console.log(title, sheet_data);
       const masks = [];
       for (let i = 0; i < sheet_data.length; i++) {
         const row = sheet_data[i];
         if (!row[0]) continue;
         let mask = getMaskFromVendorCode(row[0]);
+        console.log(title, mask);
         mask = mask.split("_");
         if (!mask.includes("КПБ")) {
           mask = mask.slice(0, 1);
         } else {
-          mask = title == "delicatus" ? mask.slice(-1) : mask.slice(-2, -1);
+          mask = title == "DELICATUS" ? mask.slice(-1) : mask.slice(-2, -1);
         }
         mask =
           row[0].includes("DELICATUS") && row[0].includes("КПБ")
             ? mask[0] + " 2"
             : mask[0];
+
+        if (
+          (mask == "СТРАЙП" && title == "DELICATUS") ||
+          mask.includes("НАМАТРАСНИК") ||
+          (mask.includes("МОНТЕ") && title == "DELICATUS")
+        )
+          continue;
         if (!masks.includes(mask)) masks.push(mask);
       }
-      // console.log(masks);
+      console.log(masks);
       for (let i = 0; i < masks.length; i++) {
         const mask_title = title + " " + masks[i];
         // console.log(mask_title);
@@ -2443,6 +2639,10 @@ module.exports = {
     const auth = await authorize();
     await genAllEqualTemplatesSheet(auth).catch(console.error);
   },
+  fetchAutoPriceRulesAndWriteToJSON: async () => {
+    const auth = await authorize();
+    await fetchAutoPriceRulesAndWriteToJSON(auth).catch(console.error);
+  },
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
@@ -2453,6 +2653,8 @@ const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
   else if (code.includes("КПБ")) {
     code.splice(3, 1);
     if (code.includes("DELICATUS")) code.pop();
+  } else if (code.includes("ФТБЛ")) {
+    code.splice(-2, 2);
   } else code.splice(2, 1);
 
   return code.join("_");

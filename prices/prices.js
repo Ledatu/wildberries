@@ -165,13 +165,15 @@ const calcNewValues = async () => {
   });
 };
 
-const calcAndSendTrendsToTg = async (hour_key) => {
+const calcAndSendTrendsToTg = async (now) => {
+  const hour_key = now.toLocaleTimeString("ru-RU").slice(0, 2);
+  console.log(hour_key, now.toLocaleTimeString("ru-RU"));
   if (!["05", "08", "11", "14", "17", "20", "23"].includes(hour_key)) return;
   const promises = [];
   campaigns.forEach(async (campaign) => {
-    promises.push(calcStatsTrendsAndWtriteToJSON(campaign));
+    promises.push(calcStatsTrendsAndWtriteToJSON(campaign, now));
   });
-  Promise.all(promises).then(async () => await sendTgBotTrendMessage(hour_key));
+  Promise.all(promises).then(async () => await sendTgBotTrendMessage(now, hour_key));
 };
 
 const writeSpp = async () => {
@@ -189,7 +191,7 @@ const writeSpp = async () => {
 };
 
 const fetchAdverts = async () => {
-  const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
+  const now = new Date();
   return new Promise(async (resolve, reject) => {
     const promises = [];
     campaigns.forEach(async (campaign) =>
@@ -200,7 +202,7 @@ const fetchAdverts = async () => {
             await fetchAdvertsAndWriteToJson(campaign),
             await fetchAdvertInfosAndWriteToJson(campaign),
             await fetchAdvertStatsAndWriteToJsonMpManager(campaign),
-            await fetchAdvertStatsAndWriteToJsonMpManagerLog(campaign),
+            await fetchAdvertStatsAndWriteToJsonMpManagerLog(campaign, now),
             await fetchRksBudgetsAndWriteToJSON(campaign),
             await getAdvertStatByMaskByDayAndWriteToJSONMpManager(campaign),
             await getAdvertStatByDayAndWriteToJSONMpManager(campaign),
@@ -213,7 +215,7 @@ const fetchAdverts = async () => {
     );
     Promise.all(promises)
       .then(async () => {
-        await calcAndSendTrendsToTg(hour_key).then(() => resolve("Updated."));
+        await calcAndSendTrendsToTg(now).then(() => resolve("Updated."));
         console.log("All tasks completed successfully");
       })
       .catch((error) => {

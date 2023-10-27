@@ -19,6 +19,8 @@ const {
   writeSppToDataSpreadsheet,
   calcAndWriteMinZakazToDataSpreadsheet,
   writePrices,
+  fetchEnteredValuesAndWriteToJSON,
+  fetchAutoPriceRulesAndWriteToJSON,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -55,6 +57,8 @@ const {
   calcStatsTrendsAndWtriteToJSON,
   sendTgBotTrendMessage,
   fetchDataAndWriteToXlsx,
+  calculateNewValuesAndWriteToXlsx,
+  calcAutoEnteredValuesAndWriteToJSON,
 } = require("./main");
 const {
   getPrices,
@@ -85,6 +89,7 @@ const {
 // updateAnalyticsOrders("delicatus");
 // fetchAdvertsAndWriteToJson('TKS')
 // calcNewValues()
+// fetchArtMaskPricesAndWriteToJSON()
 // copyPricesToDataSpreadsheet()
 // fetchNewPricesAndWriteToJSON("mayusha").then((pr) => {
 //   console.log("Prices fetched.");
@@ -192,7 +197,38 @@ const a = async () => {
 // fetchAdverts()
 // getPrices()
 // fetchDataAndWriteToXlsx('TKS')
-writePrices('TKS')
+// writePrices('TKS')
 // fetchDataAndWriteToXlsx('TKS')
 // writeSppToDataSpreadsheet()
-// calcAndSendTrendsToTg('11')
+// const d = new Date('2023-10-22T14:57:00.000Z')
+// console.log(d);
+// calcAndSendTrendsToTg(d)
+// fetchAdverts()
+// getAdvertStatByMaskByDayAndWriteToJSONMpManager("TKS")
+// fetchCardsAndWriteToJSON("TKS");
+// fetchCardsAndWriteToJSON("mayusha");
+// fetchCardsAndWriteToJSON("delicatus");
+// fetchOrdersAndWriteToJSON("TKS")
+
+// fetchEnteredValuesAndWriteToJSON('TKS')
+// calculateNewValuesAndWriteToXlsx("mayusha")
+//   .then(() => writePrices("mayusha"))
+//   .then(() => fetchNewPricesAndWriteToJSON("mayusha"));
+
+// updatePrices("ОТК");
+// updateLowRatingStocksSheet()
+// calcAvgDrrByArtAndWriteToJSON('TKS')
+// answerAllFeedbacks()
+// updateFactStatsByRK("mayusha")
+// updateFactStatsByRK("delicatus")
+// updateFactStatsByRK("TKS")
+// copyZakazToOtherSpreadsheet()
+// updatePlanFact('mayusha')
+// updatePlanFact('delicatus')
+// updatePlanFact('TKS')
+// writeDrrToDataSpreadsheet();
+// fetchAutoPriceRulesAndWriteToJSON();
+// calcAutoEnteredValuesAndWriteToJSON();
+// calculateNewValuesAndWriteToXlsx('mayusha');
+// writePrices('mayusha');
+calcNewValues();

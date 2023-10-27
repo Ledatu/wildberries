@@ -410,246 +410,255 @@ const getSales = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
-const buildXlsx = (campaign, rewriteProfit = false) => new Promise((resolve, reject) => {
-  const artsBarcodesFull = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "files", campaign, "artsBarcodesFull.json")
-    )
-  );
-  const prices = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", campaign, "prices.json"))
-  );
-  const fullWeekArtStats = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "files", campaign, "fullWeekArtStats.json")
-    )
-  );
-
-  // ------------------------
-  const storageCost = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", "storageCost.json"))
-  )[campaign].cost;
-  const byDayCampaignSalesSum = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "files", campaign, "byDayCampaignSalesSum.json")
-    )
-  );
-  const storageCostForArt =
-    storageCost / byDayCampaignSalesSum.fullLastWeek.count;
-
-  // const path_cost_by_art = path.join(
-  //   __dirname,
-  //   "files",
-  //   "storageCost by art.json"
-  // );
-  // let storageCostByArt = {};
-  // if (afs.existsSync(path_cost_by_art))
-  //   storageCostByArt = JSON.parse(afs.readFileSync(path_cost_by_art));
-  // storageCostByArt[campaign] = storageCostForArt;
-  // afs.writeFileSync(path_cost_by_art, JSON.stringify(storageCostByArt));
-  // ------------------------
-
-  const path_profit_trend = path.join(
-    __dirname,
-    "files",
-    campaign,
-    "profitTrend.json"
-  );
-  let profit_trend = { current: 0, previous: 0 };
-  if (afs.existsSync(path_profit_trend))
-    profit_trend = JSON.parse(afs.readFileSync(path_profit_trend));
-  profit_trend.previous = profit_trend.current;
-  profit_trend.current = 0;
-
-  const advertStatsByArtByDay = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "files", campaign, "advert stats by art by day.json")
-    )
-  );
-  const orders = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", campaign, "orders.json"))
-  );
-  const stocks = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
-  );
-  const arts_data = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files/data.json"))
-  );
-  const today_date_str = new Date(
-    new Date()
-      .toLocaleDateString("ru-RU")
-      .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-  )
-    .toISOString()
-    .slice(0, 10);
-  const brand_sheets = {};
-  for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
-    const brand = art_data.brand;
-    if (!(brand in brand_sheets)) brand_sheets[brand] = [[]];
-    // console.log(brand_sheets[brand]);
-    let vendorCode = art;
-    if (!vendorCode || !arts_data[vendorCode]) continue;
-    el = prices[art_data.nmId];
-
-    // console.log(vendorCode, el);
-    vendorCode = String(vendorCode);
-    const per_day = orders[vendorCode];
-    const stock = stocks["today"][vendorCode];
-    const obor = stock / per_day;
-    const mult = arts_data[vendorCode].multiplicity;
-    const zakaz =
-      Math.round((per_day * arts_data[vendorCode].pref_obor - stock) / mult) *
-      mult;
-    const roz_price = Math.round(el.price * (1 - el.discount / 100));
-    const min_zakaz = arts_data[vendorCode].min_zakaz;
-
-    const spp_price = Math.floor(
-      roz_price * (1 - arts_data[vendorCode].spp / 100)
+const buildXlsx = (campaign, rewriteProfit = false) =>
+  new Promise((resolve, reject) => {
+    const artsBarcodesFull = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "artsBarcodesFull.json")
+      )
     );
-    const commission = roz_price * (arts_data[vendorCode].commission / 100);
-    const delivery = arts_data[vendorCode].delivery;
-    const tax = spp_price * (arts_data[vendorCode].tax / 100);
-    const expences =
-      campaign == "TKS" ? spp_price * 0.07 : arts_data[vendorCode].expences;
-    const prime_cost = arts_data[vendorCode].prime_cost;
+    const prices = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files", campaign, "prices.json"))
+    );
+    const fullWeekArtStats = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "fullWeekArtStats.json")
+      )
+    );
 
-    const ad = spp_price * (arts_data[vendorCode].ad / 100);
-    const drr = ad / spp_price;
-    const drr_art_week = fullWeekArtStats[vendorCode]
-      ? fullWeekArtStats[vendorCode].drr
-      : 0;
-    const advert_sum_art_today = advertStatsByArtByDay[vendorCode]
-      ? advertStatsByArtByDay[vendorCode][today_date_str]
-        ? advertStatsByArtByDay[vendorCode][today_date_str].sum
-        : 0
-      : 0;
-    // console.log(today_date_str, vendorCode, drr_art_today);
+    // ------------------------
+    const storageCost = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files", "storageCost.json"))
+    )[campaign].cost;
+    const byDayCampaignSalesSum = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, "byDayCampaignSalesSum.json")
+      )
+    );
+    const storageCostForArt =
+      storageCost / byDayCampaignSalesSum.fullLastWeek.count;
 
-    const profit =
-      -ad -
-      commission -
-      delivery -
-      storageCostForArt -
-      tax -
-      expences -
-      prime_cost +
-      roz_price;
-    // console.log(vendorCode, profit, ad, commission, delivery, storageCostForArt, tax, expences, prime_cost, roz_price);
-    const roi = profit / (prime_cost + expences);
-    const rentabelnost = profit / spp_price;
+    // const path_cost_by_art = path.join(
+    //   __dirname,
+    //   "files",
+    //   "storageCost by art.json"
+    // );
+    // let storageCostByArt = {};
+    // if (afs.existsSync(path_cost_by_art))
+    //   storageCostByArt = JSON.parse(afs.readFileSync(path_cost_by_art));
+    // storageCostByArt[campaign] = storageCostForArt;
+    // afs.writeFileSync(path_cost_by_art, JSON.stringify(storageCostByArt));
+    // ------------------------
 
-    const realZakaz = !stock
-      ? zakaz > mult * min_zakaz
-        ? zakaz
-        : mult * min_zakaz
-      : zakaz > 0
-      ? zakaz
-      : 0;
+    const path_profit_trend = path.join(
+      __dirname,
+      "files",
+      campaign,
+      "profitTrend.json"
+    );
+    let profit_trend = { current: 0, previous: 0 };
+    if (afs.existsSync(path_profit_trend))
+      profit_trend = JSON.parse(afs.readFileSync(path_profit_trend));
+    profit_trend.previous = profit_trend.current;
+    profit_trend.current = 0;
 
-    const profit_today = !stock
-      ? 0
-      : (campaign == "TKS" ? expences : profit) * per_day;
-    profit_trend.current += isNaN(profit_today) ? 0 : profit_today;
-
-    brand_sheets[brand].push([
-      vendorCode,
-      realZakaz,
-      el.price,
-      el.discount,
-      roz_price, // розничная стоимость
-      arts_data[vendorCode].spp / 100,
-      spp_price,
-      profit,
-      stock,
-      orders[vendorCode] * 7,
-      per_day,
-      obor,
-      rentabelnost,
-      roi,
-      "",
-      "",
-      "",
-      "",
-      "",
-      prime_cost,
-      commission,
-      delivery,
-      storageCostForArt,
-      tax,
-      expences,
-      ad,
-      drr,
-      drr_art_week,
-      advert_sum_art_today,
-      profit_today,
-    ]);
-  }
-  // console.log(brand_sheets);
-
-  const xlsx_data = [];
-  const brand_names = {
-    МАЮША: "МАЮША",
-    DELICATUS: "DELICATUS",
-    "Объединённая текстильная компания": "ОТК",
-    "Amaze wear": "Amaze wear",
-  };
-  for (const [brand, brand_sheet] of Object.entries(brand_sheets)) {
-    // console.log(brand, brand_sheet);
-    brand_sheets[brand][0] = [
-      "Артикул продавца",
-      "ЗАКАЗАТЬ",
-      "Текущая розн. цена (до скидки)",
-      "Текущая скидка на сайте, %",
-      "Цена со скидкой",
-      "%CПП",
-      "Цена СПП",
-      "Профит",
-      "Остаток",
-      "Заказов/7",
-      "Заказов/1",
-      "Оборачиваемость",
-      "Рентабельность",
-      "ROI",
-      "Новый ROI",
-      "Новая РЦ",
-      "Новая РЦ с СПП",
-      "Новая WB цена",
-      "",
-      "Себестоимость",
-      "Коммисия",
-      "Логистика",
-      "Хранение",
-      "Налоги",
-      "Расходы",
-      "Реклама",
-      "%ДРР",
-      "%ДРР/АРТ неделя",
-      "Рек. сегодня",
-      `${Math.round(profit_trend.current)} Профит сегодня`,
-    ];
-
-    brand_sheets[brand] = sortData(brand_sheets[brand]); // Sort the data
-
-    xlsx_data.push({ name: brand_names[brand], data: brand_sheet });
-  }
-  console.log(xlsx_data);
-  // -------------------------
-  const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
-  if (
-    ["05", "08", "11", "14", "17", "20", "23"].includes(hour_key) &&
-    rewriteProfit
-  )
-    afs.writeFileSync(path_profit_trend, JSON.stringify(profit_trend));
-  // -------------------------
-
-  return fs
-    .writeFile(
-      path.join(__dirname, "files", campaign, "data.xlsx"),
-      xlsx.build(xlsx_data)
+    const advertStatsByArtByDay = JSON.parse(
+      afs.readFileSync(
+        path.join(
+          __dirname,
+          "files",
+          campaign,
+          "advert stats by art by day.json"
+        )
+      )
+    );
+    const orders = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files", campaign, "orders.json"))
+    );
+    const stocks = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
+    );
+    const arts_data = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "files/data.json"))
+    );
+    const today_date_str = new Date(
+      new Date()
+        .toLocaleDateString("ru-RU")
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
     )
-    .then(() => {console.log("data.xlsx created."); resolve()})
-    .catch((error) => console.error(error));
-});
+      .toISOString()
+      .slice(0, 10);
+    const brand_sheets = {};
+    for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+      const brand = art_data.brand;
+      if (!(brand in brand_sheets)) brand_sheets[brand] = [[]];
+      // console.log(brand_sheets[brand]);
+      let vendorCode = art;
+      if (!vendorCode || !arts_data[vendorCode]) continue;
+      el = prices[art_data.nmId];
+
+      // console.log(vendorCode, el);
+      vendorCode = String(vendorCode);
+      const per_day = orders[vendorCode];
+      const stock = stocks["today"][vendorCode];
+      const obor = stock / per_day;
+      const mult = arts_data[vendorCode].multiplicity;
+      const zakaz =
+        Math.round((per_day * arts_data[vendorCode].pref_obor - stock) / mult) *
+        mult;
+      const roz_price = Math.round(el.price * (1 - el.discount / 100));
+      const min_zakaz = arts_data[vendorCode].min_zakaz;
+
+      const spp_price = Math.floor(
+        roz_price * (1 - arts_data[vendorCode].spp / 100)
+      );
+      const commission = roz_price * (arts_data[vendorCode].commission / 100);
+      const delivery = arts_data[vendorCode].delivery;
+      const tax = spp_price * (arts_data[vendorCode].tax / 100);
+      const expences =
+        campaign == "TKS" ? spp_price * 0.07 : arts_data[vendorCode].expences;
+      const prime_cost = arts_data[vendorCode].prime_cost;
+
+      const ad = spp_price * (arts_data[vendorCode].ad / 100);
+      const drr = ad / spp_price;
+      const drr_art_week = fullWeekArtStats[vendorCode]
+        ? fullWeekArtStats[vendorCode].drr
+        : 0;
+      const advert_sum_art_today = advertStatsByArtByDay[vendorCode]
+        ? advertStatsByArtByDay[vendorCode][today_date_str]
+          ? advertStatsByArtByDay[vendorCode][today_date_str].sum
+          : 0
+        : 0;
+      // console.log(today_date_str, vendorCode, drr_art_today);
+
+      const profit =
+        -ad -
+        commission -
+        delivery -
+        storageCostForArt -
+        tax -
+        expences -
+        prime_cost +
+        roz_price;
+      // console.log(vendorCode, profit, ad, commission, delivery, storageCostForArt, tax, expences, prime_cost, roz_price);
+      const roi = profit / (prime_cost + expences);
+      const rentabelnost = profit / spp_price;
+
+      const realZakaz = !stock
+        ? zakaz > mult * min_zakaz
+          ? zakaz
+          : mult * min_zakaz
+        : zakaz > 0
+        ? zakaz
+        : 0;
+
+      const profit_today = !stock
+        ? 0
+        : (campaign == "TKS" ? expences : profit) * per_day;
+      profit_trend.current += isNaN(profit_today) ? 0 : profit_today;
+
+      brand_sheets[brand].push([
+        vendorCode,
+        realZakaz,
+        el.price,
+        el.discount,
+        roz_price, // розничная стоимость
+        arts_data[vendorCode].spp / 100,
+        spp_price,
+        profit,
+        stock,
+        orders[vendorCode] * 7,
+        per_day,
+        obor,
+        rentabelnost,
+        roi,
+        "",
+        "",
+        "",
+        "",
+        "",
+        prime_cost,
+        commission,
+        delivery,
+        storageCostForArt,
+        tax,
+        expences,
+        ad,
+        drr,
+        drr_art_week,
+        advert_sum_art_today,
+        profit_today,
+      ]);
+    }
+    // console.log(brand_sheets);
+
+    const xlsx_data = [];
+    const brand_names = {
+      МАЮША: "МАЮША",
+      DELICATUS: "DELICATUS",
+      "Объединённая текстильная компания": "ОТК",
+      "Amaze wear": "Amaze wear",
+    };
+    for (const [brand, brand_sheet] of Object.entries(brand_sheets)) {
+      // console.log(brand, brand_sheet);
+      brand_sheets[brand][0] = [
+        "Артикул продавца",
+        "ЗАКАЗАТЬ",
+        "Текущая розн. цена (до скидки)",
+        "Текущая скидка на сайте, %",
+        "Цена со скидкой",
+        "%CПП",
+        "Цена СПП",
+        "Профит",
+        "Остаток",
+        "Заказов/7",
+        "Заказов/1",
+        "Оборачиваемость",
+        "Рентабельность",
+        "ROI",
+        "Новый ROI",
+        "Новая РЦ",
+        "Новая РЦ с СПП",
+        "Новая WB цена",
+        "",
+        "Себестоимость",
+        "Коммисия",
+        "Логистика",
+        "Хранение",
+        "Налоги",
+        "Расходы",
+        "Реклама",
+        "%ДРР",
+        "%ДРР/АРТ неделя",
+        "Рек. сегодня",
+        `${Math.round(profit_trend.current)} Профит сегодня`,
+      ];
+
+      brand_sheets[brand] = sortData(brand_sheets[brand]); // Sort the data
+
+      xlsx_data.push({ name: brand_names[brand], data: brand_sheet });
+    }
+    console.log(xlsx_data);
+    // -------------------------
+    const hour_key = new Date().toLocaleTimeString("ru-RU").slice(0, 2);
+    if (
+      ["05", "08", "11", "14", "17", "20", "23"].includes(hour_key) &&
+      rewriteProfit
+    )
+      afs.writeFileSync(path_profit_trend, JSON.stringify(profit_trend));
+    // -------------------------
+
+    return fs
+      .writeFile(
+        path.join(__dirname, "files", campaign, "data.xlsx"),
+        xlsx.build(xlsx_data)
+      )
+      .then(() => {
+        console.log("data.xlsx created.");
+        resolve();
+      })
+      .catch((error) => console.error(error));
+  });
 
 const writeWarehousesToJson = (data, campaign) => {
   return fs
@@ -664,6 +673,7 @@ const writeWarehousesToJson = (data, campaign) => {
 const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
   const jsonDataFull = {};
+  const jsonDataFullByNmId = {};
   const jsonDataBarcodes = { direct: {}, reverse: {} };
   const jsonDataBarcodesFull = {};
   data.forEach((item) => {
@@ -693,6 +703,15 @@ const writeVendorCodeToJson = (data, campaign) => {
       colors: item.colors,
     };
   });
+  data.forEach((item) => {
+    jsonDataFullByNmId[item.nmID] = {
+      supplierArticle: item.vendorCode.replace(/\s/g, ""),
+      object: item.object,
+      brand: item.brand,
+      sizes: item.sizes,
+      colors: item.colors,
+    };
+  });
 
   // const sheet_data = [];
   // for (const [art, barcode] of Object.entries(jsonDataBarcodes)) {
@@ -707,6 +726,12 @@ const writeVendorCodeToJson = (data, campaign) => {
   fs.writeFile(
     path.join(__dirname, "files", campaign, "vendorCodesFull.json"),
     JSON.stringify(jsonDataFull)
+  )
+    .then(() => console.log("vendorCodesFull.json created."))
+    .catch((error) => console.error(error));
+  fs.writeFile(
+    path.join(__dirname, "files", campaign, "artsNmIdsFull.json"),
+    JSON.stringify(jsonDataFullByNmId)
   )
     .then(() => console.log("vendorCodesFull.json created."))
     .catch((error) => console.error(error));
@@ -854,6 +879,18 @@ const writeOrdersToJson = (data, campaign, date) => {
       path.join(__dirname, "files", campaign, "artsBarcodes.json")
     )
   );
+  const artsBarcodesFull = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "artsBarcodesFull.json")
+    )
+  );
+
+  const brand_names = {
+    МАЮША: "МАЮША",
+    DELICATUS: "DELICATUS",
+    "Объединённая текстильная компания": "ОТК",
+    "Amaze wear": "Amaze wear",
+  };
 
   const excluded = { excluded: [] };
   data.forEach((item) => {
@@ -916,13 +953,28 @@ const writeOrdersToJson = (data, campaign, date) => {
     jsonData[order_date_string][supplierArticle] += 1;
 
     // ---------------------------
-    if (!(order_date_string in byDayCampaignSum))
-      byDayCampaignSum[order_date_string] = { count: 0, sum: 0 };
-    byDayCampaignSum[order_date_string].sum += get_normalized_price(
-      jsonData[order_date_string][supplierArticle],
-      orderSumJsonData[order_date_string][supplierArticle]
-    );
-    byDayCampaignSum[order_date_string].count += 1;
+    if (supplierArticle) {
+      if (!(order_date_string in byDayCampaignSum))
+        byDayCampaignSum[order_date_string] = { count: 0, sum: 0 };
+      byDayCampaignSum[order_date_string].sum += get_normalized_price(
+        jsonData[order_date_string][supplierArticle],
+        orderSumJsonData[order_date_string][supplierArticle]
+      );
+      byDayCampaignSum[order_date_string].count += 1;
+
+      // console.log(supplierArticle, artsBarcodesFull[supplierArticle], item);
+
+      const brand = brand_names[artsBarcodesFull[supplierArticle].brand];
+      if (!(brand in byDayCampaignSum)) byDayCampaignSum[brand] = {};
+      if (!(order_date_string in byDayCampaignSum[brand]))
+        byDayCampaignSum[brand][order_date_string] = { count: 0, sum: 0 };
+      byDayCampaignSum[brand][order_date_string].sum += get_normalized_price(
+        jsonData[order_date_string][supplierArticle],
+        orderSumJsonData[order_date_string][supplierArticle]
+      );
+      byDayCampaignSum[brand][order_date_string].count += 1;
+    }
+
     // ---------------------------
 
     // by now
@@ -1006,7 +1058,7 @@ const writeOrdersToJson = (data, campaign, date) => {
     .catch((error) => console.error(error));
 };
 
-const calcStatsTrendsAndWtriteToJSON = (campaign) =>
+const calcStatsTrendsAndWtriteToJSON = (campaign, now) =>
   new Promise((resolve, reject) => {
     const jsonData = {
       today: {
@@ -1057,13 +1109,13 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
       )
     );
 
-    const today = new Date();
+    const today = new Date(now);
     const today_string = today
       .toLocaleDateString("ru-RU")
       .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
       .slice(0, 10);
 
-    const yesterday = new Date();
+    const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterday_string = yesterday
       .toLocaleDateString("ru-RU")
@@ -1100,7 +1152,7 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
     // /orders ------------------------------------------------------------
 
     // adverts ------------------------------------------------------------
-    const hour_key = today.toLocaleTimeString("ru-RU").slice(0, 2);
+    const hour_key = now.toLocaleTimeString("ru-RU").slice(0, 2);
     for (const [rk_id, item] of Object.entries(
       advertStatsMpManagerLog.today[hour_key]
     )) {
@@ -1143,7 +1195,7 @@ const calcStatsTrendsAndWtriteToJSON = (campaign) =>
 
     for (const [metric, val] of Object.entries(jsonData.trend)) {
       jsonData.trend[metric] =
-        -1 * (jsonData.yesterday[metric] / jsonData.today[metric] - 1);
+        jsonData.today[metric] / jsonData.yesterday[metric] - 1;
     }
     jsonData.trend.drr = jsonData.today.drr - jsonData.yesterday.drr;
     return fs
@@ -1370,9 +1422,9 @@ const calcAvgDrrByArtAndWriteToJSON = (campaign) => {
     const artData = advertStatsByArtByDay[art];
     if (!artData) return result;
     const today_date = new Date();
-    for (let i = 2; i <= 8; i++) {
+    for (let i = 1; i < 8; i++) {
       // last full week
-      const cur_date = new Date();
+      const cur_date = new Date(today_date);
       cur_date.setDate(today_date.getDate() - i);
       const str_date = cur_date
         .toLocaleDateString("ru-RU")
@@ -1585,6 +1637,19 @@ const getAdvertStatByMaskByDayAndWriteToJSONMpManager = async (campaign) => {
       path.join(__dirname, "files", campaign, "vendorCodes.json")
     )
   );
+  const artsNmIdsFull = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "files", campaign, "artsNmIdsFull.json")
+    )
+  );
+
+  const brand_names = {
+    МАЮША: "МАЮША",
+    DELICATUS: "DELICATUS",
+    "Объединённая текстильная компания": "ОТК",
+    "Amaze wear": "Amaze wear",
+  };
+
   const jsonDataByArt = {};
   const jsonData = {};
   let a = 0;
@@ -1628,6 +1693,35 @@ const getAdvertStatByMaskByDayAndWriteToJSONMpManager = async (campaign) => {
         console.log(art_id, date);
         continue;
       }
+
+      const brand = brand_names[artsNmIdsFull[art_id].brand];
+      if (!(brand in jsonData)) jsonData[brand] = {};
+
+      if (!(date in jsonData[brand]))
+        jsonData[brand][date] = {
+          views: 0,
+          clicks: 0,
+          unique_users: 0,
+          sum: 0,
+          ctr: 0,
+          cpm: 0,
+          cpc: 0,
+        };
+      jsonData[brand][date].views += artData.views ?? 0;
+      jsonData[brand][date].clicks += artData.clicks ?? 0;
+      jsonData[brand][date].sum += artData.cost ?? 0;
+      if (jsonData[brand][date].views)
+        jsonData[brand][date].ctr =
+          jsonData[brand][date].clicks / jsonData[brand][date].views;
+      if (jsonData[brand][date].views)
+        jsonData[brand][date].cpm =
+          jsonData[brand][date].sum / (jsonData[brand][date].views / 1000);
+      if (jsonData[brand][date].clicks)
+        jsonData[brand][date].cpc =
+          jsonData[brand][date].sum / jsonData[brand][date].clicks;
+
+      // full brand sums
+
       const art = vendorCodes[art_id];
       if (!(art in jsonDataByArt)) jsonDataByArt[art] = {};
       if (!(date in jsonDataByArt[art]))
@@ -1850,7 +1944,7 @@ const generateGeneralMaskFormsAndWriteToJSON = () =>
       });
   });
 
-const sendTgBotTrendMessage = (hour_key) =>
+const sendTgBotTrendMessage = (now, hour_key) =>
   new Promise((resolve, reject) => {
     const campaigns = JSON.parse(
       afs.readFileSync(path.join(__dirname, "files", "campaigns.json"))
@@ -1902,13 +1996,14 @@ const sendTgBotTrendMessage = (hour_key) =>
         "%"
       )}\n• Профит: ${jsonData.profit.replace("*", "р.")}\n\n`;
     }
-    text += `#метрики #в${hour_key} #${new Date().toLocaleDateString("ru-RU", {
+    text += `#метрики #в${hour_key} #${now.toLocaleDateString("ru-RU", {
       weekday: "short",
     })}${hour_key}`;
 
     const bot = new TelegramBot(tg.token);
     bot.sendMessage(tg.chatIds.dev, text);
     bot.sendMessage(tg.chatIds.prod, text);
+    bot.sendMessage(tg.chatIds.manager, text);
     delete bot;
     // jsonData.push(mask_array.join("_"));
   });
@@ -2082,6 +2177,7 @@ const answerFeedbacks = (campaign) =>
       const answers = answerTemplates[mask];
       for (const [index, feedback_data] of Object.entries(art_feedbacks)) {
         if (!answers || !answers.length) continue;
+        if (feedback_data.productValuation < 4) continue;
         console.log(feedback_data.id, art, mask, answers[0]);
         console.log("");
         await updateFeedback(authToken, {
@@ -2107,7 +2203,20 @@ const answerFeedbacks = (campaign) =>
       .catch((error) => console.error(error));
   });
 
-const updatePrices = async (campaign) => {
+const updatePrices = async (brand) => {
+  const brands = JSON.parse(
+    await fs.readFile(path.join(__dirname, `files/campaigns.json`))
+  ).brands;
+  let campaign = undefined;
+  for (const [camp, brands_array] of Object.entries(brands)) {
+    if (brands_array.includes(brand)) {
+      campaign = camp;
+      break;
+    }
+  }
+  if (!campaign) return 0;
+  console.log(brands, campaign, brand);
+
   const authToken = getAuthToken("api-token", campaign);
   const newPricesPath = path.join(
     __dirname,
@@ -2559,7 +2668,7 @@ const fetchAdvertStatsAndWriteToJsonMpManager = async (campaign) => {
     .catch((error) => console.error(error));
 };
 
-const fetchAdvertStatsAndWriteToJsonMpManagerLog = async (campaign) => {
+const fetchAdvertStatsAndWriteToJsonMpManagerLog = async (campaign, now) => {
   const authToken = getAuthTokenMpManager("api-token", campaign);
   const advertInfos = JSON.parse(
     afs.readFileSync(
@@ -2584,14 +2693,14 @@ const fetchAdvertStatsAndWriteToJsonMpManagerLog = async (campaign) => {
       )
     );
 
-  const dateTo = new Date();
+  const dateTo = new Date(now);
   const dateFrom = new Date(
     dateTo
       .toLocaleDateString("ru-RU")
       .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
       .slice(0, 10)
   );
-  const hour_key = dateTo.toLocaleTimeString("ru-RU").slice(0, 2);
+  const hour_key = now.toLocaleTimeString("ru-RU").slice(0, 2);
   jsonData.yesterday[hour_key] = jsonData.today[hour_key];
   jsonData.today[hour_key] = [];
 
@@ -2774,15 +2883,15 @@ const updateAutoAdvertsInCampaign = async (campaign) => {
         );
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      await updatePlacementsInAutoRK(
-        authToken,
-        querystring.stringify({ id: data.advertId }),
-        {
-          recom: false,
-          booster: true,
-          carousel: false,
-        }
-      );
+      // await updatePlacementsInAutoRK(
+      //   authToken,
+      //   querystring.stringify({ id: data.advertId }),
+      //   {
+      //     recom: false,
+      //     booster: true,
+      //     carousel: false,
+      //   }
+      // );
     }
   }
 };
@@ -2963,6 +3072,72 @@ const calcAdvertismentAndWriteToJSON = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const calcAutoEnteredValuesAndWriteToJSON = () => {
+  const autoPriceRules = JSON.parse(
+    afs.readFileSync(path.join(__dirname, `files/autoPriceRules.json`))
+  );
+  console.log(autoPriceRules);
+  const find_roi = (art, brand, obor_data) => {
+    const generalMask = getGeneralMaskFromVendorCode(art);
+    const obor = obor_data[art];
+    console.log(art, brand, obor, generalMask);
+    for (const [index, value] of Object.entries(autoPriceRules.turn)) {
+      if (obor <= parseInt(value))
+        return autoPriceRules[brand][generalMask][value];
+    }
+    throw new Error(`roi couldnt be found for ${art}`);
+  };
+  const brand_names = {
+    МАЮША: "МАЮША",
+    DELICATUS: "DELICATUS",
+    "Объединённая текстильная компания": "ОТК",
+    "Amaze wear": "Amaze wear",
+  };
+  const campaign_brands = JSON.parse(
+    afs.readFileSync(path.join(__dirname, `files/campaigns.json`))
+  ).brands;
+  for (const [campaign, brands] of Object.entries(campaign_brands)) {
+    const obor_data = {};
+    const xlsx_data = xlsx.parse(
+      path.join(__dirname, `files/${campaign}/data.xlsx`)
+    );
+    for (let i = 0; i < xlsx_data.length; i++) {
+      const label_row = xlsx_data[i].data[0];
+      for (let j = 1; j < xlsx_data[i].data.length; j++) {
+        const row = xlsx_data[i].data[j];
+        if (row[0] == "") continue;
+        obor_data[row[0]] = !isNaN(row[label_row.indexOf("Оборачиваемость")])
+          ? row[label_row.indexOf("Оборачиваемость")]
+          : 0;
+        // console.log(row[0], obor_data[row[0]]);
+      }
+    }
+
+    // console.log(data);
+    const jsonData = {};
+    const artsBarcodesFull = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "files", campaign, `artsBarcodesFull.json`)
+      )
+    );
+    for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+      const brand = brand_names[art_data.brand];
+      if (!(brand in jsonData)) jsonData[brand] = {};
+      try {
+        jsonData[brand][art] = {
+          roi: find_roi(art, brand, obor_data),
+          roz_price: 0,
+          spp_price: 0,
+        };
+      } catch (e) {}
+    }
+    afs.writeFileSync(
+      path.join(__dirname, "files", campaign, "enteredValues.json"),
+      JSON.stringify(jsonData)
+    );
+  }
+};
+
 const calcAvgOrdersAndWriteToJSON = (campaign) => {
   const orders_by_day = JSON.parse(
     afs.readFileSync(
@@ -3131,12 +3306,6 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
   const arts_data = JSON.parse(
     afs.readFileSync(path.join(__dirname, "files/data.json"))
   );
-  const data = xlsx.parse(
-    path.join(__dirname, `files/${campaign}/data.xlsx`)
-  )[0]["data"];
-  const ads = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", campaign, "ads.json"))
-  );
 
   // ------------------------
   const storageCost = JSON.parse(
@@ -3150,113 +3319,129 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
   const storageCostForArt =
     storageCost / byDayCampaignSalesSum.fullLastWeek.count;
   // ------------------------
+  const brands = JSON.parse(
+    afs.readFileSync(path.join(__dirname, `files/campaigns.json`))
+  ).brands[campaign];
+  const xlsx_data = xlsx.parse(
+    path.join(__dirname, `files/${campaign}/data.xlsx`)
+  );
+  const json_data = {};
+  for (let i = 0; i < xlsx_data.length; i++) {
+    json_data[xlsx_data[i].name] = xlsx_data[i].data;
+  }
+  // console.log(data);
+  for (const [index, brand] of Object.entries(brands)) {
+    // console.log(brand);
+    for (let i = 1; i < json_data[brand].length; i++) {
+      let row = json_data[brand][i];
+      // console.log(row);
+      const vendorCode = row[0];
+      if (
+        !vendorCode ||
+        !arts_data[vendorCode] ||
+        !enteredValues[brand][vendorCode]
+      ) {
+        row[14] = "";
+        row[15] = "";
+        row[16] = "";
+        row[17] = "";
 
-  for (let i = 1; i < data.length; i++) {
-    let row = data[i];
-    // console.log(row);
-    const vendorCode = row[0];
-    if (!vendorCode || !arts_data[vendorCode] || !enteredValues[vendorCode]) {
-      row[14] = "";
-      row[15] = "";
-      row[16] = "";
-      row[17] = "";
-
-      data[i] = row;
-      continue;
-    }
-
-    const calc = (roz_price) => {
-      const spp_price = Math.floor(
-        roz_price * (1 - arts_data[vendorCode].spp / 100)
-      );
-      const commission = roz_price * (arts_data[vendorCode].commission / 100);
-      const delivery = arts_data[vendorCode].delivery;
-      const tax = spp_price * (arts_data[vendorCode].tax / 100);
-      const expences =
-        campaign == "TKS" ? spp_price * 0.07 : arts_data[vendorCode].expences;
-      const prime_cost = arts_data[vendorCode].prime_cost;
-      // ads
-      const find_ad = () => {
-        for (const code in ads) {
-          if (vendorCode.match(code.replace("+", "\\+"))) return ads[code].ads;
-        }
-        return 0;
-      };
-
-      // const ad = find_ad(); //analytics ad
-      // const drr = ad / spp_price;
-
-      const ad = spp_price * (arts_data[vendorCode].ad / 100);
-      const drr = ad / spp_price;
-
-      const profit =
-        -ad -
-        commission -
-        delivery -
-        storageCostForArt -
-        tax -
-        expences -
-        prime_cost +
-        roz_price;
-      const wb_price = roz_price / (1 - row[3] / 100);
-
-      const roi = profit / (prime_cost + expences);
-      return {
-        new_roi: roi,
-        new_roz_price: roz_price,
-        new_spp_price: spp_price,
-        new_wb_price: wb_price,
-      };
-    };
-    const entered_roi = enteredValues[vendorCode].roi / 100;
-    const entered_roz_price = enteredValues[vendorCode].roz_price;
-    const entered_spp_price = enteredValues[vendorCode].spp_price;
-    let count = 0;
-    if (entered_roi) count++;
-    if (entered_roz_price) count++;
-    if (entered_spp_price) count++;
-    if (count != 1) {
-      row[14] = "";
-      row[15] = "";
-      row[16] = "";
-      row[17] = "";
-
-      data[i] = row;
-      continue;
-    }
-
-    const diffs = [];
-    const calculateds = {};
-    for (let i = 450; i < 2800; i++) {
-      const calculated = calc(i);
-      let diff = undefined;
-      if (entered_roi) {
-        diff = Math.abs(calculated.new_roi - entered_roi);
-      } else if (entered_roz_price) {
-        diff = Math.abs(calculated.new_roz_price - entered_roz_price);
-      } else if (entered_spp_price) {
-        diff = Math.abs(calculated.new_spp_price - entered_spp_price);
+        json_data[brand][i] = row;
+        continue;
       }
-      diffs.push(diff);
-      calculateds[String(diff)] = calculated;
-      // break;
+
+      const calc = (roz_price) => {
+        const spp_price = Math.floor(
+          roz_price * (1 - arts_data[vendorCode].spp / 100)
+        );
+        const commission = roz_price * (arts_data[vendorCode].commission / 100);
+        const delivery = arts_data[vendorCode].delivery;
+        const tax = spp_price * (arts_data[vendorCode].tax / 100);
+        const expences =
+          campaign == "TKS" ? spp_price * 0.07 : arts_data[vendorCode].expences;
+        const prime_cost = arts_data[vendorCode].prime_cost;
+        const ad = spp_price * (arts_data[vendorCode].ad / 100);
+        const drr = ad / spp_price;
+
+        const profit =
+          -ad -
+          commission -
+          delivery -
+          storageCostForArt -
+          tax -
+          expences -
+          prime_cost +
+          roz_price;
+        const wb_price = roz_price / (1 - row[3] / 100);
+
+        const roi = profit / (prime_cost + expences);
+        return {
+          new_roi: roi,
+          new_roz_price: roz_price,
+          new_spp_price: spp_price,
+          new_wb_price: wb_price,
+        };
+      };
+      const entered_roi = enteredValues[brand][vendorCode].roi / 100;
+      const entered_roz_price = enteredValues[brand][vendorCode].roz_price;
+      const entered_spp_price = enteredValues[brand][vendorCode].spp_price;
+      let count = 0;
+      if (entered_roi) count++;
+      if (entered_roz_price) count++;
+      if (entered_spp_price) count++;
+      if (count != 1) {
+        row[14] = "";
+        row[15] = "";
+        row[16] = "";
+        row[17] = "";
+
+        json_data[brand][i] = row;
+        continue;
+      }
+
+      const diffs = [];
+      const calculateds = {};
+      for (let i = 450; i < 2800; i++) {
+        const calculated = calc(i);
+        let diff = undefined;
+        if (entered_roi) {
+          diff = Math.abs(calculated.new_roi - entered_roi);
+        } else if (entered_roz_price) {
+          diff = Math.abs(calculated.new_roz_price - entered_roz_price);
+        } else if (entered_spp_price) {
+          diff = Math.abs(calculated.new_spp_price - entered_spp_price);
+        }
+        diffs.push(diff);
+        calculateds[String(diff)] = calculated;
+        // break;
+      }
+
+      diffs.sort();
+      const min_diff = String(diffs[0]);
+      // console.log(min_diff, diffs, calculateds[min_diff])
+      row[14] = calculateds[min_diff].new_roi;
+      row[15] = calculateds[min_diff].new_roz_price;
+      row[16] = calculateds[min_diff].new_spp_price;
+      row[17] = calculateds[min_diff].new_wb_price;
+
+      json_data[brand][i] = row;
     }
-
-    diffs.sort();
-    const min_diff = String(diffs[0]);
-    // console.log(min_diff, diffs, calculateds[min_diff])
-    row[14] = calculateds[min_diff].new_roi;
-    row[15] = calculateds[min_diff].new_roz_price;
-    row[16] = calculateds[min_diff].new_spp_price;
-    row[17] = calculateds[min_diff].new_wb_price;
-
-    data[i] = row;
   }
 
-  const buffer = xlsx.build([{ name: "Общий отчёт", data: data }]);
+  const xlsx_data_temp = [];
+  for (const [name, sheet_data] of Object.entries(json_data)) {
+    xlsx_data_temp.push({ name: name, data: sheet_data });
+  }
+  // console.log(json_data['Amaze wear']);
+
   return fs
-    .writeFile(path.join(__dirname, "files", campaign, "data.xlsx"), buffer)
-    .then(() => console.log("data.xlsx created."))
+    .writeFile(
+      path.join(__dirname, "files", campaign, "data.xlsx"),
+      xlsx.build(xlsx_data_temp)
+    )
+    .then(() => {
+      console.log("data.xlsx created.");
+    })
     .catch((error) => console.error(error));
 };
 
@@ -3297,6 +3482,7 @@ module.exports = {
   fetchSalesAndWriteToJSON,
   fetchAdvertStatsAndWriteToJsonMpManagerLog,
   calcStatsTrendsAndWtriteToJSON,
+  calcAutoEnteredValuesAndWriteToJSON,
   sendTgBotTrendMessage,
 };
 
@@ -3308,6 +3494,8 @@ const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
   else if (code.includes("КПБ")) {
     code.splice(3, 1);
     if (code.includes("DELICATUS")) code.pop();
+  } else if (code.includes("ФТБЛ")) {
+    code.splice(-2, 2);
   } else code.splice(2, 1);
 
   return code.join("_");

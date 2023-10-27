@@ -298,7 +298,7 @@ async function autoGenerateNewTags(campaign, brand) {
     );
 
     const logo = await loadImage(
-      path.join(__dirname, "files", "logos", `${brand}.jpg`)
+      path.join(__dirname, "files", "logos", `${brand}.png`)
     );
 
     for (const [art, art_data] of Object.entries(artsBarcodesFull)) {

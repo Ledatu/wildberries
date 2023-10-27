@@ -19,5 +19,5 @@ const {
 // exportAll()
 // newTagsGeneration();
 // autofillCurrent("delicatus ПР 06 МК ТУЛА");
-autoGenerateNewTags('TKS', 'Amaze wear');
+autoGenerateNewTags('delicatus', 'DELICATUS');
 // exportAll()
