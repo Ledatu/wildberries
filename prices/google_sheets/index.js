@@ -6,6 +6,7 @@ const { google } = require("googleapis");
 const console = require("console");
 const { analytics } = require("googleapis/build/src/apis/analytics");
 const { kMaxLength } = require("buffer");
+const { json } = require("express");
 const xlsx = require("node-xlsx").default;
 
 // If modifying these scopes, delete token.json.
@@ -102,7 +103,7 @@ async function writePrices(auth, campaign) {
     json_data[xlsx_data[i].name] = xlsx_data[i].data;
   }
   for (const [brand, sheet_data] of Object.entries(json_data)) {
-    // console.log(data.name);
+    // console.log(campaign, brand, sheet_data[0]);
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `${brand}!1:1000`,
@@ -164,10 +165,37 @@ async function writeDetailedByPeriod(auth, campaign) {
 
       if (row[4] != seller_ids[campaign]) continue;
 
-      const type = getMaskFromVendorCode(row[0]);
-      // console.log(type);
+      const art = row[0];
+      // const type = getMaskFromVendorCode(art);
+      if (art.includes("_ЕН")) {
+        type += "_ЕН";
+      }
+      let type = getMaskFromVendorCode(art).slice(0, 2);
+      // console.log(
+      //   art,
+      //   type,
+      //   `${
+      //     delivery[type]
+      //       ? delivery[type].average_delivery
+      //       : art.includes("_ЕН")
+      //       ? "150"
+      //       : "50"
+      //   }`.replace(".", ",")
+      // );
+
+      // data[i][0] = `${
+      //   delivery[art]
+      //     ? delivery[art].average_delivery
+      //     : delivery[type]
+      //     ? delivery[type].average_delivery
+      //     : "50"
+      // }`.replace(".", ",");
       data[i][0] = `${
-        delivery[type] ? delivery[type].average_delivery : "50"
+        delivery[type]
+          ? delivery[type].average_delivery
+          : art.includes("_ЕН")
+          ? "150"
+          : "50"
       }`.replace(".", ",");
       // console.log(campaign, type, data[i]);
     }
@@ -219,16 +247,35 @@ async function writeDrrToDataSpreadsheet(auth) {
             path.join(__dirname, `../files/${campaign}/avgDrrByMask.json`)
           )
         );
+        const artsBarcodesFull = await JSON.parse(
+          await fs.readFile(
+            path.join(__dirname, "../files", campaign, "artsBarcodesFull.json")
+          )
+        );
 
         const row = rows[i];
         if (row[0] == "") continue;
         data.push([row[11]]);
 
         if (row[4] != seller_ids[campaign]) continue;
+        if (!artsBarcodesFull[row[0]]) continue;
 
-        const type = getMaskFromVendorCode(row[0]).slice(0, 2);
+        const brand_names = {
+          МАЮША: "МАЮША",
+          DELICATUS: "DELICATUS",
+          "Объединённая текстильная компания": "ОТК",
+          "Объединённая текстильная компания ЕН": "ОТК ЕН",
+          "Amaze wear": "Amaze wear",
+          "Creative Cotton": "Creative Cotton",
+          Перинка: "Перинка",
+          "Trinity Fashion": "Trinity Fashion",
+        };
+        // console.log(row[0]);
+        // const type = brand_names[artsBarcodesFull[row[0]].brand];
+        const type = getMaskFromVendorCode(row[0]);
+        // const type = getMaskFromVendorCode(row[0]).slice(0, 2);
         // console.log(type);
-        data[i][0] = drr[type].drr ?? 0;
+        data[i][0] = drr[type] ? drr[type].drr ?? 0 : 0;
         // console.log(campaign, type, data[i]);
       }
     }
@@ -273,24 +320,51 @@ async function writeSppToDataSpreadsheet(auth) {
     const rows = res.data.values;
     // console.log(rows);
     const data = [];
-    for (let i = 0; i < rows.length; i++) {
-      for (const [campaign, seller_id] of Object.entries(seller_ids)) {
-        const spp = JSON.parse(
-          await fs.readFile(
-            path.join(__dirname, `../files/${campaign}/spp by mask.json`)
-          )
-        );
-
+    for (const [campaign, seller_id] of Object.entries(seller_ids)) {
+      const spp = JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, `../files/${campaign}/spp by mask.json`)
+        )
+      );
+      const stocks = JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, `../files/${campaign}/stocks.json`)
+        )
+      );
+      const sprav = {};
+      for (const [art, spp_data] of Object.entries(spp)) {
+        if (stocks.today[art] < 2 || !stocks.today[art]) continue;
+        const mask = getMaskFromVendorCode(art);
+        sprav[mask] = spp_data.spp;
+      }
+      for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         if (row[0] == "") continue;
         data.push([row[10]]);
 
         if (row[4] != seller_ids[campaign]) continue;
 
-        const type = getMaskFromVendorCode(row[0]);
-        // console.log(type);
-        data[i][0] = spp[type] ?? 0;
-        // console.log(campaign, type, data[i]);
+        // const type = getMaskFromVendorCode(row[0]);
+        let sspp = spp.prev.spp;
+        const type = row[0];
+        if (spp[type]) {
+          sspp = spp[type].spp;
+          if (stocks.today[type] < 2 || !stocks.today[type]) {
+            const mask = getMaskFromVendorCode(type);
+            sspp = sprav[mask];
+          }
+        }
+
+        // console.log(type, spp[type]);
+        data[i][0] = sspp;
+        // console.log(
+        //   campaign,
+        //   type,
+        //   data[i],
+        //   spp[type],
+        //   spp.prev,
+        //   spp[type] ?? spp.prev
+        // );
       }
     }
 
@@ -344,10 +418,12 @@ async function calcAndWriteMinZakazToDataSpreadsheet(auth) {
 
     const calc_min_zakaz = (art, seller_id) => {
       let max_zakaz = 0;
-      for (const [date, date_data] of Object.entries(orders[seller_id])) {
-        max_zakaz = Math.max(max_zakaz, date_data[art]);
-      }
-      if (!max_zakaz) return 5;
+      if (orders[seller_id])
+        for (const [date, date_data] of Object.entries(orders[seller_id])) {
+          max_zakaz = Math.max(max_zakaz, date_data[art]);
+        }
+      console.log(art, max_zakaz);
+      if (!max_zakaz) return art.includes("ФТБЛ") ? 1 : 1;
       return Math.ceil(
         (Math.ceil(max_zakaz / 2) * arts_data[art].pref_obor) /
           arts_data[art].multiplicity
@@ -435,6 +511,9 @@ async function fetchNewPricesAndWriteToJSON(auth, brand) {
     const brands = JSON.parse(
       await fs.readFile(path.join(__dirname, `../files/campaigns.json`))
     ).brands;
+    const artsData = JSON.parse(
+      await fs.readFile(path.join(__dirname, `../files/data.json`))
+    );
     let campaign = undefined;
     for (const [camp, brands_array] of Object.entries(brands)) {
       if (brands_array.includes(brand)) {
@@ -455,21 +534,27 @@ async function fetchNewPricesAndWriteToJSON(auth, brand) {
     const jsonData = {};
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `${brand}!A2:R`,
+      range: `${brand}!A2:S`,
       // valueRenderOption: "UNFORMATTED_VALUE",
     });
 
     const rows = res.data.values;
     rows.forEach((row) => {
-      if (row[17] == "" || !row[17]) return;
-      const new_price = Number(
-        row[17].replace("%", "").replace(",", ".").replace(/\s/g, "")
+      if (row[18] == "" || !row[18]) return;
+      const new_price = Math.round(
+        Number(row[18].replace("%", "").replace(",", ".").replace(/\s/g, ""))
       );
-      if (!new_price || new_price > 200000 || new_price < 4500) return;
+      const discount = Number(
+        row[3].replace("%", "").replace(",", ".").replace(/\s/g, "")
+      );
+      const discounted_price = new_price * (1 - discount / 100);
+      if (!new_price || discounted_price > 30000 || discounted_price < 450)
+        return;
       const roi = Number(
-        row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
+        row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
-      if (roi < -30) return;
+      // if (roi < -30) return;
+      if (discounted_price < artsData[row[0]].prime_cost) return;
       // console.log(row[0], artsBarcodesFull[row[0]]);
       jsonData[artsBarcodesFull[row[0]].nmId] = new_price;
     });
@@ -490,7 +575,7 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
   return new Promise(async (resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
 
-    const jsonData = {};
+    const jsonData = { turn: [], hours: [] };
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `РОБОТ ЦЕН!1:1000`,
@@ -506,20 +591,30 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
     const schedule_index = label_row.indexOf(
       "Расписание проверки и корректировки цен"
     );
+    for (let i = 2; i < rows.length; i++) {
+      if (rows[i][schedule_index] == "" || !rows[i][schedule_index]) continue;
+      const hour = String(parseInt(rows[i][schedule_index]) - 1);
+      jsonData.hours.push((hour.length < 2 ? "0" : "") + hour);
+    }
 
     jsonData.turn = turn_row.slice(generalMask_index + 1, schedule_index - 1);
     for (let i = 2; i < rows.length; i++) {
       const row = rows[i];
+      if (!row[generalMask_index] || row[generalMask_index] == "") continue;
+
       const brand = row[brand_index];
       if (!(brand in jsonData)) jsonData[brand] = {};
 
       const generalMask = row[generalMask_index];
       if (!(generalMask in jsonData[brand])) jsonData[brand][generalMask] = {};
 
+      // console.log(row);
       for (let j = generalMask_index + 1; j < schedule_index - 1; j++) {
-        jsonData[brand][generalMask][turn_row[j]] = parseFloat(
-          row[j].replace("%", "").replace(",", ".").replace(/\s/g, "")
-        );
+        jsonData[brand][generalMask][turn_row[j]] = row[j]
+          ? parseFloat(
+              row[j].replace("%", "").replace(",", ".").replace(/\s/g, "")
+            )
+          : null;
       }
     }
 
@@ -717,7 +812,7 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
     for (const [index, brand] of Object.entries(brands)) {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-        range: `${brand}!A2:Q`,
+        range: `${brand}!A2:R`,
       });
 
       const rows = res.data.values;
@@ -728,21 +823,26 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
         // console.log(row);
         if (!row.slice(14).length) return;
         data[brand][row[0]] = {
-          roi: Number(
-            row[14]
-              ? row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
-              : 0
-          ),
-          roz_price: Number(
-            row[15]
-              ? row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
-              : 0
-          ),
-          spp_price: Number(
-            row[16]
-              ? row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
-              : 0
-          ),
+          rentabelnost: row[14]
+            ? Number(
+                row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
+              )
+            : undefined,
+          roi: row[15]
+            ? Number(
+                row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
+              )
+            : undefined,
+          roz_price: row[16]
+            ? Number(
+                row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
+              )
+            : undefined,
+          spp_price: row[17]
+            ? Number(
+                row[17].replace("%", "").replace(",", ".").replace(/\s/g, "")
+              )
+            : undefined,
         };
       });
     }
@@ -860,6 +960,233 @@ function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
   });
 }
 
+function updateRNP(auth) {
+  return new Promise(async (resolve, reject) => {
+    const now = new Date();
+    const cur_date = parseInt(now.toLocaleDateString("ru-RU").slice(0, 2));
+
+    const sheets = google.sheets({ version: "v4", auth });
+    const brands = JSON.parse(
+      await fs.readFile(path.join(__dirname, "../files", "campaigns.json"))
+    ).brands;
+
+    const unique_params_res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: "РНП 2.0!2:2",
+    });
+    const unique_params_temp = unique_params_res.data.values[0];
+    const unique_params = [];
+    for (let i = 1; i < unique_params_temp.length; i++)
+      if (
+        !unique_params.includes(unique_params_temp[i]) &&
+        unique_params_temp[i]
+      )
+        unique_params.push(unique_params_temp[i]);
+    const param_map = {
+      "Прибыль ₽": { name: "profit", formula: "sum" },
+      "Заказы ₽": { name: "sum_orders", formula: "sum" },
+      "Заказы шт.": { name: "orders", formula: "sum" },
+      "Реклама ₽": { name: "sum_advert", formula: "sum" },
+      "%ДРР": { name: "drr", formula: "avg" },
+      "%Конверсии": { name: "conversion", formula: "avg" },
+      Показы: { name: "views", formula: "sum" },
+      SKU: { name: "sku", formula: "avg" },
+    };
+    console.log(unique_params);
+
+    const brand_plan_res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: "РНП 2.0!3:10",
+    });
+    const brand_plan_temp = brand_plan_res.data.values;
+    const brand_plan = {};
+    for (let i = 0; i < brand_plan_temp.length; i++) {
+      const row = brand_plan_temp[i];
+      const brand = row[0];
+      if (!brand || brand == "") continue;
+      if (!(brand in brand_plan)) brand_plan[brand] = {};
+
+      for (let j = 0; j < unique_params.length; j++) {
+        const metric = param_map[unique_params[j]].name;
+        if (!(metric in brand_plan[brand])) brand_plan[brand][metric] = 0;
+        const value = Number(
+          row[j + 1]
+            ? row[j + 1].replace("%", "").replace(",", ".").replace(/\s/g, "")
+            : "0"
+        );
+        brand_plan[brand][metric] = unique_params[j].includes("%")
+          ? value / 100
+          : value;
+      }
+    }
+    console.log(brand_plan);
+
+    const jsonData = {}; //brand->metric->date,plan
+    for (const [campaign, brands_data] of Object.entries(brands)) {
+      const RNPByDayMetrics = await JSON.parse(
+        await fs.readFile(
+          path.join(__dirname, "../files", "RNPByDayMetrics.json")
+        )
+      );
+
+      const get_proper_mask = (temp_mask) => {
+        const mask_splitted = temp_mask.split("_");
+        if (campaign != "delicatus" || !temp_mask.includes("КПБ"))
+          mask_splitted.pop();
+        if (temp_mask.includes("НАМАТРАСНИК")) {
+          if (campaign == "delicatus") mask_splitted.pop();
+        }
+        return mask_splitted.join("_");
+      };
+
+      for (const [index, brand] of Object.entries(brands_data)) {
+        // if (!(brand in brand_plan)) continue;
+        if (!(brand in jsonData)) jsonData[brand] = {};
+
+        for (const [index, param] of Object.entries(unique_params)) {
+          const metric = param_map[param].name;
+          const metric_formula = param_map[param].formula;
+          // console.log(brand_plan[brand], brand);
+          if (!(metric in jsonData[brand]))
+            jsonData[brand][metric] = {
+              month: {
+                plan: brand_plan[brand] ? brand_plan[brand][metric] : 0,
+                fact: RNPByDayMetrics[brand].month[metric],
+                done: 0,
+                prediction: 0,
+                done_prediction: 0,
+              },
+            };
+
+          jsonData[brand][metric].month.done = jsonData[brand][metric].month
+            .plan
+            ? jsonData[brand][metric].month.fact /
+              jsonData[brand][metric].month.plan
+            : 0;
+
+          if (metric_formula == "sum") {
+            jsonData[brand][metric].month.prediction =
+              (jsonData[brand][metric].month.fact / cur_date) *
+              new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+
+            jsonData[brand][metric].month.done_prediction = jsonData[brand][
+              metric
+            ].month.plan
+              ? jsonData[brand][metric].month.prediction /
+                jsonData[brand][metric].month.plan
+              : 0;
+          }
+          // else {
+          //   jsonData[brand][metric].month.prediction =
+          //     jsonData[brand][metric].month.fact;
+          //   jsonData[brand][metric].month.done_prediction =
+          //     jsonData[brand][metric].month.done;
+          // }
+
+          for (let i = 0; i < cur_date; i++) {
+            const date = new Date(now);
+            date.setDate(date.getDate() - i);
+            // console.log(campaign, brand, date);
+            const str_date = date
+              .toLocaleDateString("ru-RU")
+              .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+              .slice(0, 10);
+            if (!(str_date in jsonData[brand][metric]))
+              jsonData[brand][metric][str_date] = {
+                plan:
+                  jsonData[brand][metric].month.plan /
+                  (metric_formula == "sum" ? 31 : 1),
+                fact: RNPByDayMetrics[brand][str_date][metric],
+                done: 0,
+                prediction: 0,
+                done_prediction: 0,
+              };
+
+            jsonData[brand][metric][str_date].done = jsonData[brand][metric][
+              str_date
+            ].plan
+              ? jsonData[brand][metric][str_date].fact /
+                jsonData[brand][metric][str_date].plan
+              : 0;
+          }
+        }
+      }
+    }
+    await writeDataToFile(
+      jsonData,
+      path.join(__dirname, "../files", "rnp.json")
+    );
+
+    //////////////////////////////////////////////////////////////////////////////////////
+    const sheet_data = [];
+    for (const [brand, metrics] of Object.entries(jsonData)) {
+      const brand_sheet_data = [Array(6)];
+      brand_sheet_data[0][0] = `${brand} ${now
+        .toLocaleString("ru-RU", { month: "long" })
+        .toUpperCase()} ${now.getFullYear()}`;
+      brand_sheet_data.push([
+        "Метрика",
+        "План",
+        "Факт",
+        "%Выполнения",
+        "Прогноз",
+        "%Прогноз",
+      ]);
+      // brand_sheet_data[1][0] = "Метрика";
+      // for (let i = 0; i < unique_params.length; i++) {
+      //   brand_sheet_data[1][i + 1] = unique_params[i];
+      // }
+      for (let i = 0; i < unique_params.length; i++) {
+        // brand_sheet_data[2 + i * 32][0] = unique_params[i];
+        const metric = param_map[unique_params[i]].name;
+        // console.log(metric, metrics[metric], metrics[metric].month);
+        brand_sheet_data.push(
+          [unique_params[i]].concat(Object.values(metrics[metric].month))
+        );
+
+        for (let j = 0; j < 31; j++) {
+          const str_date = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            cur_date - j
+          )
+            .toLocaleDateString("ru-RU")
+            .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+            .slice(0, 10);
+          brand_sheet_data.push(
+            [cur_date - j > 0 ? `${str_date}` : ""].concat(
+              cur_date - j > 0
+                ? Object.values(metrics[metric][str_date])
+                : Array(5)
+            )
+          );
+        }
+      }
+      for (let r_index = 0; r_index < brand_sheet_data.length; r_index++) {
+        if (sheet_data.length <= r_index) sheet_data.push([]);
+        sheet_data[r_index] = sheet_data[r_index].concat(
+          brand_sheet_data[r_index].concat([""])
+        );
+      }
+    }
+
+    // console.log(sheet_data);
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `РНП 2.0!11:1000`,
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
+      range: `РНП 2.0!11:1000`,
+      valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+      resource: {
+        values: sheet_data,
+      },
+    });
+    // await Promise.all(promises).then((pr) => resolve());
+  });
+}
+
 function updatePlanFact(auth, campaign) {
   return new Promise(async (resolve, reject) => {
     const sheets = google.sheets({ version: "v4", auth });
@@ -909,16 +1236,17 @@ function updatePlanFact(auth, campaign) {
       )
     );
 
-    const spIds = {
-      mayusha: "Факт Маюша",
-      delicatus: "Факт Delicatus",
-      TKS: "Факт ОТК",
-      TKS: "Факт Amaze Wear",
-    };
-    if (!(campaign in spIds)) {
-      resolve();
-      return;
-    }
+    // const spIds = {
+    //   mayusha: "Факт Маюша",
+    //   delicatus: "Факт Delicatus",
+    //   TKS: "Факт ОТК",
+    //   Amaze: "Факт Amaze Wear",
+    //   TKS: "Факт Amaze Wear",
+    // };
+    // if (!(campaign in spIds)) {
+    //   resolve();
+    //   return;
+    // }
 
     const get_proper_mask = (temp_mask) => {
       const mask_splitted = temp_mask.split("_");
@@ -965,7 +1293,11 @@ function updatePlanFact(auth, campaign) {
       МАЮША: "МАЮША",
       DELICATUS: "DELICATUS",
       "Объединённая текстильная компания": "ОТК",
+      "Объединённая текстильная компания ЕН": "ОТК ЕН",
       "Amaze wear": "Amaze wear",
+      "Creative Cotton": "Creative Cotton",
+      Перинка: "Перинка",
+      "Trinity Fashion": "Trinity Fashion",
     };
 
     const stocksRatio = { all: { byBrand: {} }, byDate: { byBrand: {} } };
@@ -1031,7 +1363,7 @@ function updatePlanFact(auth, campaign) {
         if (!dates) {
           const cur_date = new Date();
           cur_date.setDate(cur_date.getDate() + 1);
-          for (let i = 0; i < 31; i++) {
+          for (let i = 0; i <= 31; i++) {
             cur_date.setDate(cur_date.getDate() - 1);
             const str_date = cur_date
               .toLocaleDateString("ru-RU")
@@ -1040,7 +1372,31 @@ function updatePlanFact(auth, campaign) {
             // console.log(str_date);
             if (!(str_date in dates_datas)) dates_datas[str_date] = {};
             dates_datas[str_date][mask] = Array(unique_params.length);
+
+            for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+              if (!art.includes(get_proper_mask(mask))) continue;
+
+              const was_present = Number(
+                stocks[str_date]
+                  ? avg_orders[art] <= (stocks[str_date][art] ?? 0)
+                  : 0
+              );
+              const _mask = getMaskFromVendorCode(art);
+              if (!(str_date in stocksRatio.byDate))
+                stocksRatio.byDate[str_date] = {};
+              if (!(_mask in stocksRatio.byDate[str_date]))
+                stocksRatio.byDate[str_date][_mask] = 0;
+              stocksRatio.byDate[str_date][_mask] += was_present;
+
+              const brand = brand_names[art_data.brand];
+              if (!(brand in stocksRatio.byDate.byBrand))
+                stocksRatio.byDate.byBrand[brand] = {};
+              if (!(str_date in stocksRatio.byDate.byBrand[brand]))
+                stocksRatio.byDate.byBrand[brand][str_date] = 0;
+              stocksRatio.byDate.byBrand[brand][str_date] += was_present;
+            }
           }
+
           continue;
         }
 
@@ -1050,23 +1406,6 @@ function updatePlanFact(auth, campaign) {
           dateData.orders = 0;
           dateData.stocks = 0;
           // console.log(date, mask, dateData);
-          if (!sum_orders[date]) {
-            // dates_datas[date] = {};
-            continue;
-          }
-
-          if (!(date in dates_datas)) dates_datas[date] = {};
-
-          for (const [art, sum] of Object.entries(sum_orders[date])) {
-            if (!art.includes(get_proper_mask(mask))) continue;
-            // console.log(art, mask, sum);
-            dateData.sum_orders += sum;
-          }
-          for (const [art, count] of Object.entries(orders[date])) {
-            if (!art.includes(get_proper_mask(mask))) continue;
-            // console.log(art, mask, sum);
-            dateData.orders += count;
-          }
 
           for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
             if (!art.includes(get_proper_mask(mask))) continue;
@@ -1079,6 +1418,32 @@ function updatePlanFact(auth, campaign) {
             if (!(_mask in stocksRatio.byDate[date]))
               stocksRatio.byDate[date][_mask] = 0;
             stocksRatio.byDate[date][_mask] += was_present;
+
+            const brand = brand_names[art_data.brand];
+            if (!(brand in stocksRatio.byDate.byBrand))
+              stocksRatio.byDate.byBrand[brand] = {};
+            if (!(date in stocksRatio.byDate.byBrand[brand]))
+              stocksRatio.byDate.byBrand[brand][date] = 0;
+            stocksRatio.byDate.byBrand[brand][date] += was_present;
+          }
+
+          if (!sum_orders[date]) {
+            // dates_datas[date] = {};
+            // console.log('here');
+            continue;
+          }
+
+          if (!(date in dates_datas)) dates_datas[date] = {};
+
+          for (const [art, sum] of Object.entries(sum_orders[date])) {
+            if (!art.includes(get_proper_mask(mask))) continue;
+            // console.log(art, mask, sum);
+            dateData.sum_orders += sum;
+          }
+          for (const [art, count] of Object.entries(orders[date])) {
+            if (!art.includes(get_proper_mask(mask))) continue;
+            // console.log(art, mask, count);
+            dateData.orders += count;
           }
 
           dateData.stocks = `${stocksRatio.byDate[date][mask]}/${stocksRatio.all[mask]}`;
@@ -1098,7 +1463,7 @@ function updatePlanFact(auth, campaign) {
 
       const cur_date = new Date();
       cur_date.setDate(cur_date.getDate() + 1);
-      for (let i = 0; i < 31; i++) {
+      for (let i = 0; i <= 31; i++) {
         cur_date.setDate(cur_date.getDate() - 1);
         const str_date = cur_date
           .toLocaleDateString("ru-RU")
@@ -1112,13 +1477,15 @@ function updatePlanFact(auth, campaign) {
           // save avg_drr
           // const generalMaskForDrr = all_masks[j].slice(0, 2);
           const generalMaskForDrr = all_masks[j];
+          // const generalMaskForDrr = brand;
           if (!(generalMaskForDrr in avg_drr_by_mask))
             avg_drr_by_mask[generalMaskForDrr] = {
               sum: 0,
               sum_orders: 0,
               drr: 0,
             };
-          if (1 <= i && i < 31) {
+          if (1 <= i && i < 8) {
+            // Указывыет за сколько дней считается дрр для рассчета цен
             // if (generalMaskForDrr == "ПРПЭ_120_DELICATUS")
             //   console.log(str_date, dates_datas[str_date][generalMaskForDrr]);
             if (dates_datas[str_date][all_masks[j]]) {
@@ -1138,6 +1505,12 @@ function updatePlanFact(auth, campaign) {
               )
                 ? date_sum_orders
                 : 0;
+              // if (generalMaskForDrr.slice(0, 2) == "КП")
+              //   console.log(
+              //     Math.round(avg_drr_by_mask[generalMaskForDrr].sum_orders),
+              //     str_date,
+              //     Math.round(date_sum_orders)
+              //   );
               avg_drr_by_mask[generalMaskForDrr].drr = avg_drr_by_mask[
                 generalMaskForDrr
               ].sum_orders
@@ -1177,6 +1550,8 @@ function updatePlanFact(auth, campaign) {
       console.log(jsonDataDrr);
       const campaign_summary = [[]];
       if (brand in advertStatsByMaskByDay) {
+        console.log(brand, advertStatsByMaskByDay[brand]);
+
         for (let i = 3; i < sheet_data.length; i++) {
           if (!sheet_data[i]) continue;
           const str_date = sheet_data[i][0];
@@ -1196,20 +1571,6 @@ function updatePlanFact(auth, campaign) {
               drr: 0,
             };
 
-          for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
-            const was_present = Number(
-              stocks[str_date]
-                ? avg_orders[art] <= (stocks[str_date][art] ?? 0)
-                : 0
-            );
-
-            const brand = brand_names[art_data.brand];
-            if (!(brand in stocksRatio.byDate.byBrand))
-              stocksRatio.byDate.byBrand[brand] = {};
-            if (!(str_date in stocksRatio.byDate.byBrand[brand]))
-              stocksRatio.byDate.byBrand[brand][str_date] = 0;
-            stocksRatio.byDate.byBrand[brand][str_date] += was_present;
-          }
           advertStatsByMaskByDay[brand][str_date].stocks = `${
             stocksRatio.byDate.byBrand[brand]
               ? stocksRatio.byDate.byBrand[brand][str_date]
@@ -1217,13 +1578,17 @@ function updatePlanFact(auth, campaign) {
           }/${stocksRatio.all.byBrand[brand]}`;
           advertStatsByMaskByDay[brand][str_date].orders = byDayCampaignSum[
             brand
-          ][str_date]
-            ? byDayCampaignSum[brand][str_date].count
+          ]
+            ? byDayCampaignSum[brand][str_date]
+              ? byDayCampaignSum[brand][str_date].count
+              : 0
             : 0;
           advertStatsByMaskByDay[brand][str_date].sum_orders = byDayCampaignSum[
             brand
-          ][str_date]
-            ? byDayCampaignSum[brand][str_date].sum
+          ]
+            ? byDayCampaignSum[brand][str_date]
+              ? byDayCampaignSum[brand][str_date].sum
+              : 0
             : 0;
           advertStatsByMaskByDay[brand][str_date].drr =
             advertStatsByMaskByDay[brand][str_date].sum /
@@ -1245,7 +1610,7 @@ function updatePlanFact(auth, campaign) {
       }
 
       json_sheet_data[brand] = sheet_data;
-      writeDataToFile(
+      await writeDataToFile(
         stocksRatio,
         path.join(__dirname, "../files", campaign, "stocksRatio.json")
       );
@@ -1312,12 +1677,17 @@ function updateFactStatsByRK(auth, campaign) {
       МАЮША: "МАЮША",
       DELICATUS: "DELICATUS",
       "Объединённая текстильная компания": "ОТК",
+      "Объединённая текстильная компания ЕН": "ОТК ЕН",
       "Amaze wear": "Amaze wear",
+      "Creative Cotton": "Creative Cotton",
+      Перинка: "Перинка",
+      "Trinity Fashion": "Trinity Fashion",
     };
     const std_brand_names = {
       mayusha: "МАЮША",
       delicatus: "DELICATUS",
       TKS: "ОТК",
+      perinka: "Перинка",
     };
 
     const vendorCodes = await JSON.parse(
@@ -1432,7 +1802,7 @@ function updateFactStatsByRK(auth, campaign) {
       const rkData = advertStatsByDay[advertId];
       if (!rkData) return { rk_data: result, brand: undefined };
       const today_date = new Date();
-      const nms_to_sum_orders = [];
+      let nms_to_sum_orders = [];
       for (let i = date_range.to; i <= date_range.from; i++) {
         const cur_date = new Date();
         cur_date.setDate(today_date.getDate() - i);
@@ -1470,8 +1840,25 @@ function updateFactStatsByRK(auth, campaign) {
           nms_to_sum_orders.push(advertNames[advertId]);
         }
 
+        if (nms_to_sum_orders[0] && nms_to_sum_orders[0].includes("ФТБЛ")) {
+          const temp = nms_to_sum_orders.slice();
+          nms_to_sum_orders.length = 0;
+          for (const [index, brand_art] of Object.entries(temp)) {
+            for (const [art, art_data] of Object.entries(artsBarcodesFull))
+              if (art.includes(brand_art) && !nms_to_sum_orders.includes(art))
+                nms_to_sum_orders.push(art);
+          }
+        }
+
+        if (!artsBarcodesFull[nms_to_sum_orders[0]])
+          return { rk_data: result, brand: undefined };
+
+        nms_to_sum_orders = Array.from(new Set(nms_to_sum_orders));
+        // if (campaign == "TKS") console.log(nms_to_sum_orders);
+
         // console.log(advertNames[advertId], nms_to_sum_orders, generalMasks, advertNames[advertId].split("/")[0], generalMasks.includes(advertNames[advertId].split("/")[0]));
         if (!orders[str_date]) continue;
+        if (!stocksRatio.byDate[str_date]) continue;
         // console.log(str_date);
         for (const [art, value] of Object.entries(orders[str_date])) {
           if (!nms_to_sum_orders.includes(art)) continue;
@@ -1481,6 +1868,7 @@ function updateFactStatsByRK(auth, campaign) {
           if (!nms_to_sum_orders.includes(art)) continue;
           result.sum_orders += value;
         }
+
         for (const [mask, count] of Object.entries(
           stocksRatio.byDate[str_date]
         )) {
@@ -1576,6 +1964,8 @@ function updateFactStatsByRK(auth, campaign) {
         11: "Пауза",
       };
       if (include_this_rk && [9, 11].includes(rkData.status)) {
+        // if (!advertBudgets[rkData.advertId]) continue;
+        // console.log(rkData.advertId);
         rkData.type = rk_type_map[rkData.type];
         rkData.status = rk_status_map[rkData.status];
         sheet_data_temp[brand].push(
@@ -1585,7 +1975,11 @@ function updateFactStatsByRK(auth, campaign) {
             rkData[infos_columns_map[advert_infos_columns[2]]],
             rkData[infos_columns_map[advert_infos_columns[3]]],
           ].concat(
-            rkStatInRanges.concat([advertBudgets[rkData.advertId].total])
+            rkStatInRanges.concat([
+              advertBudgets[rkData.advertId]
+                ? advertBudgets[rkData.advertId].total
+                : 0,
+            ])
           )
         );
       }
@@ -1598,9 +1992,13 @@ function updateFactStatsByRK(auth, campaign) {
       });
 
       const sheet_data = [Array(4), Array(4)];
+      const inputed_rks = [];
       for (let i = 0; i < _sheet.length; i++) {
-        sheet_data.push(_sheet[i]);
-        // console.log(sheet_data_temp[i].length);
+        if (!inputed_rks.includes(_sheet[i][0])) {
+          sheet_data.push(_sheet[i]);
+          inputed_rks.push(_sheet[i][0]);
+        }
+        // console.log(brand, _sheet[i][0]);
       }
       for (let i = 0; i < stat_date_ranges.length; i++) {
         sheet_data[1] = sheet_data[1].concat(unique_params);
@@ -1699,6 +2097,7 @@ function fetchFeedbackAnswerTemplatesAndWriteToJSON(auth) {
       mayusha: "Маюша",
       delicatus: "Деликатус",
       TKS: "ТКС",
+      perinka: "Перинка",
     };
     for (const [index, campaign] of Object.entries(campaigns)) {
       let previouslyFetchedTemplates = {};
@@ -2386,14 +2785,16 @@ async function copyZakazToOtherSpreadsheet(auth) {
       // TODO: Delete after all old arts are gone
       if (row[1] > 0) {
         const array = row[0].split("_");
-        if (array[0] == "ПР" || array[0] == "ПРПЭ") {
-          if (
-            array[1] == "120" ||
-            array[1] == "140" ||
-            array[1] == "180" ||
-            array[1] == "200"
-          ) {
-            if (array.slice(-1)[0] != "2") return;
+        if (!row[0].includes("_ПРК")) {
+          if (array[0] == "ПР" || array[0] == "ПРПЭ") {
+            if (
+              array[1] == "120" ||
+              array[1] == "140" ||
+              array[1] == "180" ||
+              array[1] == "200"
+            ) {
+              if (array.slice(-1)[0] != "2") return;
+            }
           }
         }
         data.push([row[0], row[1]]);
@@ -2423,6 +2824,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
       if (title == "Остатки руч.") continue;
       const sheet_data = await get_data(title);
       console.log(title, sheet_data);
+
       const masks = [];
       for (let i = 0; i < sheet_data.length; i++) {
         const row = sheet_data[i];
@@ -2579,6 +2981,10 @@ module.exports = {
     const auth = await authorize();
     await fetchNewRKsToCreate(auth).catch(console.error);
   },
+  updateRNP: async () => {
+    const auth = await authorize();
+    await updateRNP(auth).catch(console.error);
+  },
   updatePlanFact: async (campaign) => {
     const auth = await authorize();
     await updatePlanFact(auth, campaign).catch(console.error);
@@ -2654,8 +3060,14 @@ const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
     code.splice(3, 1);
     if (code.includes("DELICATUS")) code.pop();
   } else if (code.includes("ФТБЛ")) {
-    code.splice(-2, 2);
+    if (code.includes("МАЮ")) code.splice(-2, 1);
+    else if (code.includes("СС")) code.splice(-2, 1);
+    else if (code.includes("TF")) code.splice(-2, 1);
+    if (isNaN(parseInt(code.slice(-1)))) code.splice(-1, 1);
+    else code.splice(-2, 2);
   } else code.splice(2, 1);
+
+  if (code.includes("ЕН")) code.splice(-2, 1);
 
   return code.join("_");
 };
@@ -2666,10 +3078,12 @@ const getGeneralMaskFromVendorCode = (vendorCode) => {
   let campaign_flag = mask_array[mask_array.length - 1];
   if ("САВ" == campaign_flag) mask_array.pop();
   campaign_flag = mask_array[mask_array.length - 1];
-  if (["ОТК", "ТКС", "DELICATUS"].includes(campaign_flag)) mask_array.pop();
+
+  if (["ОТК", "ТКС", "DELICATUS", "ПРК"].includes(campaign_flag))
+    mask_array.pop();
+
   return mask_array.join("_");
 };
-
 const indexToColumn = (index) => {
   // Validate index size
   const maxIndex = 18278;

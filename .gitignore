@@ -8,3 +8,4 @@ top-stakes/google_sheets/templateXlsxDownload/Template.xlsx
 
 prices/files
 qrGeneration/files
+prices/marketMaster/*

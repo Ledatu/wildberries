@@ -38,12 +38,24 @@ const {
   createNewAdverts,
   answerAllFeedbacks,
   writeSpp,
+  calcAutoPrices,
+  fetchAdvertsMM,
 } = require("../prices/prices");
-const { updatePrices, updateStorageCost } = require("../prices/main");
+const {
+  updatePrices,
+  updateStorageCost,
+  craftNecessaryFoldersAndFilesIfNeeded,
+  calcDeliveryOrdersAndWriteToJsonMM,
+  calcMassAdvertsAndWriteToJsonMM,
+} = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
 
 const app = express();
+
+var cors = require("cors");
+app.use(cors());
+
 const port = 24456;
 const secretKey = require(path.join(
   __dirname,
@@ -113,6 +125,16 @@ app.get("/api/getPrices", authenticateToken, (req, res) => {
   res.send("Prices getting started!");
 });
 
+app.get("/api/calcAutoPrices", authenticateToken, (req, res) => {
+  calcAutoPrices(false);
+  res.send("Prices calculation and updation started!");
+});
+
+app.get("/api/updateAdvertsMM", authenticateToken, (req, res) => {
+  fetchAdvertsMM();
+  res.send("Updating adverts MM!");
+});
+
 app.get("/api/calcNewValues", authenticateToken, (req, res) => {
   calcNewValues();
   res.send("Prices getting started!");
@@ -153,6 +175,87 @@ app.post("/api/updateStorageCost", authenticateToken, (req, res) => {
     .catch((err) => res.send(err));
 });
 
+app.post("/api/getStatsByDay", authenticateToken, (req, res) => {
+  const accountUid = req.body.uid;
+  if (!accountUid || accountUid == "") return;
+
+  const secrets = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
+    )
+  ).byCampaignName;
+  const advertsStatsAccount = {};
+  for (const [campaignName, _] of Object.entries(secrets)) {
+    const advertsStatsCampaign = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          __dirname,
+          "../prices/marketMaster",
+          accountUid,
+          campaignName,
+          "advertsStatsByDay.json"
+        )
+      )
+    );
+    advertsStatsAccount[campaignName] = advertsStatsCampaign;
+  }
+  res.send(JSON.stringify(advertsStatsAccount));
+});
+
+app.post("/api/getDeliveryOrders", authenticateToken, (req, res) => {
+  const accountUid = req.body.uid;
+  const dateRange = req.body.dateRange;
+  if (!accountUid || accountUid == "") return;
+
+  const secrets = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
+    )
+  ).byCampaignName;
+  const deliveryOrdersAccount = {};
+  for (const [campaignName, _] of Object.entries(secrets)) {
+    const deliveryOrdersCampaign = calcDeliveryOrdersAndWriteToJsonMM(
+      accountUid,
+      campaignName,
+      dateRange
+    );
+    deliveryOrdersAccount[campaignName] = deliveryOrdersCampaign;
+  }
+  res.send(JSON.stringify(deliveryOrdersAccount));
+});
+
+app.post("/api/getMassAdverts", authenticateToken, (req, res) => {
+  const accountUid = req.body.uid;
+  const dateRange = req.body.dateRange;
+  if (!accountUid || accountUid == "") return;
+
+  const secrets = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
+    )
+  ).byCampaignName;
+  const massAdvertsAccount = {};
+  for (const [campaignName, _] of Object.entries(secrets)) {
+    const massAdvertsCampaign = calcMassAdvertsAndWriteToJsonMM(
+      accountUid,
+      campaignName,
+      dateRange
+    );
+    massAdvertsAccount[campaignName] = massAdvertsCampaign;
+  }
+  res.send(JSON.stringify(massAdvertsAccount));
+});
+
+app.post(
+  "/api/craftNecessaryFoldersAndFilesIfNeeded",
+  authenticateToken,
+  (req, res) => {
+    const accountInfo = req.body;
+    craftNecessaryFoldersAndFilesIfNeeded(accountInfo);
+    res.send("Crafting...");
+  }
+);
+
 // app.post("/api/getCurrentStorageCost", authenticateToken, (req, res) => {
 //   const storageCost = JSON.parse(
 //     fs.readFileSync(path.join(__dirname, "../prices/files/storageCost.json"))
@@ -175,10 +278,10 @@ app.get("/api/writeDrr", authenticateToken, (req, res) => {
   res.send("Drr writing started!");
 });
 
-app.get("/api/writeSpp", authenticateToken, (req, res) => {
-  writeSpp();
-  res.send("Spp writing started!");
-});
+// app.get("/api/writeSpp", authenticateToken, (req, res) => {
+//   writeSpp();
+//   res.send("Spp writing started!");
+// });
 
 app.get("/api/calcAndWriteMinZakaz", authenticateToken, (req, res) => {
   calcAndWriteMinZakazToDataSpreadsheet();
@@ -285,6 +388,18 @@ app.get("/api/downloadAll", async (req, res) => {
     exportAll().then(() => {
       res.download(arch);
     });
+  } catch (error) {
+    res.status(500).end(error);
+  }
+});
+
+app.get("/api/getArtsData", async (req, res) => {
+  // console.log(req)
+  try {
+    const artsData = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../prices/files/data.json"))
+    );
+    res.send(artsData);
   } catch (error) {
     res.status(500).end(error);
   }

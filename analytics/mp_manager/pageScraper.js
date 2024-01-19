@@ -23,13 +23,31 @@ const scraperObject = {
       else if (code.includes("КПБ")) {
         code.splice(3, 1);
         if (code.includes("DELICATUS")) code.pop();
+      } else if (code.includes("ФТБЛ")) {
+        if (code.includes("МАЮ")) code.splice(-2, 1);
+        else if (code.includes("СС")) code.splice(-2, 1);
+        else if (code.includes("TF")) code.splice(-2, 1);
+        if (isNaN(parseInt(code.slice(-1)))) code.splice(-1, 1);
+        else code.splice(-2, 2);
       } else code.splice(2, 1);
+
+      if (code.includes("ЕН")) code.splice(-2, 1);
 
       return code.join("_");
     };
-    const vendorCodes = JSON.parse(
+    const artsBarcodesFull = JSON.parse(
       fs.readFileSync(
-        path.join(__dirname, "../../prices/files", campaign, "vendorCodes.json")
+        path.join(
+          __dirname,
+          "../../prices/files",
+          campaign,
+          "artsBarcodesFull.json"
+        )
+      )
+    );
+    const prices = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, "../../prices/files", campaign, "prices.json")
       )
     );
     const stocks = JSON.parse(
@@ -38,18 +56,27 @@ const scraperObject = {
       )
     );
     const arts_to_check = {};
-    for (const [id, art] of Object.entries(vendorCodes)) {
-      const mask = getMaskFromVendorCode(art);
-      if (!stocks.today[art]) continue;
+    for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+      // const mask = getMaskFromVendorCode(art);
+      const mask = art;
+      const id = art_data.nmId;
+      if (!stocks.today[art]) {
+        arts_to_check[mask] = "takeprev";
+        continue;
+      }
 
       if (!(mask in arts_to_check)) arts_to_check[mask] = { id: 0, stock: 0 };
 
-      if (arts_to_check[mask].stock > stocks.today[art]) continue;
-      arts_to_check[mask] = { id: id, stock: stocks.today[art] };
+      // if (arts_to_check[mask].stock > stocks.today[art]) continue;
+      arts_to_check[mask] = {
+        id: id,
+        stock: stocks.today[art],
+        discount: prices[id] ? prices[id].discount : 50,
+      };
     }
     console.log(arts_to_check);
 
-    const getSpp = async (art) =>
+    const getSpp = async (art, discount, prev) =>
       new Promise(async (resolve, reject) => {
         const page = await context.newPage();
         const url = `https://www.wildberries.ru/catalog/${art}/detail.aspx?targetUrl=SP`;
@@ -64,7 +91,7 @@ const scraperObject = {
         if ((await page.locator("span.sold-out-product__text").count()) > 0) {
           console.log(art, "sold out");
           page.close();
-          resolve(0);
+          resolve(prev);
           return;
         }
 
@@ -88,20 +115,67 @@ const scraperObject = {
             .textContent()
         )
           .replace(/\s/g, "")
-          .slice(0, -2);
-          const int_price_with_spp = parseInt(price_with_spp);
-          const int_price_without_spp = parseInt(price_without_spp);
-        // console.log(int_price_with_spp, int_price_without_spp, (1 - int_price_with_spp / int_price_without_spp) * 100);
+          .slice(0, -1);
+        const int_price_with_spp = parseInt(price_with_spp);
+        const int_price_without_spp =
+          parseInt(price_without_spp) * (1 - discount / 100);
+        console.log(
+          art,
+          discount,
+          price_without_spp,
+          int_price_with_spp,
+          int_price_without_spp,
+          (1 - int_price_with_spp / int_price_without_spp) * 100
+        );
         page.close();
-        resolve((1 - int_price_with_spp / int_price_without_spp) * 100);
+        resolve({
+          spp: (1 - int_price_with_spp / int_price_without_spp) * 100,
+          price: int_price_without_spp,
+        });
       });
 
-    const jsonData = {};
+    const jsonData = { prev: { spp: 0, price: 0 } };
     for (const [mask, mask_data] of Object.entries(arts_to_check)) {
       // if (mask_data.stock > 1) continue;
-      const spp = await getSpp(mask_data.id);
+      if (mask_data == "takeprev") {
+        console.log(mask, jsonData.prev);
+        jsonData[mask] = jsonData.prev;
+        continue;
+      }
+      const spp = await getSpp(mask_data.id, mask_data.discount, jsonData.prev);
+      if (!spp) {
+        console.log(mask, jsonData.prev);
+        jsonData[mask] = jsonData.prev;
+        continue;
+      }
+
       // console.log(temp_value, price, intprice);
-      jsonData[mask] = Math.round(spp);
+      jsonData[mask] = { spp: Math.round(spp.spp), price: spp.price };
+
+      jsonData.prev = jsonData[mask]
+        ? jsonData[mask].spp
+          ? jsonData[mask]
+          : jsonData.prev
+        : jsonData.prev;
+    }
+
+    for (const [mask, mask_data] of Object.entries(arts_to_check)) {
+      // if (mask_data.stock > 1) continue;
+      if (mask_data == "takeprev") {
+        console.log(mask, jsonData.prev);
+        jsonData[mask] = jsonData.prev;
+        continue;
+      }
+      const normal_mask = getMaskFromVendorCode(mask);
+      for (const [art, art_data] of Object.entries(jsonData)) {
+        if (
+          getMaskFromVendorCode(art) == normal_mask &&
+          arts_to_check[art] != "takeprev"
+        ) {
+          jsonData[mask] = jsonData[art];
+          break;
+        }
+      }
     }
     // console.log(jsonData);
 

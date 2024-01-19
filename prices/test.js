@@ -21,6 +21,8 @@ const {
   writePrices,
   fetchEnteredValuesAndWriteToJSON,
   fetchAutoPriceRulesAndWriteToJSON,
+  updateRNP,
+  writeDetailedByPeriod,
 } = require("./google_sheets");
 const {
   fetchDetailedByPeriodAndWriteToJSON,
@@ -59,6 +61,17 @@ const {
   fetchDataAndWriteToXlsx,
   calculateNewValuesAndWriteToXlsx,
   calcAutoEnteredValuesAndWriteToJSON,
+  calcRNPByDayMetricsAndWriteToJSON,
+  logCurrentProfit,
+  fetchPricesAndWriteToJSON,
+  getAdvertsStatByDay,
+  fetchArtsAndWriteToJsonMM,
+  getAdvertsStatByDayMM,
+  fetchStocksAndWriteToJsonMM,
+  fetchOrdersAndWriteToJsonMM,
+  fetchOfficesAndWriteToJsonMM,
+  calcDeliveryOrdersAndWriteToJsonMM,
+  calcMassAdvertsAndWriteToJsonMM,
 } = require("./main");
 const {
   getPrices,
@@ -75,12 +88,17 @@ const {
   writeSpp,
   updateAtriculesData,
   calcAndSendTrendsToTg,
+  calcAutoPrices,
+  RNPupdation,
+  fetchAdvertsMM,
 } = require("./prices");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
 // getDelivery().then((pr) => console.log(pr));
 // fetchDataAndWriteToJSON()
-// getPrices();
+//  getPrices();
+// fetchPricesAndWriteToJSON('delicatus');
+// calcAndWriteMinZakazToDataSpreadsheet()
 // updateAnalyticsOrders("mayusha");
 // sendRKErrors('projecttriggers@gmail.com', 'Ошибки РК', 'Тест');
 // updateAdvertArtActivitiesAndGenerateNotIncluded('mayusha')
@@ -107,10 +125,10 @@ const {
 // fetchArtsRatings("delicatus");
 // fetchArtsRatings("TKS");
 // calcAvgRatingsAndWriteToJSON("mayusha");
-const a = async () => {
-  // calcAvgRatingsAndWriteToJSON("delicatus");
-  // calcAvgRatingsAndWriteToJSON("TKS");
-};
+// const a = async () => {
+//   // calcAvgRatingsAndWriteToJSON("delicatus");
+//   // calcAvgRatingsAndWriteToJSON("TKS");
+// };
 // a();
 
 // fetchStocksForLowRatingArts()
@@ -135,7 +153,8 @@ const a = async () => {
 // fetchAdvertInfosAndWriteToJson("mayusha");
 // fetchAdvertStatsAndWriteToJson("mayusha");
 // getAdvertStatByMaskByDayAndWriteToJSON('TKS')
-// updatePlanFact('mayusha')
+// updatePlanFact('TKS')
+// getAdvertStatByMaskByDayAndWriteToJSONMpManager('mayusha')
 
 // fetchOrdersAndWriteToJSON("mayusha");
 // fetchOrdersAndWriteToJSON("delicatus");
@@ -196,13 +215,15 @@ const a = async () => {
 // calcAndSendTrendsToTg('11')
 // fetchAdverts()
 // getPrices()
-// fetchDataAndWriteToXlsx('TKS')
-// writePrices('TKS')
-// fetchDataAndWriteToXlsx('TKS')
+// fetchDataAndWriteToXlsx('delicatus').then(() => writePrices('delicatus'))
+// writePrices('perinka')
+// fetchDataAndWriteToXlsx('delicatus')
+// writePrices('delicatus')
 // writeSppToDataSpreadsheet()
-// const d = new Date('2023-10-22T14:57:00.000Z')
+// const d = new Date('2023-12-22T11:57:00.000Z')
 // console.log(d);
 // calcAndSendTrendsToTg(d)
+// calcStatsTrendsAndWtriteToJSON('mayusha', d)
 // fetchAdverts()
 // getAdvertStatByMaskByDayAndWriteToJSONMpManager("TKS")
 // fetchCardsAndWriteToJSON("TKS");
@@ -224,11 +245,90 @@ const a = async () => {
 // updateFactStatsByRK("TKS")
 // copyZakazToOtherSpreadsheet()
 // updatePlanFact('mayusha')
+// getAdvertStatByMaskByDayAndWriteToJSONMpManager('delicatus')
 // updatePlanFact('delicatus')
 // updatePlanFact('TKS')
 // writeDrrToDataSpreadsheet();
 // fetchAutoPriceRulesAndWriteToJSON();
 // calcAutoEnteredValuesAndWriteToJSON();
+
 // calculateNewValuesAndWriteToXlsx('mayusha');
+// fetchDataAndWriteToXlsx('TKS')
 // writePrices('mayusha');
-calcNewValues();
+// calcNewValues();
+// calcAutoPrices(false);
+// calcAvgOrdersAndWriteToJSON('mayusha');
+// calcAutoEnteredValuesAndWriteToJSON().then(calculateNewValuesAndWriteToXlsx('perinka').then(() => writePrices('perinka')));
+// writeSpp();
+// calcRNPByDayMetricsAndWriteToJSON();
+// updateRNP();
+// RNPupdation();
+// updatePlanFact('perinka')
+// writeDrrToDataSpreadsheet()
+// logCurrentProfit('mayusha', 'МАЮША', 63841);
+// copyPricesToDataSpreadsheet()
+// fetchDataAndWriteToXlsx('perinka').then(() => writePrices('perinka'))
+
+// fetchDetailedByPeriodAndWriteToJSON('TKS')
+// writeDrrToDataSpreadsheet()
+// copyPricesToDataSpreadsheet()
+
+// getDelivery()
+// fetchNewPricesAndWriteToJSON('МАЮША')
+// updatePlanFact('perinka')
+// writeDrrToDataSpreadsheet()
+// getDelivery()
+// calcAutoPrices(false);
+
+// getPrices()
+// copyZakazToOtherSpreadsheet()
+// fetchCardsAndWriteToJSON('TKS');
+// fetchAdvertsMM()
+// fetchAdverts()
+// writeDetailedByPeriod('TKS')
+// getDelivery("TKS");
+// calcAndSendTrendsToTg(new Date());
+// updateFactStatsByRK("TKS")
+// writeDrrToDataSpreadsheet()
+// fetchAdvertInfosAndWriteToJson('TKS')
+// fetchAdvertStatsAndWriteToJson('TKS')
+// fetchAdvertStatsAndWriteToJsonMpManager('TKS', new Date())
+// getPrices()
+// writeDetailedByPeriod("TKS")
+// calcAndWriteMinZakazToDataSpreadsheet()
+// fetchAdvertsAndWriteToJson('delicatus')
+// fetchAdvertInfosAndWriteToJson("delicatus")
+// fetchAdvertStatsAndWriteToJson("delicatus")
+// getAdvertsStatByDay('delicatus')
+// fetchAdvertsMM()
+// getAdvertsStatByDayMM('332fa5da-8450-451a-b859-a84ca9951a34', 'МАЮША')
+// fetchArtsAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'Объединённая текстильная компания')
+// fetchOrdersAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'Объединённая текстильная компания')
+// fetchOrdersAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'МАЮША')
+// fetchOrdersAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'DELICATUS')
+// fetchStocksAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "Объединённая текстильная компания"
+// );
+// fetchStocksAndWriteToJsonMM("332fa5da-8450-451a-b859-a84ca9951a34", "МАЮША");
+// fetchStocksAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "DELICATUS"
+// );
+// fetchArtsAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'Объединённая текстильная компания')
+// fetchArtsAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'МАЮША')
+// fetchArtsAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'DELICATUS')
+// fetchOfficesAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'МАЮША')
+// console.log(
+//   calcDeliveryOrdersAndWriteToJsonMM(
+//     "332fa5da-8450-451a-b859-a84ca9951a34",
+//     "Объединённая текстильная компания",
+//     { from: "2024-01-10", to: "2024-01-11" }
+//   )
+// );
+
+// calcMassAdvertsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "Объединённая текстильная компания",
+//   { from: "2024-01-10", to: "2024-01-11" }
+// );

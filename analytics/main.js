@@ -29,18 +29,20 @@ const fetchAnalytics = async () => {
 
 const fetchSpp = async () =>
   new Promise((resolve, reject) => {
+    const promises = [];
     for (const campaign of campaigns) {
       // if (campaign != "mayusha") continue;
-      getSpp(campaign)
-        .then(() => {
-          console.log("All tasks completed successfully");
-          resolve();
-          // await getSpp(campaign);
-        })
-        .catch((error) => {
-          console.error("An error occurred:", error);
-        });
+      promises.push(getSpp(campaign));
     }
+    Promise.all(promises)
+      .then(() => {
+        console.log("All tasks completed successfully");
+        resolve();
+        // await getSpp(campaign);
+      })
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      });
   });
 
 module.exports = {

@@ -3,7 +3,7 @@ const {
   exportTZToXlsx,
   fetchCurrentZakazAndWriteToXLSX,
 } = require("./google_sheets/index");
-const { generateNewTags, autoGenerateNewTags } = require("./main");
+const { generateNewTags, autoGenerateNewTags, generateTagsRaspredelenniy } = require("./main");
 const {
   qrGeneration,
   tagsGeneration,
@@ -19,5 +19,9 @@ const {
 // exportAll()
 // newTagsGeneration();
 // autofillCurrent("delicatus ПР 06 МК ТУЛА");
-autoGenerateNewTags('delicatus', 'DELICATUS');
+// autoGenerateNewTags('perinka', 'Перинка');
+// autoGenerateNewTags('mayusha', 'МАЮША');
+// autoGenerateNewTags('delicatus', 'DELICATUS');
+autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
 // exportAll()
+// generateTagsRaspredelenniy()

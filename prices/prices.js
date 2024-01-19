@@ -29,6 +29,17 @@ const {
   fetchAdvertStatsAndWriteToJsonMpManagerLog,
   sendTgBotTrendMessage,
   calcStatsTrendsAndWtriteToJSON,
+  calcAutoEnteredValuesAndWriteToJSON,
+  updatePrices,
+  calcRNPByDayMetricsAndWriteToJSON,
+  fetchAdvertsAndWriteToJsonMM,
+  fetchAdvertsInfosAndWriteToJsonMM,
+  fetchAdvertsStatsAndWriteToJsonMM,
+  fetchAdvertsBudgetsAndWriteToJsonMM,
+  getAdvertsStatByDayMM,
+  fetchOrdersAndWriteToJsonMM,
+  fetchArtsAndWriteToJsonMM,
+  fetchStocksAndWriteToJsonMM,
 } = require("./main");
 const {
   writePrices,
@@ -46,6 +57,9 @@ const {
   fetchArtMaskPricesAndWriteToJSON,
   fetchFeedbackAnswerTemplatesAndWriteToJSON,
   writeSppToDataSpreadsheet,
+  fetchAutoPriceRulesAndWriteToJSON,
+  fetchNewPricesAndWriteToJSON,
+  updateRNP,
 } = require("./google_sheets/index");
 const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 const fs = require("fs");
@@ -74,7 +88,7 @@ const getPrices = async (rewriteProfit = false) => {
 
   campaigns.forEach(async (campaign) => {
     Promise.all([
-      await calcAdvertismentAndWriteToJSON(campaign),
+      // await calcAdvertismentAndWriteToJSON(campaign),
       await fetchCardsAndWriteToJSON(campaign),
       await fetchOrdersAndWriteToJSON(campaign),
       await fetchSalesAndWriteToJSON(campaign),
@@ -173,7 +187,41 @@ const calcAndSendTrendsToTg = async (now) => {
   campaigns.forEach(async (campaign) => {
     promises.push(calcStatsTrendsAndWtriteToJSON(campaign, now));
   });
-  Promise.all(promises).then(async () => await sendTgBotTrendMessage(now, hour_key));
+  Promise.all(promises).then(
+    async () => await sendTgBotTrendMessage(now, hour_key)
+  );
+};
+
+const calcAutoPrices = (autoSend = true) => {
+  return new Promise(async (resolve, reject) => {
+    const now = new Date();
+    await fetchAutoPriceRulesAndWriteToJSON();
+    const hours = JSON.parse(
+      fs.readFileSync(path.join(__dirname, `files/autoPriceRules.json`))
+    ).hours;
+    const brands = JSON.parse(
+      fs.readFileSync(path.join(__dirname, `files/campaigns.json`))
+    ).brands;
+    const hour_key = now.toLocaleTimeString("ru-RU").slice(0, 2);
+    console.log(hour_key, now.toLocaleTimeString("ru-RU"));
+    if (!hours.includes(hour_key)) return;
+    await calcAutoEnteredValuesAndWriteToJSON();
+    const promises = [];
+    campaigns.forEach(async (campaign) => {
+      // promises.push(await fetchDataAndWriteToXlsx(campaign));
+      promises.push(await calculateNewValuesAndWriteToXlsx(campaign));
+      promises.push(await writePrices(campaign));
+      if (autoSend) {
+        for (const [index, brand] of Object.entries(brands[campaign])) {
+          promises.push(await fetchNewPricesAndWriteToJSON(brand));
+          promises.push(await updatePrices(brand));
+        }
+        promises.push(await fetchDataAndWriteToXlsx(campaign));
+        promises.push(await writePrices(campaign));
+      }
+    });
+    Promise.all(promises).then(async () => resolve());
+  });
 };
 
 const writeSpp = async () => {
@@ -190,7 +238,21 @@ const writeSpp = async () => {
   });
 };
 
+const RNPupdation = async () => {
+  // await fetchDataAndWriteToJSON()
+  await calcRNPByDayMetricsAndWriteToJSON().then(
+    updateRNP()
+      .then(async () => {
+        console.log("All tasks completed successfully");
+      })
+      .catch((error) => {
+        console.error("An error occurred:", error);
+      })
+  );
+};
+
 const fetchAdverts = async () => {
+  // const now = new Date('2023-12-19T17:57:00.000Z')
   const now = new Date();
   return new Promise(async (resolve, reject) => {
     const promises = [];
@@ -198,10 +260,10 @@ const fetchAdverts = async () => {
       promises.push(
         new Promise(async (resolve, reject) => {
           Promise.all([
-            await fetchOrdersAndWriteToJSON(campaign),
+            // await fetchOrdersAndWriteToJSON(campaign),
             await fetchAdvertsAndWriteToJson(campaign),
             await fetchAdvertInfosAndWriteToJson(campaign),
-            await fetchAdvertStatsAndWriteToJsonMpManager(campaign),
+            await fetchAdvertStatsAndWriteToJsonMpManager(campaign, now),
             await fetchAdvertStatsAndWriteToJsonMpManagerLog(campaign, now),
             await fetchRksBudgetsAndWriteToJSON(campaign),
             await getAdvertStatByMaskByDayAndWriteToJSONMpManager(campaign),
@@ -221,6 +283,46 @@ const fetchAdverts = async () => {
       .catch((error) => {
         console.error("An error occurred:", error);
       });
+  });
+};
+
+const fetchAdvertsMM = async () => {
+  // const now = new Date('2023-12-19T17:57:00.000Z')
+  // const now = new Date();
+  return new Promise(async (resolve, reject) => {
+    const customers = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "marketMaster", "customers.json"))
+    );
+    const promises = [];
+    for (const [uid, customerData] of Object.entries(customers)) {
+      const campaignsNames = customerData.campaignsNames;
+      for (let i = 0; i < campaignsNames.length; i++) {
+        const campaignName = campaignsNames[i];
+        console.log(uid, campaignName);
+        promises.push(
+          new Promise(async (resolve, reject) => {
+            Promise.all([
+              await fetchArtsAndWriteToJsonMM(uid, campaignName),
+              await fetchOrdersAndWriteToJsonMM(uid, campaignName),
+              await fetchStocksAndWriteToJsonMM(uid, campaignName),
+              await fetchAdvertsAndWriteToJsonMM(uid, campaignName),
+              await fetchAdvertsInfosAndWriteToJsonMM(uid, campaignName),
+              await fetchAdvertsStatsAndWriteToJsonMM(uid, campaignName),
+              await fetchAdvertsBudgetsAndWriteToJsonMM(uid, campaignName),
+              await getAdvertsStatByDayMM(uid, campaignName),
+            ]).then(() => resolve(uid, campaignName, "Adverts updated."));
+          })
+        );
+      }
+    }
+    Promise.all(promises).then(() => resolve());
+    //   .then(async () => {
+    //     await calcAndSendTrendsToTg(now).then(() => resolve("Updated."));
+    //     console.log("All tasks completed successfully");
+    //   })
+    //   .catch((error) => {
+    //     console.error("An error occurred:", error);
+    //   });
   });
 };
 
@@ -313,4 +415,7 @@ module.exports = {
   answerAllFeedbacks,
   writeSpp,
   calcAndSendTrendsToTg,
+  calcAutoPrices,
+  RNPupdation,
+  fetchAdvertsMM,
 };

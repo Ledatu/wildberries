@@ -194,7 +194,7 @@ async function autoGenerateNewTags(campaign, brand) {
       barcode,
       size,
       logo,
-      art,
+      art
     ) => {
       const pdfDoc = await PDFDocument.create();
       pdfDoc.registerFontkit(fontkit);
@@ -213,15 +213,21 @@ async function autoGenerateNewTags(campaign, brand) {
         // mayusha: pngImageEmbed.scale(0.075),
         // TKS: pngImageEmbed.scale(0.06),
         // delicatus: pngImageEmbed.scale(0.05),
-        mayusha: { width: 90, height: 37.5 },
-        delicatus: { width: 64, height: 26.65 },
-        TKS: { width: 76.8, height: 31.98 },
+        МАЮША: { width: 90, height: 37.5 },
+        DELICATUS: { width: 64, height: 26.65 },
+        "Объединённая текстильная компания": { width: 76.8, height: 31.98 },
         "Amaze wear": pngImageEmbed.scale(0.05),
+        Перинка: pngImageEmbed.scale(0.06),
+        "Trinity Fashion": pngImageEmbed.scale(0.06),
+        "Creative Cotton": pngImageEmbed.scale(0.06),
       };
       const scalar = scalars[campaign];
       page.drawImage(pngImageEmbed, {
         x: (169 - scalar.width) / 2,
-        y: 113 - scalar.height + (campaign != "delicatus" && campaign != 'Amaze wear' ? 4 : 0),
+        y:
+          113 -
+          scalar.height +
+          (campaign != "delicatus" && campaign != "Amaze wear" ? 4 : 0),
         width: scalar.width,
         height: scalar.height,
       });
@@ -246,15 +252,17 @@ async function autoGenerateNewTags(campaign, brand) {
         font: openSans,
       });
 
-      const fontSizeVeryBig = 42;
-      const size_width = openSans.widthOfTextAtSize(size, fontSizeVeryBig);
-      page.drawText(size, {
-        x: 169 - size_width - 5,
-        y: 78,
-        size: fontSizeVeryBig,
-        lineHeight: 9,
-        font: openSans,
-      });
+      if (parseInt(size)) {
+        const fontSizeVeryBig = 42;
+        const size_width = openSans.widthOfTextAtSize(size, fontSizeVeryBig);
+        page.drawText(size, {
+          x: 169 - size_width - 5,
+          y: 78,
+          size: fontSizeVeryBig,
+          lineHeight: 9,
+          font: openSans,
+        });
+      }
 
       const fontSize = 8;
       const art_text = "АРТИКУЛ: " + brand_art;
@@ -267,11 +275,12 @@ async function autoGenerateNewTags(campaign, brand) {
         font: openSans,
       });
 
-      const col_text = "ЦВЕТ: " + color + (size != '0' ? `  РАЗМЕР: ${size}` : '');
-      const col_text_width = openSans.widthOfTextAtSize(col_text, fontSize +2 );
+      const col_text =
+        "ЦВЕТ: " + color + (size != "0" ? `  РАЗМЕР: ${size}` : "");
+      const col_text_width = openSans.widthOfTextAtSize(col_text, fontSize + 2);
       page.drawText(col_text, {
         x: (169 - col_text_width) / 2,
-        y: 65 - (fontSize +2),
+        y: 65 - (fontSize + 2),
         size: fontSize + 2,
         lineHeight: 9,
         font: openSans,
@@ -299,10 +308,11 @@ async function autoGenerateNewTags(campaign, brand) {
 
     const logo = await loadImage(
       path.join(__dirname, "files", "logos", `${brand}.png`)
+      // path.join(__dirname, "files", "logos", `${brand}.jpg`)
     );
 
     for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
-      if (art_data.brand != brand) continue;
+      if (art_data.brand != brand || !art.includes("WH")) continue;
       await makePdf(
         brand,
         art_data.brand_art.toUpperCase(),
@@ -479,6 +489,111 @@ function generateTags() {
   });
 }
 
+function generateTagsRaspredelenniy() {
+  return new Promise((resolve, reject) => {
+    const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
+    const brands = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../prices/files/campaigns.json"))
+    ).brands;
+    const promises = [];
+
+    for (const [campaign, brand_data] of Object.entries(brands)) {
+      if (campaign != "perinka") continue;
+      const artsBarcodesFull = JSON.parse(
+        fs.readFileSync(
+          path.join(
+            __dirname,
+            "../prices/files",
+            campaign,
+            "artsBarcodesFull.json"
+          )
+        )
+      );
+      for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+        const array = art.split("_");
+        if (!art.includes("ФТБЛ")) continue;
+        if (!art.includes("TF")) continue;
+        if (!art.includes("_ПРК")) {
+          if (array[0] == "ПР" || array[0] == "ПРПЭ") {
+            if (
+              array[1] == "120" ||
+              array[1] == "140" ||
+              array[1] == "180" ||
+              array[1] == "200"
+            ) {
+              if (array.slice(-1)[0] != "2") continue;
+            }
+          }
+        }
+
+        let mask = getGeneralMaskFromVendorCode(art);
+        // mask = mask.split("_");
+        // if (!mask.includes("КПБ")) {
+        //   mask = mask.slice(0, 1);
+        // } else {
+        //   mask =
+        //     art_data.brand == "DELICATUS" ? mask.slice(-1) : mask.slice(-2, -1);
+        // }
+        // mask =
+        //   art.includes("DELICATUS") && art.includes("КПБ")
+        //     ? mask[0] + " 2"
+        //     : mask[0];
+
+        // if (
+        //   (mask == "СТРАЙП" && title == "DELICATUS") ||
+        //   mask.includes("НАМАТРАСНИК") ||
+        //   (mask.includes("МОНТЕ") && title == "DELICATUS")
+        // )
+        //   continue;
+
+        const currentTagsDir_brand = path.join(
+          __dirname,
+          "../qrGeneration/files/Распределенные Этикетки",
+          art_data.brand
+        );
+        if (!fs.existsSync(currentTagsDir_brand)) {
+          fs.rmSync(
+            currentTagsDir_brand,
+            { recursive: true, force: true },
+            (err) => {
+              if (err) reject(err);
+            }
+          );
+          fs.mkdirSync(currentTagsDir_brand);
+        }
+        const currentTagsDir = path.join(currentTagsDir_brand, mask);
+        if (!fs.existsSync(currentTagsDir)) {
+          // fs.rmSync(currentTagsDir, { recursive: true, force: true }, (err) => {
+          //   if (err) reject(err);
+          // });
+          fs.mkdirSync(currentTagsDir);
+        }
+        console.log(currentTagsDir);
+
+        promises.push(
+          fs.copyFile(
+            path.join(mainTagsDir, art + ".pdf"),
+            path.join(currentTagsDir, art + ".pdf"),
+            (err) => {
+              if (err) throw err;
+            }
+          )
+        );
+      }
+    }
+    Promise.all(promises).then((pr) => {
+      const arch = path.join(__dirname, "../qrGeneration/files/Этикетки.zip");
+      return zipDirectory(
+        path.join(__dirname, "../qrGeneration/files/Распределенные Этикетки"),
+        arch
+      ).then(() => {
+        console.log("Zipping complete.");
+      });
+      resolve();
+    });
+  });
+}
+
 function autofillAndWriteToXlsx() {
   return new Promise((resolve, reject) => {
     const tags = JSON.parse(
@@ -552,11 +667,46 @@ function autofillAndWriteToXlsx() {
   });
 }
 
+const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
+  if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE";
+  const code = vendorCode.split("_");
+  if (code.slice(-1) == "2") code.pop();
+  if (cut_namatr && code.includes("НАМАТРАСНИК")) code.splice(1, 1);
+  else if (code.includes("КПБ")) {
+    code.splice(3, 1);
+    if (code.includes("DELICATUS")) code.pop();
+  } else if (code.includes("ФТБЛ")) {
+    if (code.includes("МАЮ")) code.splice(-2, 1);
+    else if (code.includes("СС")) code.splice(-2, 1);
+    else if (code.includes("TF")) code.splice(-2, 1);
+    if (isNaN(parseInt(code.slice(-1)))) code.splice(-1, 1);
+    else code.splice(-2, 2);
+  } else code.splice(2, 1);
+
+  if (code.includes("ЕН")) code.splice(-2, 1);
+
+  return code.join("_");
+};
+
+const getGeneralMaskFromVendorCode = (vendorCode) => {
+  const mask = getMaskFromVendorCode(vendorCode, false);
+  const mask_array = mask.split("_");
+  let campaign_flag = mask_array[mask_array.length - 1];
+  if ("САВ" == campaign_flag) mask_array.pop();
+  campaign_flag = mask_array[mask_array.length - 1];
+
+  if (["ОТК", "ТКС", "DELICATUS", "ПРК"].includes(campaign_flag))
+    mask_array.pop();
+
+  return mask_array.join("_");
+};
+
 module.exports = {
   main,
   zipDirectory,
   generateTags,
   generateNewTags,
   autofillAndWriteToXlsx,
+  generateTagsRaspredelenniy,
   autoGenerateNewTags,
 };
