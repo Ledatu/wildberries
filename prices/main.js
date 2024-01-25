@@ -6,6 +6,7 @@ const afs = require("fs");
 const path = require("path");
 const { fetchHandStocks, sendEmail } = require("./google_sheets");
 const TelegramBot = require("node-telegram-bot-api");
+const { log } = require("console");
 
 const sortData = (data) => {
   const header = data.shift(); // Remove the header row and store it in a variable
@@ -199,8 +200,7 @@ const fetchRKsBudget = (authToken, queryParams) => {
       },
       params: {},
     })
-    .then((response) => response.data)
-    .catch((error) => console.error(error));
+    .then((response) => response.data);
 };
 const updateRKsBudget = (authToken, queryParams, params) => {
   return axios
@@ -902,7 +902,7 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
     "arts.json"
   );
   let arts = {};
-  if (afs.existsSync(artsPath)) arts = JSON.parse(afs.readFileSync(artsPath));
+  // if (afs.existsSync(artsPath)) arts = JSON.parse(afs.readFileSync(artsPath));
   if (!("byArt" in arts)) arts.byArt = {};
   if (!("bySku" in arts)) arts.bySku = {};
   if (!("byNmId" in arts)) arts.byNmId = {};
@@ -916,6 +916,7 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
       arts.byArt[art] = {
         art: art,
         object: item.object,
+        objectId: item.objectID,
         brand: item.brand + (art.includes("_ЕН") ? " ЕН" : ""),
         size: size,
         color: item.colors[0],
@@ -927,6 +928,7 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
       arts.bySku[size_data.skus[0]] = {
         art: art,
         object: item.object,
+        objectId: item.objectID,
         brand: item.brand + (art.includes("_ЕН") ? " ЕН" : ""),
         size: size,
         color: item.colors[0],
@@ -943,6 +945,7 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
     arts.byNmId[item.nmID] = {
       art: art,
       object: item.object,
+      objectId: item.objectID,
       brand: item.brand + (art.includes("_ЕН") ? " ЕН" : ""),
       sizes: item.sizes,
       colors: item.colors,
@@ -951,10 +954,7 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
   });
 
   return fs
-    .writeFile(
-      path.join(__dirname, "marketMaster", uid, campaignName, "arts.json"),
-      JSON.stringify(arts)
-    )
+    .writeFile(artsPath, JSON.stringify(arts))
     .then(() => console.log(uid, campaignName, "arts.json created."))
     .catch((error) => console.error(error));
 };
@@ -1120,10 +1120,11 @@ const writeStocksToJsonMM = async (data, uid, campaignName) => {
     campaignName,
     "stocks.json"
   );
-  let stocks = {};
+  let stocksCurrent = {};
   if (afs.existsSync(stocksPath))
-    stocks = JSON.parse(afs.readFileSync(stocksPath));
+    stocksCurrent = JSON.parse(afs.readFileSync(stocksPath));
 
+  const stocks = {};
   if (!(str_date in stocks)) stocks[str_date] = { all: {} };
 
   if (data && data.length) {
@@ -1163,6 +1164,10 @@ const writeStocksToJsonMM = async (data, uid, campaignName) => {
     });
   }
 
+  for (const [strDate, dateData] of Object.entries(stocks)) {
+    stocksCurrent[strDate] = dateData;
+  }
+
   return fs
     .writeFile(stocksPath, JSON.stringify(stocks))
     .then(() => console.log(uid, campaignName, "stocks.json created."))
@@ -1187,10 +1192,11 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
     campaignName,
     "orders.json"
   );
-  let orders = {};
+  let ordersCurrent = {};
   if (afs.existsSync(ordersPath))
-    orders = JSON.parse(afs.readFileSync(ordersPath));
+    ordersCurrent = JSON.parse(afs.readFileSync(ordersPath));
 
+  const orders = {};
   data.forEach((item) => {
     if (!(item.barcode in arts.bySku)) return;
     const art = arts.bySku[item.barcode].art;
@@ -1237,7 +1243,11 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
     orders[order_date_string].all[brand].sum += get_item_price();
   });
 
-  return Promise.all([fs.writeFile(ordersPath, JSON.stringify(orders))])
+  for (const [strDate, dateData] of Object.entries(orders)) {
+    ordersCurrent[strDate] = dateData;
+  }
+
+  return Promise.all([fs.writeFile(ordersPath, JSON.stringify(ordersCurrent))])
     .then(() => console.log(uid, campaignName, "orders.json created."))
     .catch((error) => console.error(error));
 };
@@ -2977,21 +2987,51 @@ const fetchRksBudgetsAndWriteToJSON = async (campaign) => {
 
 const fetchAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
   const authToken = getAuthTokenMM(uid, campaignName);
-  const adverts = JSON.parse(
+  const advertsInfos = JSON.parse(
     afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "adverts.json")
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsInfos.json"
+      )
     )
   );
-  const jsonData = {};
-  for (const [advertId, advertData] of Object.entries(adverts)) {
-    if (!advertId) continue;
-    const queryParams = new URLSearchParams();
-    queryParams.append("id", advertData.advertId);
-    await fetchRKsBudget(authToken, queryParams).then((pr) => {
-      if (pr) jsonData[advertId] = pr;
-    });
-    await new Promise((resolve) => setTimeout(resolve, 700));
+  const advertsIds = [];
+  for (const [advertId, advertData] of Object.entries(advertsInfos)) {
+    if (!advertId || !advertData) continue;
+    if (![4, 9, 11].includes(advertData.status)) {
+      continue;
+    }
+    advertsIds.push(advertData.advertId);
   }
+  console.log(uid, campaignName, advertsIds.length, "budgets to fetch.");
+  const jsonData = {};
+  for (let i = 0; i < advertsIds.length; i++) {
+    const advertId = advertsIds[i];
+    const queryParams = new URLSearchParams();
+    queryParams.append("id", advertId);
+    await fetchRKsBudget(authToken, queryParams)
+      .then((pr) => {
+        if (!pr) return;
+        const budget = pr.total;
+        jsonData[advertId] = budget;
+        console.log(uid, campaignName, "fetched", advertId, "budget:", budget);
+      })
+      .catch((e) => {
+        console.log(
+          uid,
+          campaignName,
+          "couldn't fetch",
+          advertId,
+          "budget, retrying..."
+        );
+        i--;
+      });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
   return fs
     .writeFile(
       path.join(
@@ -3005,6 +3045,287 @@ const fetchAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
     )
     .then(() => console.log(uid, campaignName, "advertsBudgets.json created."))
     .catch((error) => console.error(error));
+};
+
+const setAdvertCPM = (authToken, params) => {
+  return axios
+    .post("https://advert-api.wb.ru/adv/v0/cpm", params, {
+      headers: {
+        Authorization: authToken,
+      },
+    })
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const depositAdvertBudget = (authToken, advertId, params) => {
+  return axios
+    .post(
+      "https://advert-api.wb.ru/adv/v1/budget/deposit?id=" + advertId,
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const startAdvert = (authToken, params) => {
+  return axios
+    .get("https://advert-api.wb.ru/adv/v0/start", {
+      headers: {
+        Authorization: authToken,
+      },
+      params: params,
+    })
+    .then((response) => response.data)
+    .catch((error) => console.log(error.response.data));
+};
+
+const depositAdvertsBudgetsAndWriteToJsonMM = async (
+  uid,
+  campaignName,
+  data
+) => {
+  return new Promise((resolve, reject) => {
+    // console.log(uid, campaignName, data);
+    const authToken = getAuthTokenMM(uid, campaignName);
+
+    const advertsBudgets = JSON.parse(
+      afs.readFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBudgets.json"
+        )
+      )
+    );
+    const advertsBudgetsToKeep = JSON.parse(
+      afs.readFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBudgetsToKeep.json"
+        )
+      )
+    );
+
+    const depositAdvertsBudgets = async () => {
+      for (const [advertId, advertData] of Object.entries(data)) {
+        if (!advertId || !advertData) continue;
+        const mode = advertData.mode;
+        if (!mode) continue;
+        const budget = advertData.budget;
+        if (budget === undefined) continue;
+        console.log(uid, campaignName, advertId, mode, budget);
+
+        if (mode == "Пополнить") {
+          const depositParams = {
+            sum: budget,
+            type: 1,
+            return: true,
+          };
+
+          const newBudget = await depositAdvertBudget(
+            authToken,
+            advertId,
+            depositParams
+          );
+          advertsBudgets[advertId] = newBudget.total;
+          await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
+
+          await startAdvert(authToken, { id: advertId });
+        } else if (mode == "Установить лимит") {
+          advertsBudgetsToKeep[advertId] = budget == 0 ? undefined : budget;
+        }
+      }
+    };
+
+    depositAdvertsBudgets().then(() => {
+      afs.writeFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBudgets.json"
+        ),
+        JSON.stringify(advertsBudgets)
+      );
+      afs.writeFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBudgetsToKeep.json"
+        ),
+        JSON.stringify(advertsBudgetsToKeep)
+      );
+      resolve();
+    });
+  });
+};
+
+const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
+  return new Promise((resolve, reject) => {
+    const authToken = getAuthTokenMM(uid, campaignName);
+
+    const advertsBudgets = JSON.parse(
+      afs.readFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBudgets.json"
+        )
+      )
+    );
+    const advertsBudgetsToKeep = JSON.parse(
+      afs.readFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBudgetsToKeep.json"
+        )
+      )
+    );
+
+    const depositAdvertsBudgets = async () => {
+      for (const [advertId, budgetToKeep] of Object.entries(
+        advertsBudgetsToKeep
+      )) {
+        if (!advertId || !budgetToKeep) continue;
+
+        const currentBudget = advertsBudgets[advertId];
+        if (currentBudget > budgetToKeep) continue;
+
+        let budget = budgetToKeep - currentBudget;
+        budget = Math.ceil(budget / 50) * 50;
+        if (budget < 500) budget = 500;
+
+        const depositParams = {
+          sum: budget,
+          type: 1,
+          return: true,
+        };
+
+        const newBudget = await depositAdvertBudget(
+          authToken,
+          advertId,
+          depositParams
+        );
+        advertsBudgets[advertId] = newBudget.total;
+        await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
+
+        await startAdvert(authToken, { id: advertId });
+      }
+    };
+
+    depositAdvertsBudgets().then(() => {
+      afs.writeFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBudgets.json"
+        ),
+        JSON.stringify(advertsBudgets)
+      );
+      resolve();
+    });
+  });
+};
+
+const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
+  return new Promise((resolve, reject) => {
+    // console.log(uid, campaignName, data);
+    const authToken = getAuthTokenMM(uid, campaignName);
+
+    const advertsBidsPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsBidsPath.json"
+    );
+    const advertsAutoBidsRulesPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsBudgetsToKeep.json"
+    );
+    const advertsInfosPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsInfos.json"
+    );
+    const advertsBids = readIfExists(advertsBidsPath);
+    const advertsAutoBidsRules = readIfExists(advertsAutoBidsRulesPath);
+    const advertsInfos = readIfExists(advertsInfosPath);
+
+    const setAdvertsCPMs = async () => {
+      for (const [advertId, advertData] of Object.entries(data)) {
+        if (!advertId || !advertData) continue;
+        const mode = advertData.mode;
+        if (!mode) continue;
+        const bid = advertData.budget;
+        if (bid === undefined) continue;
+        console.log(uid, campaignName, advertId, mode, bid);
+
+        if (mode == "Установить") {
+          const params = {
+            advertId: advertId,
+            type: advertsInfos[advertId].type,
+            cpm: bid,
+          };
+
+          await setAdvertCPM(authToken, params);
+          await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
+        } else if (mode == "Установить лимит") {
+          advertsBudgetsToKeep[advertId] = budget == 0 ? undefined : budget;
+        }
+      }
+    };
+
+    depositAdvertsBudgets().then(() => {
+      afs.writeFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBudgets.json"
+        ),
+        JSON.stringify(advertsBudgets)
+      );
+      afs.writeFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBudgetsToKeep.json"
+        ),
+        JSON.stringify(advertsBudgetsToKeep)
+      );
+      resolve();
+    });
+  });
 };
 
 const fetchAdvertStatsAndWriteToJson = async (campaign) => {
@@ -3036,28 +3357,80 @@ const fetchAdvertStatsAndWriteToJson = async (campaign) => {
     .catch((error) => console.error(error));
 };
 
-const fetchAdvertsStatsAndWriteToJsonMM = async (uid, campaignName) => {
+const fetchAdvertsStatsAndWriteToJsonMM = async (
+  uid,
+  campaignName,
+  batchSize = 1,
+  daysCount = 2
+) => {
   const authToken = getAuthTokenMM(uid, campaignName);
-  const adverts = JSON.parse(
+  const advertsInfos = JSON.parse(
     afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "adverts.json")
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsInfos.json"
+      )
     )
   );
-  const jsonData = {};
+  const advertsStatsByDay = JSON.parse(
+    afs.readFileSync(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsStatsByDay.json"
+      )
+    )
+  );
+
   let numOfButches = 0;
   const params = [[]];
   const today_str = new Date()
     .toLocaleDateString("ru-RU")
     .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
     .slice(0, 10);
-  for (const [advertId, advertData] of Object.entries(adverts)) {
+  for (const [advertId, advertData] of Object.entries(advertsInfos)) {
     if (!advertId || !advertData) continue;
-    // if (![9, 11].includes(advertData.status)) continue;
-    if (params[numOfButches].length == 100) {
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(advertData.endTime.slice(0, 10));
+    endDate.setHours(0, 0, 0, 0);
+
+    const daysPassed = (today.getTime() - endDate.getTime()) / 86400 / 1000;
+    // console.log(new Date(advertData.endTime.slice(0, 10)), new Date(), dayyss);
+    if (daysPassed >= daysCount) {
+      continue;
+    }
+
+    const getDateFromLocaleString = (str) => {
+      const [date, time] = str.split(", ");
+      const isoDate = date
+        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+        .slice(0, 10);
+      const res = new Date(`${isoDate}T${time}.000Z`);
+      return res;
+    };
+
+    const updateTime = advertsStatsByDay[advertId]
+      ? advertsStatsByDay[advertId].updateTime
+      : "";
+    const updateDate = getDateFromLocaleString(updateTime);
+    const minutesPassed =
+      (now.getTime() - (updateDate.getTime() - 1000 * 60 * 60 * 3)) / 60 / 1000;
+    console.log(uid, campaignName, advertId, minutesPassed, updateTime);
+    if (minutesPassed < 30) continue;
+
+    if (params[numOfButches].length == batchSize) {
+      // if (![9, 11].includes(advertData.status)) continue;
       params.push([]);
       numOfButches++;
     }
-    console.log(uid, campaignName, advertId);
+    // console.log(uid, campaignName, advertId);
     params[numOfButches].push({
       id: advertData.advertId,
       interval: {
@@ -3066,31 +3439,51 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (uid, campaignName) => {
       },
     });
   }
+  // return;
+  let retry = false;
   for (let i = 0; i < params.length; i++) {
-    await getAdvertsStatsMM(authToken, params[i])
-      .then((pr) => {
+    const paramsToSend = params[i];
+    console.log(uid, campaignName, `${i + 1}/${params.length}`, paramsToSend);
+    if (!paramsToSend.length) continue;
+    const advertsStatsPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsStats.json"
+    );
+    let jsonData = {};
+    if (afs.existsSync(advertsStatsPath))
+      jsonData = JSON.parse(afs.readFileSync(advertsStatsPath));
+    await getAdvertsStatsMM(authToken, paramsToSend)
+      .then(async (pr) => {
+        if (!pr) return;
+        // if (!retry) {
+        //   if (pr.length != params[i].length) {
+        //     retry = true;
+        //     console.log(uid, campaignName, "Retrying:", params[i]);
+        //     i--;
+        //     await new Promise((resolve) => setTimeout(resolve, 1 * 30 * 1000));
+        //   }
+        // } else retry = false;
+
         for (let j = 0; j < pr.length; j++) {
-          const advertId = pr[j].advertId;
-          if (!advertId) continue;
-          jsonData[advertId] = pr[j];
+          const advertData = pr[j];
+          const advertId = advertData.advertId;
+          if (!advertId) {
+            console.log("Skipped:", params[i], pr[j]);
+            continue;
+          }
+          advertData.updateTime = new Date().toLocaleString("ru-RU");
+          jsonData[advertId] = advertData;
+          console.log(uid, campaignName, advertId, "stats updated.");
         }
       })
       .catch((er) => console.log(er));
-    await new Promise((resolve) => setTimeout(resolve, 65 * 1000));
+    afs.writeFileSync(advertsStatsPath, JSON.stringify(jsonData));
+    await getAdvertsStatByDayMM(uid, campaignName);
+    await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
   }
-  return fs
-    .writeFile(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsStats.json"
-      ),
-      JSON.stringify(jsonData)
-    )
-    .then(() => console.log(uid, campaignName, "advertStats.json created."))
-    .catch((error) => console.error(error));
 };
 
 const getAdvertsStatByDay = (campaign) => {
@@ -3207,14 +3600,15 @@ const getAdvertsStatByDayMM = (uid, campaignName) => {
     const name = advertsInfos[advertId].name;
     const type = advertsInfos[advertId].type;
     const status = advertsInfos[advertId].status;
+    const updateTime = stats.updateTime;
     const artsToSumUp = [];
     const splitted = name.split("/")[0];
     if (!(splitted in arts.byArt)) {
       let nms = [];
       if (type == 8) {
-        nms = advertsInfos[advertId].autoParams.nms;
+        nms = advertsInfos[advertId].autoParams.nms ?? [];
       } else {
-        const temp = advertsInfos[advertId].params[0].nms;
+        const temp = advertsInfos[advertId].params[0].nms ?? [];
         for (let i = 0; i < temp.length; i++) {
           nms.push(temp[i].nm);
         }
@@ -3234,7 +3628,13 @@ const getAdvertsStatByDayMM = (uid, campaignName) => {
       artsToSumUp.push(splitted);
     }
     if (!(advertId in jsonData))
-      jsonData[advertId] = { name: name, type: type, status: status, days: {} };
+      jsonData[advertId] = {
+        name: name,
+        type: type,
+        status: status,
+        updateTime: updateTime,
+        days: {},
+      };
     for (let i = 0; i < days.length; i++) {
       const day = days[i];
       const date = day.date.slice(0, 10);
@@ -3251,16 +3651,16 @@ const getAdvertsStatByDayMM = (uid, campaignName) => {
       for (let j = 0; j < artsToSumUp.length; j++) {
         const art = artsToSumUp[j];
         if (!orders[date]) continue;
-        if (!orders[date][art]) continue;
+        if (!orders[date].all[art]) continue;
         // console.log(art);
-        jsonData[advertId].days[date].orders = orders[date][art].count
-          ? orders[date][art].count
-            ? orders[date][art].count
+        jsonData[advertId].days[date].orders = orders[date].all[art].count
+          ? orders[date].all[art].count
+            ? orders[date].all[art].count
             : 0
           : 0;
-        jsonData[advertId].days[date].sum_orders = orders[date][art].sum
-          ? orders[date][art].sum
-            ? orders[date][art].sum
+        jsonData[advertId].days[date].sum_orders = orders[date].all[art].sum
+          ? orders[date].all[art].sum
+            ? orders[date].all[art].sum
             : 0
           : 0;
       }
@@ -4078,9 +4478,26 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
       path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
     )
   );
-  const data = JSON.parse(
+  const advertsBudgets = JSON.parse(
     afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "data.json")
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsBudgets.json"
+      )
+    )
+  );
+  const advertsBudgetsToKeep = JSON.parse(
+    afs.readFileSync(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsBudgetsToKeep.json"
+      )
     )
   );
   const advertsInfos = JSON.parse(
@@ -4094,11 +4511,78 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
       )
     )
   );
+  const advertsStatsByDay = JSON.parse(
+    afs.readFileSync(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsStatsByDay.json"
+      )
+    )
+  );
   const stocks = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "marketMaster", uid, campaignName, "stocks.json")
     )
   );
+  const orders = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "marketMaster", uid, campaignName, "orders.json")
+    )
+  );
+
+  arts.byBrandArt = {};
+  for (const [nmId, artData] of Object.entries(arts.byNmId)) {
+    arts.byBrandArt[artData.art] = artData;
+  }
+
+  const advertsStatsByArt = {};
+  for (const [advertId, advertStats] of Object.entries(advertsStatsByDay)) {
+    if (!advertId || !advertStats) continue;
+    const art = advertsInfos[advertId].name;
+    if (!(art in advertsStatsByArt)) advertsStatsByArt[art] = {};
+    // console.log(artsToSumOrders);
+
+    for (const [date, dateData] of Object.entries(advertStats.days)) {
+      if (!(date in advertsStatsByArt[art]))
+        advertsStatsByArt[art][date] = {
+          orders: 0,
+          sum_orders: 0,
+          sum: 0,
+          views: 0,
+          clicks: 0,
+        };
+
+      advertsStatsByArt[art][date].sum += dateData.sum ?? 0;
+      advertsStatsByArt[art][date].views += dateData.views ?? 0;
+      advertsStatsByArt[art][date].clicks += dateData.clicks ?? 0;
+    }
+  }
+
+  ////// orders
+  if (orders) {
+    for (const [date, ordersData] of Object.entries(orders)) {
+      for (const [local_art, artOrdersData] of Object.entries(ordersData.all)) {
+        if (!(local_art in arts.byArt)) continue;
+        const art = arts.byArt[local_art].brand_art;
+        if (!(art in advertsStatsByArt)) advertsStatsByArt[art] = {};
+
+        if (!(date in advertsStatsByArt[art]))
+          advertsStatsByArt[art][date] = {
+            orders: 0,
+            sum_orders: 0,
+            sum: 0,
+            views: 0,
+            clicks: 0,
+          };
+
+        advertsStatsByArt[art][date].orders += artOrdersData.count;
+        advertsStatsByArt[art][date].sum_orders += artOrdersData.sum;
+      }
+    }
+  }
 
   const artsWithAdverts = {};
   for (const [advertId, advertInfos] of Object.entries(advertsInfos)) {
@@ -4106,7 +4590,9 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
 
     const type = advertInfos.type;
     const status = advertInfos.status;
-    if (![4, 9, 11].includes(status)) continue;
+    const budget = advertsBudgets[advertId];
+    const budgetToKeep = advertsBudgetsToKeep[advertId];
+    // if (![4, 9, 11].includes(status)) continue;
 
     let nms = [];
     if (type == 8) {
@@ -4126,24 +4612,18 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
       if (!art) continue;
 
       if (!(art in artsWithAdverts)) artsWithAdverts[art] = {};
-      artsWithAdverts[art][advertInfos.advertId] = {
-        advertId: advertInfos.advertId,
+      if (!(type in artsWithAdverts[art])) artsWithAdverts[art][type] = {};
+      artsWithAdverts[art][type][advertId] = {
+        updateTime: advertsStatsByDay[advertId]
+          ? advertsStatsByDay[advertId].updateTime
+          : "Ошибка.",
+        advertId: advertId,
         type: type,
         status: status,
+        budget: budget,
+        budgetToKeep: budgetToKeep,
       };
     }
-
-    // will be neccessary to calc orders
-    // for (let i = 0; i < nms.length; i++) {
-    //   if (!arts.byNmId[nms[i]]) continue;
-    //   // console.log(campaignName, nms, arts.byNmId[nms[i]]);
-    //   const sizes = arts.byNmId[nms[i]].sizes;
-    //   for (let j = 0; j < sizes.length; j++) {
-    //     const sku = sizes[j].skus[0];
-    //     const art = arts.bySku[sku].art;
-    //     artsToSumUp.push(art);
-    //   }
-    // }
   }
 
   const dateFrom = new Date(dateRange.from);
@@ -4165,10 +4645,11 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
 
     jsonData[art].art = art;
     jsonData[art].object = artData.object;
-    jsonData[art].nmId = nmId;
+    jsonData[art].nmId = parseInt(nmId);
     jsonData[art].title = artData.title;
     jsonData[art].size = artData.size;
     jsonData[art].adverts = artsWithAdverts[art];
+    jsonData[art].advertsStats = advertsStatsByArt[art];
     jsonData[art].stocks = 0;
     jsonData[art].brand = artData.brand;
 
@@ -4190,6 +4671,132 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
   );
 
   return jsonData;
+};
+
+const createMassAdvertsMM = (uid, campaignName, data) => {
+  return new Promise((resolve, reject) => {
+    // console.log(uid, campaignName, data);
+    const authToken = getAuthTokenMM(uid, campaignName);
+    const arts = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
+      )
+    );
+
+    const createAutoRK = (params) => {
+      return axios
+        .post("https://advert-api.wb.ru/adv/v1/save-ad", params, {
+          headers: {
+            Authorization: authToken,
+          },
+        })
+        .then((response) => {
+          console.log(
+            uid,
+            campaignName,
+            "created",
+            response.data,
+            "auto campaign."
+          );
+          return response.data;
+        })
+        .catch((error) => console.error(error));
+    };
+
+    const createSearchRK = (params) => {
+      return axios
+        .post("https://advert-api.wb.ru/adv/v1/search/save-ad", params, {
+          headers: {
+            Authorization: authToken,
+          },
+        })
+        .then((response) => {
+          console.log(
+            uid,
+            campaignName,
+            "created",
+            response.data,
+            "auto campaign."
+          );
+          return response.data;
+        })
+        .catch((error) => console.error(error));
+    };
+
+    const updatePlacementsInAutoRK = (advertId, params) => {
+      return axios
+        .post(
+          "https://advert-api.wb.ru/adv/v1/auto/active" + "?id=" + advertId,
+          params,
+          {
+            headers: {
+              Authorization: authToken,
+            },
+          }
+        )
+        .then((response) => {
+          console.log(
+            uid,
+            campaignName,
+            "switched placements for",
+            advertId,
+            "auto campaign."
+          );
+          return response.data;
+        })
+        .catch((error) => console.error(error));
+    };
+
+    const createCampaigns = async () => {
+      for (const [art, artData] of Object.entries(data)) {
+        if (!art || !artData) continue;
+        const type = artData.type;
+        if (!type) continue;
+        const nmId = artData.nmId;
+        if (!nmId) continue;
+        const object = arts.byNmId[nmId].object;
+        if (!object) continue;
+        const objectId = arts.byNmId[nmId].objectId;
+        if (!objectId) continue;
+        const budget = artData.budget;
+        if (!budget) continue;
+        const bid = artData.bid;
+        if (!bid) continue;
+        // console.log(type, nmId, object, objectId, budget, bid, art);
+
+        if (type == "Авто") {
+          const createParams = {
+            type: 8,
+            name: art,
+            subjectId: objectId,
+            sum: budget,
+            btype: 1,
+            on_pause: false,
+            nms: [nmId],
+            cpm: bid,
+          };
+
+          // console.log(uid, campaignName, createParams);
+
+          const newCampaignId = parseInt(await createAutoRK(createParams));
+          await updatePlacementsInAutoRK(newCampaignId, artData.placements);
+          await new Promise((resolve) => setTimeout(resolve, 22 * 1000));
+        } else if (type == "Поиск") {
+          const createParams = {
+            campaignName: art,
+            groups: [{ nms: [nmId], key_word: object, subjectId: objectId }],
+          };
+
+          await createSearchRK(createParams);
+          await new Promise((resolve) => setTimeout(resolve, 62 * 1000));
+        }
+      }
+
+      // return jsonData;
+    };
+
+    createCampaigns().then(() => resolve());
+  });
 };
 
 const fetchSalesAndWriteToJSON = (campaign) => {
@@ -4939,6 +5546,11 @@ module.exports = {
   fetchOfficesAndWriteToJsonMM,
   calcDeliveryOrdersAndWriteToJsonMM,
   calcMassAdvertsAndWriteToJsonMM,
+  createMassAdvertsMM,
+  getAdvertsStatsMM,
+  getAuthTokenMM,
+  depositAdvertsBudgetsAndWriteToJsonMM,
+  autoDepositAdvertsBudgetsAndWriteToJsonMM,
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
@@ -4973,4 +5585,10 @@ const getGeneralMaskFromVendorCode = (vendorCode) => {
     mask_array.pop();
 
   return mask_array.join("_");
+};
+
+const readIfExists = (filepath, _default = {}) => {
+  let result = _default;
+  if (afs.existsSync(filepath)) result = JSON.parse(afs.readFileSync(filepath));
+  return result;
 };

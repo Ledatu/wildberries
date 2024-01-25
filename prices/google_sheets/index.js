@@ -117,6 +117,7 @@ async function writePrices(auth, campaign) {
 }
 
 async function writeDetailedByPeriod(auth, campaign) {
+  const sheets = google.sheets({ version: "v4", auth });
   return new Promise(async (resolve, reject) => {
     // console.log(campaign);
 
@@ -142,13 +143,31 @@ async function writeDetailedByPeriod(auth, campaign) {
         path.join(__dirname, `../files/${campaign}/detailedByPeriod.json`)
       )
     );
+    const useEnteredDeliveryPrice = Object.keys(delivery).length == 0;
+    if (useEnteredDeliveryPrice) {
+      console.log("Fetching entered delivery for", campaign);
+
+      const enteredDeliveryPriceRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+        range: "Логистика по умолчанию!A2:B",
+      });
+
+      // Parse the values into a JSON object
+      const enteredDeliveryPriceRows = enteredDeliveryPriceRes.data.values;
+
+      enteredDeliveryPriceRows.forEach((row) => {
+        const mask = row[0];
+        if (!mask || mask == "") return;
+        delivery[mask] = { average_delivery: row[1] };
+      });
+    }
+
     const drr = JSON.parse(
       await fs.readFile(
         path.join(__dirname, `../files/${campaign}/avgDrrByMask.json`)
       )
     );
     // console.log(data);
-    const sheets = google.sheets({ version: "v4", auth });
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
@@ -166,11 +185,17 @@ async function writeDetailedByPeriod(auth, campaign) {
       if (row[4] != seller_ids[campaign]) continue;
 
       const art = row[0];
+      let type = "";
+      if (!useEnteredDeliveryPrice) {
+        type = getMaskFromVendorCode(art).slice(0, 2);
+      } else {
+        type = art.split("_")[0];
+        // console.log(type, delivery[type]);
+      }
       // const type = getMaskFromVendorCode(art);
       if (art.includes("_ЕН")) {
         type += "_ЕН";
       }
-      let type = getMaskFromVendorCode(art).slice(0, 2);
       // console.log(
       //   art,
       //   type,

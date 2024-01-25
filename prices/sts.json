@@ -1,0 +1,91 @@
+[
+  {
+    "interval": { "begin": "2019-01-01", "end": "2024-01-23" },
+    "views": 5,
+    "clicks": 0,
+    "ctr": 0,
+    "cpc": 0,
+    "sum": 0.78,
+    "atbs": 0,
+    "orders": 0,
+    "cr": 0,
+    "shks": 0,
+    "sum_price": 0,
+    "days": [
+      {
+        "date": "2024-01-23T03:00:00+03:00",
+        "views": 5,
+        "clicks": 0,
+        "ctr": 0,
+        "cpc": 0,
+        "sum": 0.78,
+        "atbs": 0,
+        "orders": 0,
+        "cr": 0,
+        "shks": 0,
+        "sum_price": 0,
+        "apps": [
+          {
+            "views": 3,
+            "clicks": 0,
+            "ctr": 0,
+            "cpc": 0,
+            "sum": 0.47,
+            "atbs": 0,
+            "orders": 0,
+            "cr": 0,
+            "shks": 0,
+            "sum_price": 0,
+            "nm": [
+              {
+                "views": 3,
+                "clicks": 0,
+                "ctr": 0,
+                "cpc": 0,
+                "sum": 0.47,
+                "atbs": 0,
+                "orders": 0,
+                "cr": 0,
+                "shks": 0,
+                "sum_price": 0,
+                "name": "Простынь на резинке 160х200 трикотажная натяжная",
+                "nmId": 83784844
+              }
+            ],
+            "appType": 32
+          },
+          {
+            "views": 2,
+            "clicks": 0,
+            "ctr": 0,
+            "cpc": 0,
+            "sum": 0,
+            "atbs": 0,
+            "orders": 0,
+            "cr": 0,
+            "shks": 0,
+            "sum_price": 0,
+            "nm": [
+              {
+                "views": 2,
+                "clicks": 0,
+                "ctr": 0,
+                "cpc": 0,
+                "sum": 0.31,
+                "atbs": 0,
+                "orders": 0,
+                "cr": 0,
+                "shks": 0,
+                "sum_price": 0,
+                "name": "Простынь на резинке 160х200 трикотажная натяжная",
+                "nmId": 83784844
+              }
+            ],
+            "appType": 64
+          }
+        ]
+      }
+    ],
+    "advertId": 13381678
+  }
+]

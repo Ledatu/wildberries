@@ -307,9 +307,9 @@ const fetchAdvertsMM = async () => {
               await fetchStocksAndWriteToJsonMM(uid, campaignName),
               await fetchAdvertsAndWriteToJsonMM(uid, campaignName),
               await fetchAdvertsInfosAndWriteToJsonMM(uid, campaignName),
-              await fetchAdvertsStatsAndWriteToJsonMM(uid, campaignName),
+              // await fetchAdvertsStatsAndWriteToJsonMM(uid, campaignName),
               await fetchAdvertsBudgetsAndWriteToJsonMM(uid, campaignName),
-              await getAdvertsStatByDayMM(uid, campaignName),
+              // await getAdvertsStatByDayMM(uid, campaignName),
             ]).then(() => resolve(uid, campaignName, "Adverts updated."));
           })
         );

@@ -72,6 +72,10 @@ const {
   fetchOfficesAndWriteToJsonMM,
   calcDeliveryOrdersAndWriteToJsonMM,
   calcMassAdvertsAndWriteToJsonMM,
+  fetchAdvertsInfosAndWriteToJsonMM,
+  getAdvertsStatsMM,
+  getAuthTokenMM,
+  fetchAdvertsBudgetsAndWriteToJsonMM,
 } = require("./main");
 const {
   getPrices,
@@ -213,7 +217,8 @@ const {
 // calcStatsTrendsAndWtriteToJSON("TKS")
 // sendTgBotTrendMessage()
 // calcAndSendTrendsToTg('11')
-// fetchAdverts()
+// fetchAdvertsMM()
+// getDelivery()
 // getPrices()
 // fetchDataAndWriteToXlsx('delicatus').then(() => writePrices('delicatus'))
 // writePrices('perinka')
@@ -297,7 +302,10 @@ const {
 // writeDetailedByPeriod("TKS")
 // calcAndWriteMinZakazToDataSpreadsheet()
 // fetchAdvertsAndWriteToJson('delicatus')
-// fetchAdvertInfosAndWriteToJson("delicatus")
+// fetchAdvertsInfosAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "МАЮША"
+// );
 // fetchAdvertStatsAndWriteToJson("delicatus")
 // getAdvertsStatByDay('delicatus')
 // fetchAdvertsMM()
@@ -326,9 +334,43 @@ const {
 //     { from: "2024-01-10", to: "2024-01-11" }
 //   )
 // );
-
+// console.log(
 // calcMassAdvertsAndWriteToJsonMM(
 //   "332fa5da-8450-451a-b859-a84ca9951a34",
-//   "Объединённая текстильная компания",
+//   "МАЮША",
 //   { from: "2024-01-10", to: "2024-01-11" }
 // );
+//);
+// const afs = require("fs");
+// const path = require("path");
+
+// const authToken = getAuthTokenMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "МАЮША"
+// );
+// getAdvertsStatsMM(authToken, [
+//   {
+//     id: 13381678,
+//     interval: {
+//       begin: "2019-01-01",
+//       end: "2024-01-23",
+//     },
+//   },
+// ]).then((pr) => {
+//   afs.writeFileSync(path.join(__dirname, "sts.json"), JSON.stringify(pr));
+// });
+
+fetchAdvertsBudgetsAndWriteToJsonMM(
+  "332fa5da-8450-451a-b859-a84ca9951a34",
+  "МАЮША"
+);
+
+fetchAdvertsBudgetsAndWriteToJsonMM(
+  "332fa5da-8450-451a-b859-a84ca9951a34",
+  "DELICATUS"
+);
+
+fetchAdvertsBudgetsAndWriteToJsonMM(
+  "332fa5da-8450-451a-b859-a84ca9951a34",
+  "Объединённая текстильная компания"
+);

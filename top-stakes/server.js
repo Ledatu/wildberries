@@ -3,10 +3,8 @@
  * @module server
  */
 
-const express = require("express");
 const jwt = require("jsonwebtoken");
 const path = require("path");
-const fs = require("fs");
 const bodyParser = require("body-parser");
 const main = require("./main");
 const {
@@ -47,10 +45,14 @@ const {
   craftNecessaryFoldersAndFilesIfNeeded,
   calcDeliveryOrdersAndWriteToJsonMM,
   calcMassAdvertsAndWriteToJsonMM,
+  createMassAdvertsMM,
+  depositAdvertsBudgetsAndWriteToJsonMM,
 } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
 
+const fs = require("fs");
+const express = require("express");
 const app = express();
 
 var cors = require("cors");
@@ -244,6 +246,38 @@ app.post("/api/getMassAdverts", authenticateToken, (req, res) => {
     massAdvertsAccount[campaignName] = massAdvertsCampaign;
   }
   res.send(JSON.stringify(massAdvertsAccount));
+});
+
+app.post("/api/createMassAdverts", authenticateToken, async (req, res) => {
+  const accountUid = req.body.uid;
+  const campaignName = req.body.campaignName;
+  const data = req.body.arts;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  const massAdvertsCampaign = await createMassAdvertsMM(
+    accountUid,
+    campaignName,
+    data
+  );
+  res.send(JSON.stringify(massAdvertsCampaign));
+});
+
+app.post("/api/depositAdvertsBudgets", authenticateToken, async (req, res) => {
+  const accountUid = req.body.uid;
+  const campaignName = req.body.campaignName;
+  const data = req.body.advertsIds;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  const massAdvertsCampaign = await depositAdvertsBudgetsAndWriteToJsonMM(
+    accountUid,
+    campaignName,
+    data
+  );
+  res.send(JSON.stringify(massAdvertsCampaign));
 });
 
 app.post(
