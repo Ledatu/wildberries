@@ -3253,19 +3253,12 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
     // console.log(uid, campaignName, data);
     const authToken = getAuthTokenMM(uid, campaignName);
 
-    const advertsBidsPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsBidsPath.json"
-    );
     const advertsAutoBidsRulesPath = path.join(
       __dirname,
       "marketMaster",
       uid,
       campaignName,
-      "advertsBudgetsToKeep.json"
+      "advertsAutoBidsRules.json"
     );
     const advertsInfosPath = path.join(
       __dirname,
@@ -3274,7 +3267,6 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
       campaignName,
       "advertsInfos.json"
     );
-    const advertsBids = readIfExists(advertsBidsPath);
     const advertsAutoBidsRules = readIfExists(advertsAutoBidsRulesPath);
     const advertsInfos = readIfExists(advertsInfosPath);
 
@@ -3283,11 +3275,12 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
         if (!advertId || !advertData) continue;
         const mode = advertData.mode;
         if (!mode) continue;
-        const bid = advertData.budget;
-        if (bid === undefined) continue;
-        console.log(uid, campaignName, advertId, mode, bid);
 
         if (mode == "Установить") {
+          const bid = advertData.bid;
+          if (bid === undefined) continue;
+          console.log(uid, campaignName, advertId, mode, bid);
+
           const params = {
             advertId: advertId,
             type: advertsInfos[advertId].type,
@@ -3296,32 +3289,19 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
 
           await setAdvertCPM(authToken, params);
           await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
-        } else if (mode == "Установить лимит") {
-          advertsBudgetsToKeep[advertId] = budget == 0 ? undefined : budget;
+        } else if (mode == "Автоставки") {
+          // const cpo = advertData.cpo;
+          // if (cpo === undefined) continue;
+          // console.log(uid, campaignName, advertId, mode, bid);
+          // advertsAutoBidsRules[advertId] = bid == 0 ? undefined : bid;
         }
       }
     };
 
-    depositAdvertsBudgets().then(() => {
+    setAdvertsCPMs().then(() => {
       afs.writeFileSync(
-        path.join(
-          __dirname,
-          "marketMaster",
-          uid,
-          campaignName,
-          "advertsBudgets.json"
-        ),
-        JSON.stringify(advertsBudgets)
-      );
-      afs.writeFileSync(
-        path.join(
-          __dirname,
-          "marketMaster",
-          uid,
-          campaignName,
-          "advertsBudgetsToKeep.json"
-        ),
-        JSON.stringify(advertsBudgetsToKeep)
+        advertsAutoBidsRulesPath,
+        JSON.stringify(advertsAutoBidsRules)
       );
       resolve();
     });
@@ -4489,6 +4469,17 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
       )
     )
   );
+  const advertsStats = JSON.parse(
+    afs.readFileSync(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsStats.json"
+      )
+    )
+  );
   const advertsBudgetsToKeep = JSON.parse(
     afs.readFileSync(
       path.join(
@@ -4591,6 +4582,11 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
     const type = advertInfos.type;
     const status = advertInfos.status;
     const budget = advertsBudgets[advertId];
+    const cpm = advertsStats[advertId]
+      ? advertsStats[advertId].autoParams
+        ? advertsStats[advertId].autoParams.cpm
+        : undefined
+      : undefined;
     const budgetToKeep = advertsBudgetsToKeep[advertId];
     // if (![4, 9, 11].includes(status)) continue;
 
@@ -4621,6 +4617,7 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
         type: type,
         status: status,
         budget: budget,
+        cpm: cpm,
         budgetToKeep: budgetToKeep,
       };
     }
@@ -5551,6 +5548,7 @@ module.exports = {
   getAuthTokenMM,
   depositAdvertsBudgetsAndWriteToJsonMM,
   autoDepositAdvertsBudgetsAndWriteToJsonMM,
+  setAdvertsCPMsAndWriteToJsonMM,
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {

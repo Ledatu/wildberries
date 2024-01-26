@@ -47,16 +47,28 @@ const {
   calcMassAdvertsAndWriteToJsonMM,
   createMassAdvertsMM,
   depositAdvertsBudgetsAndWriteToJsonMM,
+  setAdvertsCPMsAndWriteToJsonMM,
 } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
 
 const fs = require("fs");
+const http = require("http");
+const https = require("https");
+const certificate = fs.readFileSync(
+  path.join(__dirname, "../secrets/cert/cert.pem")
+);
+const privateKey = fs.readFileSync(
+  path.join(__dirname, "../secrets/cert/key.pem")
+);
+
+const credentials = { key: privateKey, cert: certificate };
 const express = require("express");
 const app = express();
 
 var cors = require("cors");
 app.use(cors());
+// your express configuration here
 
 const port = 24456;
 const secretKey = require(path.join(
@@ -280,6 +292,22 @@ app.post("/api/depositAdvertsBudgets", authenticateToken, async (req, res) => {
   res.send(JSON.stringify(massAdvertsCampaign));
 });
 
+app.post("/api/setAdvertsCPMs", authenticateToken, async (req, res) => {
+  const accountUid = req.body.uid;
+  const campaignName = req.body.campaignName;
+  const data = req.body.advertsIds;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  const result = await setAdvertsCPMsAndWriteToJsonMM(
+    accountUid,
+    campaignName,
+    data
+  );
+  res.send(JSON.stringify(result));
+});
+
 app.post(
   "/api/craftNecessaryFoldersAndFilesIfNeeded",
   authenticateToken,
@@ -497,15 +525,19 @@ app.post("/api/login", (req, res) => {
   });
 });
 
+const httpServer = http.createServer(app);
+const httpsServer = https.createServer(credentials, app);
 /**
  * Start the server.
  * @function
  * @name startServer
  */
 function startServer() {
-  app.listen(port, () => {
-    console.log(`Server listening at http://localhost:${port}`);
+  httpServer.listen(24456, () => {
+    console.log(`Http server listening at http://185.164.172.100:24456`);
+  });
+  httpsServer.listen(24458, () => {
+    console.log(`Https server listening at https://185.164.172.100:24458`);
   });
 }
-
 module.exports = startServer;
