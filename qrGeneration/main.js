@@ -13,7 +13,7 @@ const { type } = require("os");
  * @param {String} outPath: /path/to/created.zip
  * @returns {Promise}
  */
-function zipDirectory(sourceDir, outPath) {
+function  zipDirectory(sourceDir, outPath) {
   const archive = archiver("zip", { zlib: { level: 9 } });
   const stream = fs.createWriteStream(outPath);
 
@@ -312,7 +312,7 @@ async function autoGenerateNewTags(campaign, brand) {
     );
 
     for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
-      if (art_data.brand != brand || !art.includes("WH")) continue;
+      if (art_data.brand != brand) continue;
       await makePdf(
         brand,
         art_data.brand_art.toUpperCase(),

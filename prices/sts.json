@@ -1,24 +1,24 @@
 [
   {
-    "interval": { "begin": "2019-01-01", "end": "2024-01-23" },
-    "views": 5,
-    "clicks": 0,
-    "ctr": 0,
-    "cpc": 0,
-    "sum": 0.78,
+    "views": 72,
+    "clicks": 3,
+    "ctr": 4.17,
+    "cpc": 3.13,
+    "sum": 9.38,
     "atbs": 0,
     "orders": 0,
     "cr": 0,
     "shks": 0,
     "sum_price": 0,
+    "dates": ["2024-01-27"],
     "days": [
       {
-        "date": "2024-01-23T03:00:00+03:00",
-        "views": 5,
-        "clicks": 0,
+        "date": "2024-01-27T03:00:00+03:00",
+        "views": 72,
+        "clicks": 3,
         "ctr": 0,
-        "cpc": 0,
-        "sum": 0.78,
+        "cpc": 3.13,
+        "sum": 9.38,
         "atbs": 0,
         "orders": 0,
         "cr": 0,
@@ -26,11 +26,11 @@
         "sum_price": 0,
         "apps": [
           {
-            "views": 3,
+            "views": 15,
             "clicks": 0,
             "ctr": 0,
             "cpc": 0,
-            "sum": 0.47,
+            "sum": 1.88,
             "atbs": 0,
             "orders": 0,
             "cr": 0,
@@ -38,26 +38,55 @@
             "sum_price": 0,
             "nm": [
               {
-                "views": 3,
+                "views": 15,
                 "clicks": 0,
                 "ctr": 0,
                 "cpc": 0,
-                "sum": 0.47,
+                "sum": 1.88,
                 "atbs": 0,
                 "orders": 0,
                 "cr": 0,
                 "shks": 0,
                 "sum_price": 0,
-                "name": "Простынь на резинке 160х200 трикотажная натяжная",
-                "nmId": 83784844
+                "name": "Простынь на резинке 140х200 трикотажная натяжная",
+                "nmId": 168413237
+              }
+            ],
+            "appType": 1
+          },
+          {
+            "views": 49,
+            "clicks": 2,
+            "ctr": 4.08,
+            "cpc": 3.19,
+            "sum": 6.38,
+            "atbs": 0,
+            "orders": 0,
+            "cr": 0,
+            "shks": 0,
+            "sum_price": 0,
+            "nm": [
+              {
+                "views": 49,
+                "clicks": 2,
+                "ctr": 4.08,
+                "cpc": 3.19,
+                "sum": 6.38,
+                "atbs": 0,
+                "orders": 0,
+                "cr": 0,
+                "shks": 0,
+                "sum_price": 0,
+                "name": "Простынь на резинке 140х200 трикотажная натяжная",
+                "nmId": 168413237
               }
             ],
             "appType": 32
           },
           {
-            "views": 2,
-            "clicks": 0,
-            "ctr": 0,
+            "views": 8,
+            "clicks": 1,
+            "ctr": 12.5,
             "cpc": 0,
             "sum": 0,
             "atbs": 0,
@@ -67,18 +96,18 @@
             "sum_price": 0,
             "nm": [
               {
-                "views": 2,
-                "clicks": 0,
-                "ctr": 0,
-                "cpc": 0,
-                "sum": 0.31,
+                "views": 8,
+                "clicks": 1,
+                "ctr": 12.5,
+                "cpc": 1.13,
+                "sum": 1.13,
                 "atbs": 0,
                 "orders": 0,
                 "cr": 0,
                 "shks": 0,
                 "sum_price": 0,
-                "name": "Простынь на резинке 160х200 трикотажная натяжная",
-                "nmId": 83784844
+                "name": "Простынь на резинке 140х200 трикотажная натяжная",
+                "nmId": 168413237
               }
             ],
             "appType": 64
@@ -86,6 +115,9 @@
         ]
       }
     ],
-    "advertId": 13381678
+    "boosterStats": [
+      { "date": "2024-01-27T00:00:00Z", "nm": 168413237, "avg_position": 185 }
+    ],
+    "advertId": 13452224
   }
 ]

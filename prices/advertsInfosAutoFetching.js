@@ -1,16 +1,13 @@
-const { fetchAdvertsStatsAndWriteToJsonMM } = require("./main");
+const { fetchAdvertsInfosAndWriteToJsonMM } = require("./main");
 const fs = require("fs");
 const path = require("path");
 
-const autoFetchAdvertsMM = async (uid, campaignName, batchSize, daysCount) => {
+const autoFetchAdvertsInfosMM = async (uid, campaignName) => {
   await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
   while (true) {
-    await fetchAdvertsStatsAndWriteToJsonMM(
-      uid,
-      campaignName,
-      batchSize,
-      daysCount
-    ).then(() => console.log(uid, campaignName, "Adverts updated."));
+    await fetchAdvertsInfosAndWriteToJsonMM(uid, campaignName).then(() =>
+      console.log(uid, campaignName, "advertsInfos updated.")
+    );
     await new Promise((resolve) => setTimeout(resolve, 10 * 61 * 1000));
   }
 };
@@ -23,13 +20,11 @@ const start = async () => {
     const campaignsNames = customerData.campaignsNames;
     for (let i = 0; i < campaignsNames.length; i++) {
       const campaignName = campaignsNames[i];
-      // if (campaignName != "Объединённая текстильная компания") continue;
       console.log(uid, campaignName);
-      autoFetchAdvertsMM(uid, campaignName, 100, 2);
+      autoFetchAdvertsInfosMM(uid, campaignName);
     }
   }
   console.log("Started");
 };
 
 start();
-// autoFetchAdvertsMM(100, 30);

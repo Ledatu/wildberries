@@ -2,6 +2,7 @@ const {
   fetchQrCodesAndWriteToJSON,
   exportTZToXlsx,
   fetchCurrentZakazAndWriteToXLSX,
+  fetchOTKArtMathcingAndWriteToJSON,
 } = require("./google_sheets/index");
 const { generateNewTags, autoGenerateNewTags, generateTagsRaspredelenniy } = require("./main");
 const {
@@ -20,8 +21,9 @@ const {
 // newTagsGeneration();
 // autofillCurrent("delicatus ПР 06 МК ТУЛА");
 // autoGenerateNewTags('perinka', 'Перинка');
-// autoGenerateNewTags('mayusha', 'МАЮША');
+autoGenerateNewTags('mayusha', 'МАЮША');
 // autoGenerateNewTags('delicatus', 'DELICATUS');
-autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
+// autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
 // exportAll()
 // generateTagsRaspredelenniy()
+// fetchOTKArtMathcingAndWriteToJSON()

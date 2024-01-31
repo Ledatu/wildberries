@@ -1,9 +1,9 @@
-const { autoDepositAdvertsBudgetsAndWriteToJsonMM } = require("./main");
+const { autoSetMinusPhrasesMM } = require("./main");
 const { scheduleJob } = require("node-schedule");
 const fs = require("fs");
 const path = require("path");
 
-const autoDepositAdverts = async () => {
+const autoSetMinusPhrases = async () => {
   return new Promise(async (resolve, reject) => {
     const customers = JSON.parse(
       fs.readFileSync(path.join(__dirname, "marketMaster", "customers.json"))
@@ -15,15 +15,15 @@ const autoDepositAdverts = async () => {
         const campaignName = campaignsNames[i];
         console.log(uid, campaignName);
         promises.push(
-          autoDepositAdvertsBudgetsAndWriteToJsonMM(uid, campaignName).then(
-            () => resolve(uid, campaignName, "Adverts budgets deposited.")
+          autoSetMinusPhrasesMM(uid, campaignName).then(() =>
+            resolve(uid, campaignName, "Adverts minus phrases set.")
           )
         );
       }
     }
     await Promise.all(promises).then(() => resolve());
   });
-};  
+};
 
-scheduleJob("10 0 * * *", () => autoDepositAdverts());
-// autoDepositAdverts();
+scheduleJob("3 * * * *", () => autoSetMinusPhrases());
+// autoSetMinusPhrases();

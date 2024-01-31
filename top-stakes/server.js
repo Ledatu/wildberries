@@ -48,6 +48,7 @@ const {
   createMassAdvertsMM,
   depositAdvertsBudgetsAndWriteToJsonMM,
   setAdvertsCPMsAndWriteToJsonMM,
+  setAdvertsPlusPhrasesTemplatesMM,
 } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
@@ -238,6 +239,37 @@ app.post("/api/getDeliveryOrders", authenticateToken, (req, res) => {
   res.send(JSON.stringify(deliveryOrdersAccount));
 });
 
+app.post("/api/setPlusPhraseTemplate", authenticateToken, (req, res) => {
+  const accountUid = req.body.uid;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+
+  const plusPhrasesTemplates = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        "plusPhrasesTemplates.json"
+      )
+    )
+  );
+  if (data.mode == "Установить") plusPhrasesTemplates[data.name] = data;
+  else if (data.mode == "Удалить") plusPhrasesTemplates[data.name] = undefined;
+
+  fs.writeFileSync(
+    path.join(
+      __dirname,
+      "../prices/marketMaster",
+      accountUid,
+      "plusPhrasesTemplates.json"
+    ),
+    JSON.stringify(plusPhrasesTemplates)
+  );
+
+  res.send(JSON.stringify("Set plusPhrasesTemplates"));
+});
+
 app.post("/api/getMassAdverts", authenticateToken, (req, res) => {
   const accountUid = req.body.uid;
   const dateRange = req.body.dateRange;
@@ -248,14 +280,27 @@ app.post("/api/getMassAdverts", authenticateToken, (req, res) => {
       path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
     )
   ).byCampaignName;
-  const massAdvertsAccount = {};
+  const plusPhrasesTemplates = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        "plusPhrasesTemplates.json"
+      )
+    )
+  );
+  const massAdvertsAccount = {
+    plusPhrasesTemplates: plusPhrasesTemplates,
+    campaigns: {},
+  };
   for (const [campaignName, _] of Object.entries(secrets)) {
     const massAdvertsCampaign = calcMassAdvertsAndWriteToJsonMM(
       accountUid,
       campaignName,
       dateRange
     );
-    massAdvertsAccount[campaignName] = massAdvertsCampaign;
+    massAdvertsAccount.campaigns[campaignName] = massAdvertsCampaign;
   }
   res.send(JSON.stringify(massAdvertsAccount));
 });
@@ -276,10 +321,30 @@ app.post("/api/createMassAdverts", authenticateToken, async (req, res) => {
   res.send(JSON.stringify(massAdvertsCampaign));
 });
 
+app.post(
+  "/api/setAdvertsPlusPhrasesTemplates",
+  authenticateToken,
+  async (req, res) => {
+    const accountUid = req.body.uid;
+    const campaignName = req.body.campaignName;
+    const data = req.body.data;
+    if (!accountUid || accountUid == "") return;
+    if (!campaignName || campaignName == "") return;
+    if (!data || data == "") return;
+
+    const massAdvertsCampaign = await setAdvertsPlusPhrasesTemplatesMM(
+      accountUid,
+      campaignName,
+      data
+    );
+    res.send(JSON.stringify(massAdvertsCampaign));
+  }
+);
+
 app.post("/api/depositAdvertsBudgets", authenticateToken, async (req, res) => {
   const accountUid = req.body.uid;
   const campaignName = req.body.campaignName;
-  const data = req.body.advertsIds;
+  const data = req.body.data;
   if (!accountUid || accountUid == "") return;
   if (!campaignName || campaignName == "") return;
   if (!data || data == "") return;
@@ -295,7 +360,7 @@ app.post("/api/depositAdvertsBudgets", authenticateToken, async (req, res) => {
 app.post("/api/setAdvertsCPMs", authenticateToken, async (req, res) => {
   const accountUid = req.body.uid;
   const campaignName = req.body.campaignName;
-  const data = req.body.advertsIds;
+  const data = req.body.data;
   if (!accountUid || accountUid == "") return;
   if (!campaignName || campaignName == "") return;
   if (!data || data == "") return;
@@ -461,7 +526,12 @@ app.get("/api/getArtsData", async (req, res) => {
     const artsData = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../prices/files/data.json"))
     );
-    res.send(artsData);
+    const OTKArtMatching = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, "../qrGeneration/files/OTKArtMatching.json")
+      )
+    );
+    res.send({ arts: artsData, otkMatching: OTKArtMatching });
   } catch (error) {
     res.status(500).end(error);
   }

@@ -2790,7 +2790,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
   const update_data = async (sheet, data) => {
     await sheets.spreadsheets.values.update({
       spreadsheetId: destinationSpreadsheetId,
-      range: `${sheet}!A2:B`,
+      range: `${sheet}!B2:C`,
       valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
       resource: {
         values: data,

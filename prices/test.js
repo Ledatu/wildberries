@@ -76,6 +76,8 @@ const {
   getAdvertsStatsMM,
   getAuthTokenMM,
   fetchAdvertsBudgetsAndWriteToJsonMM,
+  fetchAdvertsStatsAndWriteToJsonMM,
+  fetchAdvertsWordsAndWriteToJsonMM,
 } = require("./main");
 const {
   getPrices,
@@ -341,36 +343,59 @@ const {
 //   { from: "2024-01-10", to: "2024-01-11" }
 // );
 //);
+
+// fetchAdvertsStatsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "МАЮША",
+//   100,
+//   2
+// );
+
 // const afs = require("fs");
 // const path = require("path");
-
 // const authToken = getAuthTokenMM(
 //   "332fa5da-8450-451a-b859-a84ca9951a34",
 //   "МАЮША"
 // );
 // getAdvertsStatsMM(authToken, [
 //   {
-//     id: 13381678,
-//     interval: {
-//       begin: "2019-01-01",
-//       end: "2024-01-23",
-//     },
+//     id: 13452224,
+//     dates: ["2024-01-26"],
 //   },
 // ]).then((pr) => {
 //   afs.writeFileSync(path.join(__dirname, "sts.json"), JSON.stringify(pr));
 // });
 
-fetchAdvertsBudgetsAndWriteToJsonMM(
-  "332fa5da-8450-451a-b859-a84ca9951a34",
-  "МАЮША"
-);
+// fetchAdvertsBudgetsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "МАЮША"
+// );
 
-fetchAdvertsBudgetsAndWriteToJsonMM(
-  "332fa5da-8450-451a-b859-a84ca9951a34",
-  "DELICATUS"
-);
+// fetchAdvertsBudgetsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "DELICATUS"
+// );
 
-fetchAdvertsBudgetsAndWriteToJsonMM(
-  "332fa5da-8450-451a-b859-a84ca9951a34",
-  "Объединённая текстильная компания"
-);
+// fetchAdvertsBudgetsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "Объединённая текстильная компания"
+// );
+
+// fetchAdvertsMM()
+// const d = new Date('2024-01-30T05:58:00.000Z')
+// calcAndSendTrendsToTg(d);
+// fetchAdvertsWordsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "МАЮША"
+// );
+
+// fetchAdvertsWordsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "DELICATUS"
+// );
+// fetchAdvertsWordsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "Объединённая текстильная компания"
+// );
+
+fetchDetailedByPeriodAndWriteToJSON("mayusha");

@@ -132,17 +132,17 @@ async function fetchTagsAndWriteToJSON(auth, name) {
     if (name) {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ",
-        range: `${name}!B2:E`,
+        range: `${name}!A2:F`,
       });
 
       // Parse the values into a JSON object
       const rows = res.data.values;
       const data = { tags: [] };
       rows.forEach((row) => {
-        if (!row[0] || !row[3]) return;
+        if (!row[5] || !row[2]) return;
         data["tags"].push({
-          tag: row[3],
-          count: parseInt(row[0].replace(/\s/g, "")),
+          tag: row[5],
+          count: parseInt(row[2].replace(/\s/g, "")),
         });
       });
 
@@ -203,14 +203,20 @@ async function fetchCurrentZakazAndWriteToXLSX(auth, sheet_name) {
     const xlsxSheets = [];
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1ShAelY_Xi50Au2Ij7PvK0QhfwKmRFdI0Yqthx-I_JbQ",
-      range: `${sheet_name}!A2:D`,
+      range: `${sheet_name}!A2:E`,
     });
+    const OTKArtMatching = JSON.parse(
+      afs.readFileSync(path.join(__dirname, "../files/OTKArtMatching.json"))
+    );
     // Parse the values into a JSON object
     const rows = res.data.values;
     const filled_rows = [];
     for (let i = 0; i < rows.length; i++) {
-      if (!rows[i][0]) continue;
-      filled_rows.push(rows[i]);
+      const row = rows[i];
+      const art = row[1];
+      if (!art) continue;
+      row[0] = OTKArtMatching[art];
+      filled_rows.push(row);
     }
     xlsxSheets.push({ name: sheet_name, data: filled_rows });
 
@@ -224,6 +230,36 @@ async function fetchCurrentZakazAndWriteToXLSX(auth, sheet_name) {
       JSON.stringify({ name: sheet_name })
     );
     // console.log(xlsxSheets);
+    resolve();
+  });
+}
+
+async function fetchOTKArtMathcingAndWriteToJSON(auth) {
+  return new Promise(async (resolve, reject) => {
+    const sheets = google.sheets({ version: "v4", auth });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: `Сопоставление артикулов с ОТК!A2:E`,
+    });
+    // Parse the values into a JSON object
+    const rows = res.data.values;
+    // console.log(rows);
+    const jsonData = {};
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      // console.log(row);
+      if (!row || !row[0] || row[0] == "") continue;
+      for (let j = 1; j < row.length; j++) {
+        const art = row[j];
+        if (!art || art == "") continue;
+        jsonData[art] = row[0];
+      }
+    }
+
+    await afs.writeFileSync(
+      path.join(__dirname, "../files/", `OTKArtMatching.json`),
+      JSON.stringify(jsonData)
+    );
     resolve();
   });
 }
@@ -298,6 +334,13 @@ module.exports = {
     return new Promise(async (resolve, reject) => {
       const auth = await authorize();
       await exportTZToXlsx(auth).catch(console.error);
+      resolve();
+    });
+  },
+  fetchOTKArtMathcingAndWriteToJSON: () => {
+    return new Promise(async (resolve, reject) => {
+      const auth = await authorize();
+      await fetchOTKArtMathcingAndWriteToJSON(auth).catch(console.error);
       resolve();
     });
   },

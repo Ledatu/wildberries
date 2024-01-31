@@ -185,6 +185,7 @@ const scraperObject = {
     );
   },
   async scraper(browser, campaign) {
+    return;
     const context = await browser.newContext();
     // for (let id = 0; id < adsIds.data.length; id++) {
     const RKsToCreate = JSON.parse(

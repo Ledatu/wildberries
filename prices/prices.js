@@ -40,6 +40,7 @@ const {
   fetchOrdersAndWriteToJsonMM,
   fetchArtsAndWriteToJsonMM,
   fetchStocksAndWriteToJsonMM,
+  fetchAdvertsWordsAndWriteToJsonMM,
 } = require("./main");
 const {
   writePrices,
@@ -65,12 +66,18 @@ const campaigns = require(path.join(__dirname, "files/campaigns")).campaigns;
 const fs = require("fs");
 const { fetchAdsIdsAndWriteToJSON } = require("../analytics/google_sheets");
 const { fetchSpp } = require("../analytics/main");
+const {
+  fetchOTKArtMathcingAndWriteToJSON,
+} = require("../qrGeneration/google_sheets");
 
 const updateAtriculesData = async () => {
   await fetchArtMaskPricesAndWriteToJSON().then(() =>
     generateGeneralMaskFormsAndWriteToJSON().then(() =>
       copyPricesToDataSpreadsheet().then(
-        async (pr) => await fetchDataAndWriteToJSON()
+        async () =>
+          await fetchDataAndWriteToJSON().then(
+            async () => await fetchOTKArtMathcingAndWriteToJSON()
+          )
       )
     )
   );
@@ -265,7 +272,6 @@ const fetchAdverts = async () => {
             await fetchAdvertInfosAndWriteToJson(campaign),
             await fetchAdvertStatsAndWriteToJsonMpManager(campaign, now),
             await fetchAdvertStatsAndWriteToJsonMpManagerLog(campaign, now),
-            await fetchRksBudgetsAndWriteToJSON(campaign),
             await getAdvertStatByMaskByDayAndWriteToJSONMpManager(campaign),
             await getAdvertStatByDayAndWriteToJSONMpManager(campaign),
             await calcAvgDrrByArtAndWriteToJSON(campaign),
@@ -276,15 +282,16 @@ const fetchAdverts = async () => {
       )
     );
     Promise.all(promises)
-      .then(async () => {
-        await calcAndSendTrendsToTg(now).then(() => resolve("Updated."));
-        console.log("All tasks completed successfully");
-      })
+      .then(() => resolve())
       .catch((error) => {
         console.error("An error occurred:", error);
       });
   });
 };
+// .then(async () => {
+//   await calcAndSendTrendsToTg(now).then(() => resolve("Updated."));
+//   console.log("All tasks completed successfully");
+// })
 
 const fetchAdvertsMM = async () => {
   // const now = new Date('2023-12-19T17:57:00.000Z')
@@ -306,10 +313,8 @@ const fetchAdvertsMM = async () => {
               await fetchOrdersAndWriteToJsonMM(uid, campaignName),
               await fetchStocksAndWriteToJsonMM(uid, campaignName),
               await fetchAdvertsAndWriteToJsonMM(uid, campaignName),
-              await fetchAdvertsInfosAndWriteToJsonMM(uid, campaignName),
-              // await fetchAdvertsStatsAndWriteToJsonMM(uid, campaignName),
               await fetchAdvertsBudgetsAndWriteToJsonMM(uid, campaignName),
-              // await getAdvertsStatByDayMM(uid, campaignName),
+              await fetchAdvertsWordsAndWriteToJsonMM(uid, campaignName),
             ]).then(() => resolve(uid, campaignName, "Adverts updated."));
           })
         );
