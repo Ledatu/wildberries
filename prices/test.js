@@ -366,20 +366,20 @@ const {
 //   afs.writeFileSync(path.join(__dirname, "sts.json"), JSON.stringify(pr));
 // });
 
-// fetchAdvertsBudgetsAndWriteToJsonMM(
-//   "332fa5da-8450-451a-b859-a84ca9951a34",
-//   "МАЮША"
-// );
+fetchAdvertsBudgetsAndWriteToJsonMM(
+  "332fa5da-8450-451a-b859-a84ca9951a34",
+  "МАЮША"
+);
 
-// fetchAdvertsBudgetsAndWriteToJsonMM(
-//   "332fa5da-8450-451a-b859-a84ca9951a34",
-//   "DELICATUS"
-// );
+fetchAdvertsBudgetsAndWriteToJsonMM(
+  "332fa5da-8450-451a-b859-a84ca9951a34",
+  "DELICATUS"
+);
 
-// fetchAdvertsBudgetsAndWriteToJsonMM(
-//   "332fa5da-8450-451a-b859-a84ca9951a34",
-//   "Объединённая текстильная компания"
-// );
+fetchAdvertsBudgetsAndWriteToJsonMM(
+  "332fa5da-8450-451a-b859-a84ca9951a34",
+  "Объединённая текстильная компания"
+);
 
 // fetchAdvertsMM()
 // const d = new Date('2024-01-30T05:58:00.000Z')
@@ -398,4 +398,4 @@ const {
 //   "Объединённая текстильная компания"
 // );
 
-fetchDetailedByPeriodAndWriteToJSON("mayusha");
+// fetchDetailedByPeriodAndWriteToJSON("mayusha");

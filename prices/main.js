@@ -3014,13 +3014,14 @@ const fetchAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
   const advertsIds = [];
   for (const [advertId, advertData] of Object.entries(advertsInfos)) {
     if (!advertId || !advertData) continue;
-    if (![4, 9, 11].includes(advertData.status)) {
+    if (![9, 11].includes(advertData.status)) {
       continue;
     }
     advertsIds.push(advertData.advertId);
   }
   console.log(uid, campaignName, advertsIds.length, "budgets to fetch.");
   const jsonData = {};
+  let retry = false;
   for (let i = 0; i < advertsIds.length; i++) {
     const advertId = advertsIds[i];
     const queryParams = new URLSearchParams();
@@ -3028,11 +3029,15 @@ const fetchAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
     await fetchRKsBudget(authToken, queryParams)
       .then((pr) => {
         if (!pr) return;
+
+        if (retry) {
+          retry = false;
+        }
         const budget = pr.total;
         jsonData[advertId] = budget;
         console.log(uid, campaignName, "fetched", advertId, "budget:", budget);
       })
-      .catch((e) => {
+      .catch(async (e) => {
         console.log(
           uid,
           campaignName,
@@ -3040,7 +3045,14 @@ const fetchAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
           advertId,
           "budget, retrying..."
         );
-        i--;
+        if (retry) {
+          retry = false;
+          return;
+        } else {
+          i--;
+          retry = true;
+          await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
+        }
       });
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -3073,7 +3085,7 @@ const fetchAdvertsWordsAndWriteToJsonMM = async (uid, campaignName) => {
   const advertsIds = [];
   for (const [advertId, advertData] of Object.entries(advertsInfos)) {
     if (!advertId || !advertData) continue;
-    if (![4, 9, 11].includes(advertData.status)) continue;
+    if (![9, 11].includes(advertData.status)) continue;
     if (advertData.type != 8) continue;
     advertsIds.push(advertData.advertId);
   }
@@ -3452,18 +3464,18 @@ const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
           const advertId = advertData.advertId;
           if (advertData.status != 11 && advertData.status != 9) continue;
           if (advertData.name != art) continue;
-          if (advertData.type != 8) continue;
-          console.log(advertId);
+          // if (advertData.type != 8) continue;
 
           if (advertData.status == 11) toRestart.push(advertId);
 
           const currentBudget = advertsBudgets[advertId];
-          if (currentBudget > budgetToKeep) continue;
+          if (currentBudget >= budgetToKeep) continue;
 
           let budget = budgetToKeep - currentBudget;
           // if (budget < 125) continue;
           budget = Math.ceil(budget / 50) * 50;
           if (budget < 500) budget = 500;
+          // if (buf)
 
           const depositParams = {
             sum: budget,
@@ -3495,8 +3507,10 @@ const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
     };
 
     depositAdvertsBudgets().then(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
+      await new Promise((resolve) => setTimeout(resolve, 3 * 60 * 1000));
       for (let i = 0; i < toRestart.length; i++) {
+        const advertId = toRestart[i];
+        if (!advertId) continue;
         await startAdvert(authToken, { id: advertId });
         await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
       }
@@ -4798,6 +4812,52 @@ const fetchOrdersAndWriteToJsonMM = (uid, campaignName) => {
   });
 };
 
+const calcNomenclaturesAndWriteToJsonMM = (uid, campaignName) => {
+  const arts = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
+    )
+  );
+  const warehousesDataPath = path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "warehouseNames.json"
+  );
+  const warehousesData = readIfExists(warehousesDataPath);
+
+  const nomenclaturesPath = path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "nomenclatures.json"
+  );
+  const nomenclatures = readIfExists(nomenclaturesPath);
+
+  for (const [art, artData] of Object.entries(arts.byArt)) {
+    if (!(art in nomenclatures)) nomenclatures[art] = { byWarehouses: {} };
+    for (const [warehouseName, _] of Object.entries(warehousesData)) {
+      if (!(warehouseName in jsonData[art].byWarehouses))
+        nomenclatures[art].byWarehouses[warehouseName] = { prefObor: 0 };
+    }
+
+    if (nomenclatures[art].art) continue;
+
+    jsonData[art].art = artData.brand_art;
+    jsonData[art].size = artData.size;
+    jsonData[art].brand = artData.brand;
+    jsonData[art].object = artData.object;
+    jsonData[art].nmId = artData.nmId;
+    jsonData[art].barcode = artData.barcode;
+  }
+
+  afs.writeFileSync(nomenclaturesPath, JSON.stringify(nomenclatures));
+
+  return nomenclatures;
+};
+
 const calcDeliveryOrdersAndWriteToJsonMM = (uid, campaignName, dateRange) => {
   const warehouses = JSON.parse(
     afs.readFileSync(path.join(__dirname, "marketMaster", "warehouses.json"))
@@ -4859,15 +4919,22 @@ const calcDeliveryOrdersAndWriteToJsonMM = (uid, campaignName, dateRange) => {
   }
 
   const jsonData = { warehouseNames: [] };
+  const warehousesDataPath = path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "warehouseNames.json"
+  );
+  const warehousesData = readIfExists(warehousesDataPath);
   for (const [warehouseName, _] of Object.entries(avgOrdersByWarehouse)) {
     jsonData.warehouseNames.push(warehouseName);
+    if (warehousesData[warehouseName]) continue;
+    else warehousesData[warehouseName] = {};
   }
+  afs.writeFileSync(warehousesDataPath, JSON.stringify(warehousesData));
 
   // console.log(avgOrdersByWarehouse);
-  // afs.writeFileSync(
-  //   path.join(__dirname, "marketMaster", uid, campaignName, "avgOrders.json"),
-  //   JSON.stringify(avgOrdersByWarehouse)
-  // );
 
   const today = new Date();
   const todayStr = today
@@ -4931,7 +4998,8 @@ const calcDeliveryOrdersAndWriteToJsonMM = (uid, campaignName, dateRange) => {
         price: 400,
       };
 
-      jsonData[art].art = art;
+      jsonData[art].art = artData.brand_art;
+      jsonData[art].brand = artData.brand;
       jsonData[art].object = artData.object;
       jsonData[art].nmId = artData.nmId;
       jsonData[art].title = artData.title;
@@ -5107,7 +5175,7 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
     const status = advertInfos.status;
     const budget = advertsBudgets[advertId];
     const cpm = type == 8 ? advertInfos.autoParams.cpm : undefined;
-    if (![4, 9, 11].includes(status)) continue;
+    if (![9, 11].includes(status)) continue;
 
     let nms = [];
     if (type == 8) {
@@ -6086,6 +6154,7 @@ module.exports = {
   fetchAdvertsWordsAndWriteToJsonMM,
   setAdvertsPlusPhrasesTemplatesMM,
   autoSetMinusPhrasesMM,
+  calcNomenclaturesAndWriteToJsonMM,
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {

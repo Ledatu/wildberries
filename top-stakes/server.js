@@ -49,6 +49,7 @@ const {
   depositAdvertsBudgetsAndWriteToJsonMM,
   setAdvertsCPMsAndWriteToJsonMM,
   setAdvertsPlusPhrasesTemplatesMM,
+  calcNomenclaturesAndWriteToJsonMM,
 } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
@@ -303,6 +304,26 @@ app.post("/api/getMassAdverts", authenticateToken, (req, res) => {
     massAdvertsAccount.campaigns[campaignName] = massAdvertsCampaign;
   }
   res.send(JSON.stringify(massAdvertsAccount));
+});
+
+app.post("/api/getNomenclatures", authenticateToken, (req, res) => {
+  const accountUid = req.body.uid;
+  if (!accountUid || accountUid == "") return;
+
+  const secrets = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
+    )
+  ).byCampaignName;
+  const nomenclaturesAccount = {};
+  for (const [campaignName, _] of Object.entries(secrets)) {
+    const nomenclaturesCampaign = calcNomenclaturesAndWriteToJsonMM(
+      accountUid,
+      campaignName
+    );
+    nomenclaturesAccount[campaignName] = nomenclaturesCampaign;
+  }
+  res.send(JSON.stringify(nomenclaturesAccount));
 });
 
 app.post("/api/createMassAdverts", authenticateToken, async (req, res) => {
