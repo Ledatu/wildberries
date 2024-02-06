@@ -13,10 +13,14 @@ const { scheduleJob, gracefulShutdown } = require("node-schedule");
 
 startServer();
 // scheduleJob("20 * * * *", () => writeSpp());
-// scheduleJob("50 * * * *", () => getPrices(true));
 scheduleJob("55 * * * *", () => fetchAdverts());
 scheduleJob("40 * * * *", () => fetchAdvertsMM());
-// scheduleJob("58 * * * *", () => calcAutoPrices());
+scheduleJob("50 * * * *", () => {
+  if ([3, 9, 15, 21].includes(new Date().getHours())) getPrices(true);
+});
+scheduleJob("58 * * * *", () => {
+  if ([3, 9, 15, 21].includes(new Date().getHours())) calcAutoPrices();
+});
 scheduleJob("10 * * * *", () => RNPupdation());
 scheduleJob("58 * * * *", () => {
   const now = new Date();

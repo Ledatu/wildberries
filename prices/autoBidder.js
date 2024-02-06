@@ -25,5 +25,5 @@ const autoBidder = async () => {
   });
 };
 
-scheduleJob("5 * * * *", () => autoBidder());
-// autoBidder();
+// scheduleJob("5 * * * *", () => autoBidder());
+autoBidder();

@@ -50,6 +50,8 @@ const {
   setAdvertsCPMsAndWriteToJsonMM,
   setAdvertsPlusPhrasesTemplatesMM,
   calcNomenclaturesAndWriteToJsonMM,
+  setByWarehousesInfoMM,
+  calcPricesTemplateAndWriteToXlsxMM,
 } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
@@ -67,6 +69,9 @@ const privateKey = fs.readFileSync(
 const credentials = { key: privateKey, cert: certificate };
 const express = require("express");
 const app = express();
+
+const fileUpload = require("express-fileupload");
+app.use(fileUpload());
 
 var cors = require("cors");
 app.use(cors());
@@ -362,6 +367,47 @@ app.post(
   }
 );
 
+app.post("/api/uploadFile", authenticateToken, async (req, res) => {
+  const accountUid = req.body.uid;
+  const campaignName = req.body.campaignName;
+  const files = req.files;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+
+  if (!files || Object.keys(files).length === 0) {
+    return res.status(400).send("No files were uploaded.");
+  }
+  const file = files.file;
+  if (!file) return;
+
+  const filepath = path.join(
+    __dirname,
+    "../prices/marketMaster",
+    accountUid,
+    campaignName,
+    `uploaded${file.name}`
+  );
+
+  if (fs.existsSync(filepath)) fs.rmSync(filepath);
+
+  file.mv(filepath, function (err) {
+    if (err) return res.status(500).send(err);
+    res.send("File uploaded!");
+  });
+});
+
+app.post("/api/setByWarehousesInfo", authenticateToken, async (req, res) => {
+  const accountUid = req.body.uid;
+  const campaignName = req.body.campaignName;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  const result = await setByWarehousesInfoMM(accountUid, campaignName, data);
+  res.send(JSON.stringify(result));
+});
+
 app.post("/api/depositAdvertsBudgets", authenticateToken, async (req, res) => {
   const accountUid = req.body.uid;
   const campaignName = req.body.campaignName;
@@ -534,6 +580,28 @@ app.get("/api/downloadAll", async (req, res) => {
       `../qrGeneration/files/Поставки/${name}.zip`
     );
     exportAll().then(() => {
+      res.download(arch);
+    });
+  } catch (error) {
+    res.status(500).end(error);
+  }
+});
+
+app.post("/api/downloadPricesTemplate", authenticateToken, async (req, res) => {
+  try {
+    const accountUid = req.body.uid;
+    const campaignName = req.body.campaignName;
+    if (!accountUid || accountUid == "") return;
+    if (!campaignName || campaignName == "") return;
+
+    const arch = path.join(
+      __dirname,
+      "../prices/marketMaster",
+      accountUid,
+      campaignName,
+      "pricesTemplate.xlsx"
+    );
+    calcPricesTemplateAndWriteToXlsxMM(accountUid, campaignName).then(() => {
       res.download(arch);
     });
   } catch (error) {

@@ -3248,16 +3248,23 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
           const toExclude = excluded ?? [];
           let needsUpdate = false;
           for (let i = 0; i < clusters.length; i++) {
-            const { cluster, count } = clusters[i];
-            // console.log(keyword, count);
+            const { cluster, count, keywords } = clusters[i];
             if (plusPhrasesTemplate.clusters.includes(cluster)) continue;
             else if (plusPhrasesTemplate.threshold > count) continue;
 
-            for (let j = 0; j < clusters.keywords; j++) {
-              const keyword = clusters.keywords[j];
-              if (!toExclude.includes(keyword)) {
-                needsUpdate = true;
-                toExclude.push(keyword);
+            // console.log(advertId, cluster, count, keywords);
+
+            if (!toExclude.includes(cluster)) {
+              needsUpdate = true;
+              toExclude.push(cluster);
+            }
+            if (keywords) {
+              for (let j = 0; j < keywords.length; j++) {
+                const keyword = keywords[j];
+                if (!toExclude.includes(keyword)) {
+                  needsUpdate = true;
+                  toExclude.push(keyword);
+                }
               }
             }
           }
@@ -3295,6 +3302,50 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
     };
 
     excludeMinusPhrases().then(() => {
+      resolve();
+    });
+  });
+};
+
+const setByWarehousesInfoMM = async (uid, campaignName, data) => {
+  return new Promise((resolve, reject) => {
+    const nomenclaturesPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "nomenclatures.json"
+    );
+    const nomenclatures = readIfExists(nomenclaturesPath);
+    const artsPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "arts.json"
+    );
+    const arts = readIfExists(artsPath);
+
+    const { values, key, barcodes } = data;
+    if (!values || !key || !barcodes) return;
+
+    const setByWarehousesInfo = async () => {
+      for (let i = 0; i < barcodes.length; i++) {
+        const barcode = barcodes[i];
+        if (!barcode) continue;
+        const art = arts.bySku[barcode].art;
+        if (!art) continue;
+
+        for (const [warehouseName, warehouseData] of Object.entries(values)) {
+          if (warehouseName == "Все склады") continue;
+          nomenclatures[art].byWarehouses[warehouseName][key] =
+            warehouseData.val;
+        }
+      }
+    };
+
+    setByWarehousesInfo().then(() => {
+      afs.writeFileSync(nomenclaturesPath, JSON.stringify(nomenclatures));
       resolve();
     });
   });
@@ -3654,6 +3705,14 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
       campaignName,
       "arts.json"
     );
+    const advertsBidsLogPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsBidsLog.json"
+    );
+    const advertsBidsLog = readIfExists(advertsBidsLogPath);
     const advertsAutoBidsRules = readIfExists(advertsAutoBidsRulesPath);
     const advertsInfos = readIfExists(advertsInfosPath);
     const advertsStatsByDay = readIfExists(advertsStatsByDayPath);
@@ -3670,6 +3729,9 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
         cpo: 0,
         sum: 0,
         orders: 0,
+        views: 0,
+        cpm: 0,
+        cr: 0,
       };
 
       for (let i = 0; i <= daysCount; i++) {
@@ -3700,12 +3762,15 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             : undefined;
           if (!dateData) continue;
           res.sum += dateData.sum;
+          res.views += dateData.views;
         }
       }
 
       res.orders = Math.round(res.orders);
       res.sum = Math.round(res.sum);
       res.cpo = getRoundValue(res.sum, res.orders, false, res.sum);
+      res.cpm = getRoundValue(res.sum * 1000, res.views);
+      res.cr = getRoundValue(res.orders, res.views, true);
 
       console.log(res);
       return res;
@@ -3740,18 +3805,19 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
           if (advertData.status == 9) activeAdvertsIds.push(advertId);
         }
 
-        const { cpo } = recalc(art, dateRange, advertsIds);
+        const { cr, cpo } = recalc(art, dateRange, advertsIds);
         ///// TODO add active campaign sum check
         // console.log(art, cpo);
         // continue;
-        if (!cpo) continue;
+        if (!cr || !cpo) continue;
         for (let i = 0; i < activeAdvertsIds.length; i++) {
           const advertId = activeAdvertsIds[i];
-          const advertCurrentBid = advertsInfos[advertId].autoParams.cpm;
-          let bid = advertCurrentBid;
-          if (cpo == desiredCPO) continue;
-          else if (cpo < desiredCPO) bid += bidStep;
-          else if (cpo > desiredCPO) bid -= bidStep;
+          // const advertCurrentBid = advertsInfos[advertId].autoParams.cpm;
+          // let bid = advertCurrentBid;
+          // if (cpo == desiredCPO) continue;
+          // else if (cpo < desiredCPO) bid += bidStep;
+          // else if (cpo > desiredCPO) bid -= bidStep;
+          let bid = Math.round(cr * 10 * desiredCPO);
 
           if (bid < 125) bid = 125;
 
@@ -3774,11 +3840,25 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             "установлена ставка",
             bid
           );
+          if (!(advertId in advertsBidsLog))
+            advertsBidsLog[advertId] = { bids: [] };
+          const len = advertsBidsLog[advertId].bids.length;
+          if (len >= 7 * 24) {
+            advertsBidsLog[advertId].bids.shift();
+          }
+
+          advertsBidsLog[advertId].bids.push({
+            time: new Date().toISOString(),
+            val: bid,
+          });
         }
       }
     };
 
-    setAdvertsCPMs().then(() => resolve());
+    setAdvertsCPMs().then(() => {
+      afs.writeFileSync(advertsBidsLogPath, JSON.stringify(advertsBidsLog));
+      resolve();
+    });
   });
 };
 
@@ -4836,26 +4916,127 @@ const calcNomenclaturesAndWriteToJsonMM = (uid, campaignName) => {
   );
   const nomenclatures = readIfExists(nomenclaturesPath);
 
+  const artsPrices = calcPricesJsonDataMM(uid, campaignName);
+
   for (const [art, artData] of Object.entries(arts.byArt)) {
     if (!(art in nomenclatures)) nomenclatures[art] = { byWarehouses: {} };
     for (const [warehouseName, _] of Object.entries(warehousesData)) {
-      if (!(warehouseName in jsonData[art].byWarehouses))
+      if (!(warehouseName in nomenclatures[art].byWarehouses))
         nomenclatures[art].byWarehouses[warehouseName] = { prefObor: 0 };
     }
+    nomenclatures[art].factoryArt = artsPrices[art]
+      ? artsPrices[art].factoryArt
+      : undefined;
+    nomenclatures[art].multiplicity = artsPrices[art]
+      ? artsPrices[art].multiplicity
+      : undefined;
+    nomenclatures[art].prices = artsPrices[art]
+      ? artsPrices[art].prices
+      : undefined;
 
     if (nomenclatures[art].art) continue;
 
-    jsonData[art].art = artData.brand_art;
-    jsonData[art].size = artData.size;
-    jsonData[art].brand = artData.brand;
-    jsonData[art].object = artData.object;
-    jsonData[art].nmId = artData.nmId;
-    jsonData[art].barcode = artData.barcode;
+    nomenclatures[art].art = artData.brand_art;
+    nomenclatures[art].size = artData.size;
+    nomenclatures[art].brand = artData.brand;
+    nomenclatures[art].object = artData.object;
+    nomenclatures[art].nmId = artData.nmId;
+    nomenclatures[art].barcode = artData.barcode;
   }
 
   afs.writeFileSync(nomenclaturesPath, JSON.stringify(nomenclatures));
 
   return nomenclatures;
+};
+
+const calcPricesJsonDataMM = (uid, campaignName) => {
+  const arts = JSON.parse(
+    afs.readFileSync(
+      path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
+    )
+  );
+  const uploadedpricesTemplatePath = path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "uploadedpricesTemplate.xlsx"
+  );
+  let sheetData = [];
+  if (afs.existsSync(uploadedpricesTemplatePath))
+    sheetData = xlsx.parse(uploadedpricesTemplatePath)[0].data;
+
+  const jsonData = {};
+  for (let i = 1; i < sheetData.length; i++) {
+    const row = sheetData[i];
+    if (!row) continue;
+    if (!row[0] || row[0] == "") continue;
+    const barcode = row[1];
+    const art = arts.bySku[barcode];
+    if (!art) continue;
+    const factoryArt = row[2];
+    const multiplicity = row[3];
+    const prices = {};
+    for (let j = 4; j < row.length; j++) {
+      const priceName = sheetData[0][j];
+      if (!priceName || priceName == "") continue;
+      const price = Number(row[j]);
+      prices[priceName] = price;
+    }
+    jsonData[art] = {
+      art: art,
+      factoryArt: factoryArt,
+      multiplicity: multiplicity,
+      prices: prices,
+    };
+  }
+
+  afs.writeFileSync(
+    path.join(__dirname, "marketMaster", uid, campaignName, "artsPrices.json"),
+    JSON.stringify(jsonData)
+  );
+
+  return jsonData;
+};
+
+const calcPricesTemplateAndWriteToXlsxMM = (uid, campaignName) => {
+  return new Promise((resolve, reject) => {
+    console.log(uid, campaignName, "generating prices template.xlsx");
+    const arts = JSON.parse(
+      afs.readFileSync(
+        path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
+      )
+    );
+
+    const sheetData = [
+      [
+        "Артикул ВБ",
+        "Баркод",
+        "Фабричный артикул",
+        "Кратность короба",
+        "Цена 1",
+        "Цена 2",
+      ],
+    ];
+    for (const [barcode, artData] of Object.entries(arts.bySku)) {
+      if (!barcode || !artData) continue;
+      const row = [artData.art, barcode, undefined, undefined, undefined];
+      sheetData.push(row);
+    }
+
+    afs.writeFileSync(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "pricesTemplate.xlsx"
+      ),
+      xlsx.build([{ name: "Лист 1", data: sheetData }])
+    );
+
+    resolve();
+  });
 };
 
 const calcDeliveryOrdersAndWriteToJsonMM = (uid, campaignName, dateRange) => {
@@ -4880,6 +5061,17 @@ const calcDeliveryOrdersAndWriteToJsonMM = (uid, campaignName, dateRange) => {
   const stocks = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "marketMaster", uid, campaignName, "stocks.json")
+    )
+  );
+  const nomenclatures = JSON.parse(
+    afs.readFileSync(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "nomenclatures.json"
+      )
     )
   );
 
@@ -4976,7 +5168,11 @@ const calcDeliveryOrdersAndWriteToJsonMM = (uid, campaignName, dateRange) => {
         : 0;
       const multiplicity = data[art] ? data[art].multiplicity : 10;
       const min_zakaz = data[art] ? data[art].min_zakaz : 1;
-      const prefObor = data[art] ? data[art].pref_obor : 10;
+      const prefObor = nomenclatures[art]
+        ? nomenclatures[art].byWarehouses[warehouse]
+          ? nomenclatures[art].byWarehouses[warehouse].prefObor
+          : 0
+        : 0;
       const toOrderTemp =
         Math.round((avgOrderRate * prefObor - currentStocks) / multiplicity) *
         multiplicity;
@@ -4991,7 +5187,8 @@ const calcDeliveryOrdersAndWriteToJsonMM = (uid, campaignName, dateRange) => {
         toOrder: Math.round(toOrder),
         orders: Math.round(ordersInDateRange),
         orderRate: Math.round(avgOrderRate * 10) / 10,
-        obor: Math.round(prefObor),
+        prefObor: Math.round(prefObor),
+        obor: Math.round(currentObor),
         stock: Math.round(currentStocks),
         inWayToWarehouse: 100,
         currentObor: Math.round(currentObor),
@@ -5094,6 +5291,14 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
       )
     )
   );
+  const advertsBidsLogPath = path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "advertsBidsLog.json"
+  );
+  const advertsBidsLog = readIfExists(advertsBidsLogPath);
   const advertsStatsByDay = JSON.parse(
     afs.readFileSync(
       path.join(
@@ -5218,6 +5423,7 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
         budget: budget,
         cpm: cpm,
         words: words,
+        bidLog: advertsBidsLog[advertId],
       };
     }
   }
@@ -6155,6 +6361,9 @@ module.exports = {
   setAdvertsPlusPhrasesTemplatesMM,
   autoSetMinusPhrasesMM,
   calcNomenclaturesAndWriteToJsonMM,
+  setByWarehousesInfoMM,
+  calcPricesTemplateAndWriteToXlsxMM,
+  calcPricesJsonDataMM,
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
