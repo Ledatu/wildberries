@@ -78,6 +78,13 @@ const {
   fetchAdvertsBudgetsAndWriteToJsonMM,
   fetchAdvertsStatsAndWriteToJsonMM,
   fetchAdvertsWordsAndWriteToJsonMM,
+  getAdvertsStatByArtMM,
+  fetchSalesAndWriteToJsonMM,
+  getPaidStorageCostMM,
+  getTariffsBoxAndWriteToJsonMM,
+  fetchNmDetailReportAndWriteToJsonMM,
+  calcSmartDetailedByPeriodAndWriteToJSON,
+  autoAdvertsManagingMM,
 } = require("./main");
 const {
   getPrices,
@@ -211,7 +218,7 @@ const {
 // writeSpp()
 // calcAndWriteMinZakazToDataSpreadsheet()
 // updateAtriculesData()
-
+// fetchAdvertsMM()
 // fetchAdvertStatsAndWriteToJsonMpManagerLog('mayusha')
 
 // calcStatsTrendsAndWtriteToJSON("mayusha")
@@ -314,7 +321,7 @@ const {
 // getAdvertsStatByDayMM('332fa5da-8450-451a-b859-a84ca9951a34', 'МАЮША')
 // fetchArtsAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'Объединённая текстильная компания')
 // fetchOrdersAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'Объединённая текстильная компания')
-// fetchOrdersAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'МАЮША')
+// fetchOrdersAndWriteToJsonMM("332fa5da-8450-451a-b859-a84ca9951a34", "МАЮША");
 // fetchOrdersAndWriteToJsonMM('332fa5da-8450-451a-b859-a84ca9951a34', 'DELICATUS')
 // fetchStocksAndWriteToJsonMM(
 //   "332fa5da-8450-451a-b859-a84ca9951a34",
@@ -350,7 +357,7 @@ const {
 //   100,
 //   2
 // );
-
+// calcSmartDetailedByPeriodAndWriteToJSON("mayusha");
 // const afs = require("fs");
 // const path = require("path");
 // const authToken = getAuthTokenMM(
@@ -364,22 +371,100 @@ const {
 //   },
 // ]).then((pr) => {
 //   afs.writeFileSync(path.join(__dirname, "sts.json"), JSON.stringify(pr));
-// });
+// // });
 
-fetchAdvertsBudgetsAndWriteToJsonMM(
-  "332fa5da-8450-451a-b859-a84ca9951a34",
-  "МАЮША"
-);
+// fetchAdvertsWordsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Валерий"
+// );
 
-fetchAdvertsBudgetsAndWriteToJsonMM(
-  "332fa5da-8450-451a-b859-a84ca9951a34",
-  "DELICATUS"
-);
+// fetchSalesAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Артем"
+// );
+// fetchSalesAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Валерий"
+// );
+// getDelivery()
+// fetchSalesAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Оксана"
+// );
+// fetchOrdersAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "Текстиль"
+// );
 
-fetchAdvertsBudgetsAndWriteToJsonMM(
-  "332fa5da-8450-451a-b859-a84ca9951a34",
-  "Объединённая текстильная компания"
-);
+// fetchOrdersAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Артем"
+// );
+// fetchOrdersAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Валерий"
+// );
+// fetchOrdersAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Оксана"
+// );
+// getPaidStorageCostMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "Текстиль"
+// );
+// getPaidStorageCostMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Артем"
+// );
+// getPaidStorageCostMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Валерий"
+// );
+// getPaidStorageCostMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Оксана"
+// );
+// writeSppToDataSpreadsheet()
+
+// getPrices()
+// fetchAutoPriceRulesAndWriteToJSON()
+// calcAutoPrices(false)
+
+// fetchAdvertsWordsAndWriteToJsonMM(
+//     "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Валерий"
+// )
+
+// fetchAdvertsMM();
+// getTariffsBoxAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Валерий"
+// );
+// fetchArtsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Иосифова Р. И."
+// );
+// fetchNmDetailReportAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "ИП Валерий"
+// );
+// getAdvertsStatByArtMM("332fa5da-8450-451a-b859-a84ca9951a34", "ИП Валерий");
+// getAdvertsStatByArtMM("332fa5da-8450-451a-b859-a84ca9951a34", "ИП Артем");
+// getAdvertsStatByArtMM("332fa5da-8450-451a-b859-a84ca9951a34", "ИП Оксана");
+// getAdvertsStatByArtMM("332fa5da-8450 -451a-b859-a84ca9951a34", "Текстиль");
+// autoAdvertsManagingMM("332fa5da-8450-451a-b859-a84ca9951a34", "ТОРГМАКСИМУМ");
+// fetchAdvertsBudgetsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "DELICATUS"
+// );
+
+// fetchAdvertsBudgetsAndWriteToJsonMM(
+//   "332fa5da-8450-451a-b859-a84ca9951a34",
+//   "Объединённая текстильная компания"
+// );
+
+// fetchAdvertsMM()
+// writeSpp
 
 // fetchAdvertsMM()
 // const d = new Date('2024-01-30T05:58:00.000Z')
@@ -398,4 +483,4 @@ fetchAdvertsBudgetsAndWriteToJsonMM(
 //   "Объединённая текстильная компания"
 // );
 
-// fetchDetailedByPeriodAndWriteToJSON("mayusha");
+// fetchDetailedByPeriodAndWriteToJSON("TKS");

@@ -1,9 +1,9 @@
-const { autoDepositAdvertsBudgetsAndWriteToJsonMM } = require("./main");
 const { scheduleJob } = require("node-schedule");
 const fs = require("fs");
 const path = require("path");
+const { getPaidStorageCostMM } = require("./main");
 
-const autoDepositAdverts = async () => {
+const autoFetchStorage = async () => {
   return new Promise(async (resolve, reject) => {
     const customers = JSON.parse(
       fs.readFileSync(path.join(__dirname, "marketMaster", "customers.json"))
@@ -16,8 +16,8 @@ const autoDepositAdverts = async () => {
         console.log(uid, campaignName);
         // if (campaignName != "DELICATUS") continue;
         promises.push(
-          autoDepositAdvertsBudgetsAndWriteToJsonMM(uid, campaignName).then(
-            () => resolve(uid, campaignName, "Adverts budgets deposited.")
+          getPaidStorageCostMM(uid, campaignName).then(
+            () => resolve(uid, campaignName, "paid storage cost updated.")
           )
         );
       }
@@ -26,5 +26,5 @@ const autoDepositAdverts = async () => {
   });
 };
 
-scheduleJob("10 0 * * *", () => autoDepositAdverts());
-// autoDepositAdverts();
+scheduleJob("10 5 * * *", () => autoFetchStorage());
+// autoFetchStorage();

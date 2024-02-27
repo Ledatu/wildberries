@@ -1,12 +1,14 @@
-const { fetchAdvertsInfosAndWriteToJsonMM } = require("./main");
+const { fetchAdvertsInfosAndWriteToJsonMM, fetchAdvertsAndWriteToJsonMM } = require("./main");
 const fs = require("fs");
 const path = require("path");
 
 const autoFetchAdvertsInfosMM = async (uid, campaignName) => {
   await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
   while (true) {
-    await fetchAdvertsInfosAndWriteToJsonMM(uid, campaignName).then(() =>
-      console.log(uid, campaignName, "advertsInfos updated.")
+    await fetchAdvertsAndWriteToJsonMM(uid, campaignName).then(() =>
+      fetchAdvertsInfosAndWriteToJsonMM(uid, campaignName).then(() =>
+        console.log(uid, campaignName, "advertsInfos updated.")
+      )
     );
     await new Promise((resolve) => setTimeout(resolve, 10 * 61 * 1000));
   }

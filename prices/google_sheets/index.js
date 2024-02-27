@@ -140,8 +140,11 @@ async function writeDetailedByPeriod(auth, campaign) {
 
     const delivery = JSON.parse(
       await fs.readFile(
-        path.join(__dirname, `../files/${campaign}/detailedByPeriod.json`)
+        path.join(__dirname, `../files/${campaign}/logistics.json`)
       )
+    );
+    const arts = readIfExists(
+      path.join(__dirname, "../files", campaign, "artsBarcodesFull.json")
     );
     const useEnteredDeliveryPrice = Object.keys(delivery).length == 0;
     if (useEnteredDeliveryPrice) {
@@ -185,16 +188,21 @@ async function writeDetailedByPeriod(auth, campaign) {
       if (row[4] != seller_ids[campaign]) continue;
 
       const art = row[0];
+      if (!arts[art]) continue;
       let type = "";
       if (!useEnteredDeliveryPrice) {
-        type = getMaskFromVendorCode(art).slice(0, 2);
+        // type = getMaskFromVendorCode(art).slice(0, 2);
+        // type = art.split("_")[0];
+        type = arts[art].brand_art;
       } else {
+        // type = getMaskFromVendorCode(art).slice(0, 2);
         type = art.split("_")[0];
         // console.log(type, delivery[type]);
-      }
-      // const type = getMaskFromVendorCode(art);
-      if (art.includes("_ЕН")) {
-        type += "_ЕН";
+
+        // const type = getMaskFromVendorCode(art);
+        if (art.includes("_ЕН")) {
+          type += "_ЕН";
+        }
       }
       // console.log(
       //   art,
@@ -216,11 +224,7 @@ async function writeDetailedByPeriod(auth, campaign) {
       //     : "50"
       // }`.replace(".", ",");
       data[i][0] = `${
-        delivery[type]
-          ? delivery[type].average_delivery
-          : art.includes("_ЕН")
-          ? "150"
-          : "50"
+        delivery[type] ? delivery[type].avg : art.includes("_ЕН") ? "150" : "50"
       }`.replace(".", ",");
       // console.log(campaign, type, data[i]);
     }
@@ -297,8 +301,8 @@ async function writeDrrToDataSpreadsheet(auth) {
         };
         // console.log(row[0]);
         // const type = brand_names[artsBarcodesFull[row[0]].brand];
-        const type = getMaskFromVendorCode(row[0]);
-        // const type = getMaskFromVendorCode(row[0]).slice(0, 2);
+        // const type = getMaskFromVendorCode(row[0]);
+        const type = getMaskFromVendorCode(row[0]).slice(0, 2);
         // console.log(type);
         data[i][0] = drr[type] ? drr[type].drr ?? 0 : 0;
         // console.log(campaign, type, data[i]);
@@ -310,8 +314,96 @@ async function writeDrrToDataSpreadsheet(auth) {
   });
 }
 
+async function writeLogisticsToDataSpreadsheet(auth) {
+  return new Promise(async (resolve, reject) => {
+    const mapp = {
+      mayusha: "ИП Валерий",
+      delicatus: "ИП Артем",
+      TKS: "Текстиль",
+      perinka: "ИП Оксана",
+    };
+
+    const seller_ids = (
+      await JSON.parse(
+        await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
+      )
+    ).seller_ids;
+
+    const update_data = async (data) => {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+        range: `Данные!G2:G`,
+        valueInputOption: "USER_ENTERED", // The information will be passed according to what the usere passes in as date, number or text
+        resource: {
+          values: data,
+        },
+      });
+    };
+
+    // console.log(data);
+    const sheets = google.sheets({ version: "v4", auth });
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Данные!G2:G",
+    });
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
+      range: "Данные!A2:G",
+    });
+
+    // Parse the values into a JSON object
+    const rows = res.data.values;
+    // console.log(rows);
+    const data = [];
+    for (const [campaign, seller_id] of Object.entries(seller_ids)) {
+      const logistics = readIfExists(
+        path.join(__dirname, `../files/${campaign}/logistics.json`)
+      );
+      const arts = readIfExists(
+        path.join(
+          __dirname,
+          `../marketMaster/332fa5da-8450-451a-b859-a84ca9951a34/${mapp[campaign]}/arts.json`
+        )
+      );
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (row[0] == "") continue;
+        data.push([row[10]]);
+
+        if (row[4] != seller_ids[campaign]) continue;
+        if (!arts.byArt[row[0]]) continue;
+        // const brand_art = arts.byArt[row[0]].brand_art;
+        const brand_art = arts.byArt[row[0]].art;
+        // if (row[0] == "ПР_120_БЕЛЫЙ_ОТК") console.log(findLastSaleSpp(row[0]));
+        // console.log(type, spp[type]);
+        data[i][0] = logistics[brand_art] ? logistics[brand_art].avg ?? 50 : 50;
+        // console.log(
+        //   campaign,
+        //   type,
+        //   data[i],
+        //   spp[type],
+        //   spp.prev,
+        //   spp[type] ?? spp.prev
+        // );
+      }
+    }
+
+    await update_data(data).then((pr) => resolve());
+    console.log(`Logistics data written to the google sheets.`);
+  });
+}
+
 async function writeSppToDataSpreadsheet(auth) {
   return new Promise(async (resolve, reject) => {
+    const mapp = {
+      mayusha: "ИП Валерий",
+      delicatus: "ИП Артем",
+      TKS: "Текстиль",
+      perinka: "ИП Оксана",
+    };
+
     const seller_ids = (
       await JSON.parse(
         await fs.readFile(path.join(__dirname, "../files/campaigns.json"))
@@ -346,42 +438,58 @@ async function writeSppToDataSpreadsheet(auth) {
     // console.log(rows);
     const data = [];
     for (const [campaign, seller_id] of Object.entries(seller_ids)) {
-      const spp = JSON.parse(
-        await fs.readFile(
-          path.join(__dirname, `../files/${campaign}/spp by mask.json`)
+      // const sales = JSON.parse(
+      //   await fs.readFile(
+      //     path.join(
+      //       __dirname,
+      //       `../marketMaster/332fa5da-8450-451a-b859-a84ca9951a34/${mapp[campaign]}/sales.json`
+      //     )
+      //   )
+      // );
+      const sppData = readIfExists(
+        path.join(
+          __dirname,
+          `../marketMaster/332fa5da-8450-451a-b859-a84ca9951a34/${mapp[campaign]}/sppData.json`
         )
       );
-      const stocks = JSON.parse(
+      const arts = JSON.parse(
         await fs.readFile(
-          path.join(__dirname, `../files/${campaign}/stocks.json`)
+          path.join(
+            __dirname,
+            `../marketMaster/332fa5da-8450-451a-b859-a84ca9951a34/${mapp[campaign]}/arts.json`
+          )
         )
       );
-      const sprav = {};
-      for (const [art, spp_data] of Object.entries(spp)) {
-        if (stocks.today[art] < 2 || !stocks.today[art]) continue;
-        const mask = getMaskFromVendorCode(art);
-        sprav[mask] = spp_data.spp;
-      }
+
+      const findLastSaleSpp = (art) => {
+        if (!arts.byArt[art]) return undefined;
+        let res = sales[art]
+          ? sales[art].avg
+            ? sales[art].avg.spp ?? undefined
+            : undefined
+          : undefined;
+        if (!res) {
+          const byObj = sales.byObject[arts.byArt[art].object];
+          // console.log(arts.byArt[art].object, byObj);
+          res = byObj ? byObj.avg.spp : undefined;
+        }
+        return res;
+      };
+
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         if (row[0] == "") continue;
         data.push([row[10]]);
 
         if (row[4] != seller_ids[campaign]) continue;
+        if (!arts.byArt[row[0]]) continue;
 
-        // const type = getMaskFromVendorCode(row[0]);
-        let sspp = spp.prev.spp;
-        const type = row[0];
-        if (spp[type]) {
-          sspp = spp[type].spp;
-          if (stocks.today[type] < 2 || !stocks.today[type]) {
-            const mask = getMaskFromVendorCode(type);
-            sspp = sprav[mask];
-          }
-        }
-
+        // if (row[0] == "ПР_120_БЕЛЫЙ_ОТК") console.log(findLastSaleSpp(row[0]));
         // console.log(type, spp[type]);
-        data[i][0] = sspp;
+        // data[i][0] = findLastSaleSpp(row[0]);
+        data[i][0] = sppData[arts.byArt[row[0]].brand_art]
+          ? sppData[arts.byArt[row[0]].brand_art].spp ?? 0
+          : 0;
         // console.log(
         //   campaign,
         //   type,
@@ -573,8 +681,7 @@ async function fetchNewPricesAndWriteToJSON(auth, brand) {
         row[3].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
       const discounted_price = new_price * (1 - discount / 100);
-      if (!new_price || discounted_price > 30000 || discounted_price < 450)
-        return;
+      if (!new_price || discounted_price > 30000) return;
       const roi = Number(
         row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
       );
@@ -603,39 +710,34 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
     const jsonData = { turn: [], hours: [] };
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `РОБОТ ЦЕН!1:1000`,
+      range: `РОБОТ ЦЕН 2.0!1:2000`,
       // valueRenderOption: "UNFORMATTED_VALUE",
     });
     const rows = res.data.values;
 
     const label_row = rows[0];
-    const turn_row = rows[1];
 
-    const brand_index = label_row.indexOf("БРЕНД");
-    const generalMask_index = label_row.indexOf("АРТИКУЛЫ");
-    const schedule_index = label_row.indexOf(
-      "Расписание проверки и корректировки цен"
-    );
-    for (let i = 2; i < rows.length; i++) {
-      if (rows[i][schedule_index] == "" || !rows[i][schedule_index]) continue;
-      const hour = String(parseInt(rows[i][schedule_index]) - 1);
-      jsonData.hours.push((hour.length < 2 ? "0" : "") + hour);
-    }
+    const brand_index = label_row.indexOf("Бренд");
+    const art_index = label_row.indexOf("Артикул продавца");
 
-    jsonData.turn = turn_row.slice(generalMask_index + 1, schedule_index - 1);
-    for (let i = 2; i < rows.length; i++) {
+    jsonData.hours = ["00", "05", "11", "17"];
+    jsonData.turn = label_row.slice(brand_index + 1, brand_index + 9);
+
+    for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      if (!row[generalMask_index] || row[generalMask_index] == "") continue;
+      if (!row[art_index] || row[art_index] == "") continue;
 
       const brand = row[brand_index];
       if (!(brand in jsonData)) jsonData[brand] = {};
 
-      const generalMask = row[generalMask_index];
-      if (!(generalMask in jsonData[brand])) jsonData[brand][generalMask] = {};
+      const art = row[art_index];
+      if (!(art in jsonData[brand])) jsonData[brand][art] = {};
 
-      // console.log(row);
-      for (let j = generalMask_index + 1; j < schedule_index - 1; j++) {
-        jsonData[brand][generalMask][turn_row[j]] = row[j]
+      // console.log(row, art, brand);
+      for (let j = brand_index + 1; j < brand_index + 9; j++) {
+        const turn = jsonData.turn[j - 2];
+        // console.log(turn, jsonData[brand][art], jsonData[brand][art][turn]);
+        jsonData[brand][art][turn] = row[j]
           ? parseFloat(
               row[j].replace("%", "").replace(",", ".").replace(/\s/g, "")
             )
@@ -643,7 +745,43 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
       }
     }
 
+    const campaigns = readIfExists(
+      path.join(__dirname, "../files/campaigns.json")
+    ).campaigns;
+    for (let i = 0; i < campaigns.length; i++) {
+      const campaign = campaigns[i];
+      const arts = readIfExists(
+        path.join(__dirname, "../files", campaign, "artsBarcodesFull.json")
+      );
+      for (const [art, artData] of Object.entries(arts)) {
+        const { brand } = artData;
+        if (!jsonData[brand]) jsonData[brand] = {};
+        if (!jsonData[brand][art]) jsonData[brand][art] = {};
+      }
+    }
     // console.log(jsonData);
+    const sheetData = [];
+    for (const [brand, brandData] of Object.entries(jsonData)) {
+      if (brand == "turn" || brand == "hours") continue;
+      for (const [art, artData] of Object.entries(brandData)) {
+        const toPush = [art, brand];
+        for (let i = 0; i < jsonData.turn.length; i++) {
+          toPush.push(artData[jsonData.turn[i]]);
+        }
+        sheetData.push(toPush);
+      }
+    }
+    sheetData.sort((a, b) => a[0].localeCompare(b[0], "ru-RU"));
+    sheetData.sort((a, b) => a[1].localeCompare(b[1], "ru-RU"));
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
+      range: `РОБОТ ЦЕН 2.0!2:2000`,
+      valueInputOption: "USER_ENTERED",
+      resource: {
+        values: sheetData,
+      },
+    });
 
     writeDataToFile(
       jsonData,
@@ -735,7 +873,7 @@ async function fetchDataAndWriteToJSON(auth) {
     // Retrieve the values from the specified range
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-      range: "Данные!A2:N",
+      range: "Данные!A2:P",
     });
 
     // Parse the values into a JSON object
@@ -755,7 +893,9 @@ async function fetchDataAndWriteToJSON(auth) {
         tax: Math.abs(
           Number(row[7] ? row[7].replace("%", "").replace(",", ".") : 0)
         ),
-        expences: Math.abs(Number(row[8] ? row[8].replace(",", ".") : 0)),
+        expences: Math.abs(
+          Number(row[8] ? row[8].replace("%", "").replace(",", ".") : 0)
+        ),
         prime_cost: Math.abs(Number(row[9] ? row[9].replace(",", ".") : 0)),
         spp: Math.abs(
           Number(row[10] ? row[10].replace("%", "").replace(",", ".") : 0)
@@ -768,6 +908,12 @@ async function fetchDataAndWriteToJSON(auth) {
         ),
         min_zakaz: Math.abs(
           Number(row[13] ? row[13].replace("%", "").replace(",", ".") : 0)
+        ),
+        volume: Math.abs(
+          Number(row[14] ? row[14].replace("%", "").replace(",", ".") : 0)
+        ),
+        ktr: Math.abs(
+          Number(row[15] ? row[15].replace("%", "").replace(",", ".") : 0)
         ),
       };
     });
@@ -1509,7 +1655,7 @@ function updatePlanFact(auth, campaign) {
               sum_orders: 0,
               drr: 0,
             };
-          if (1 <= i && i < 8) {
+          if (1 <= i && i < 30) {
             // Указывыет за сколько дней считается дрр для рассчета цен
             // if (generalMaskForDrr == "ПРПЭ_120_DELICATUS")
             //   console.log(str_date, dates_datas[str_date][generalMaskForDrr]);
@@ -3074,6 +3220,10 @@ module.exports = {
     const auth = await authorize();
     await fetchAutoPriceRulesAndWriteToJSON(auth).catch(console.error);
   },
+  writeLogisticsToDataSpreadsheet: async () => {
+    const auth = await authorize();
+    await writeLogisticsToDataSpreadsheet(auth).catch(console.error);
+  },
 };
 
 const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
@@ -3128,4 +3278,10 @@ const indexToColumn = (index) => {
     }
     return l[index - 1];
   }
+};
+
+const readIfExists = (filepath, _default = {}) => {
+  let result = _default;
+  if (afs.existsSync(filepath)) result = JSON.parse(afs.readFileSync(filepath));
+  return result;
 };

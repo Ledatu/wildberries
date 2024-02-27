@@ -41,6 +41,7 @@ const {
   fetchArtsAndWriteToJsonMM,
   fetchStocksAndWriteToJsonMM,
   fetchAdvertsWordsAndWriteToJsonMM,
+  fetchSalesAndWriteToJsonMM,
 } = require("./main");
 const {
   writePrices,
@@ -96,6 +97,7 @@ const getPrices = async (rewriteProfit = false) => {
   campaigns.forEach(async (campaign) => {
     Promise.all([
       // await calcAdvertismentAndWriteToJSON(campaign),
+
       await fetchCardsAndWriteToJSON(campaign),
       await fetchOrdersAndWriteToJSON(campaign),
       await fetchSalesAndWriteToJSON(campaign),
@@ -211,7 +213,7 @@ const calcAutoPrices = (autoSend = true) => {
     ).brands;
     const hour_key = now.toLocaleTimeString("ru-RU").slice(0, 2);
     console.log(hour_key, now.toLocaleTimeString("ru-RU"));
-    if (!hours.includes(hour_key)) return;
+    // if (!hours.includes(hour_key) && autoSend) return;
     await calcAutoEnteredValuesAndWriteToJSON();
     const promises = [];
     campaigns.forEach(async (campaign) => {
@@ -232,17 +234,16 @@ const calcAutoPrices = (autoSend = true) => {
 };
 
 const writeSpp = async () => {
-  // await fetchDataAndWriteToJSON()
-  await fetchSpp();
-  campaigns.forEach(async (campaign) => {
-    Promise.all([await writeSppToDataSpreadsheet(campaign)])
-      .then(async () => {
-        console.log("All tasks completed successfully");
-      })
-      .catch((error) => {
-        console.error("An error occurred:", error);
-      });
-  });
+  await writeSppToDataSpreadsheet();
+  // campaigns.forEach(async (campaign) => {
+  //   Promise.all([await writeSppToDataSpreadsheet(campaign)])
+  //     .then(async () => {
+  //       console.log("All tasks completed successfully");
+  //     })
+  //     .catch((error) => {
+  //       console.error("An error occurred:", error);
+  //     });
+  // });
 };
 
 const RNPupdation = async () => {
@@ -268,10 +269,10 @@ const fetchAdverts = async () => {
         new Promise(async (resolve, reject) => {
           Promise.all([
             // await fetchOrdersAndWriteToJSON(campaign),
-            await fetchAdvertsAndWriteToJson(campaign),
-            await fetchAdvertInfosAndWriteToJson(campaign),
-            await fetchAdvertStatsAndWriteToJsonMpManager(campaign, now),
-            await fetchAdvertStatsAndWriteToJsonMpManagerLog(campaign, now),
+            // await fetchAdvertsAndWriteToJson(campaign),
+            // await fetchAdvertInfosAndWriteToJson(campaign),
+            // await fetchAdvertStatsAndWriteToJsonMpManager(campaign, now),
+            // await fetchAdvertStatsAndWriteToJsonMpManagerLog(campaign, now),
             await getAdvertStatByMaskByDayAndWriteToJSONMpManager(campaign),
             await getAdvertStatByDayAndWriteToJSONMpManager(campaign),
             await calcAvgDrrByArtAndWriteToJSON(campaign),
@@ -305,14 +306,15 @@ const fetchAdvertsMM = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
+        // if (campaignName != "ИП Валерий") continue;
         console.log(uid, campaignName);
         promises.push(
           new Promise(async (resolve, reject) => {
             Promise.all([
               await fetchArtsAndWriteToJsonMM(uid, campaignName),
               await fetchOrdersAndWriteToJsonMM(uid, campaignName),
+              await fetchSalesAndWriteToJsonMM(uid, campaignName),
               await fetchStocksAndWriteToJsonMM(uid, campaignName),
-              await fetchAdvertsAndWriteToJsonMM(uid, campaignName),
               await fetchAdvertsBudgetsAndWriteToJsonMM(uid, campaignName),
               await fetchAdvertsWordsAndWriteToJsonMM(uid, campaignName),
             ]).then(() => resolve(uid, campaignName, "Adverts updated."));

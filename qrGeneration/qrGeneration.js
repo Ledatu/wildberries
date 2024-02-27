@@ -43,13 +43,17 @@ const autofillCurrent = (name) => {
   return new Promise(async (resolve, reject) => {
     await updateAtriculesData(); //prices
     await fetchTagsAndWriteToJSON(name);
-    autofillAndWriteToXlsx().then(async (count) => {
-      await writeCurrent();
-      await qrGeneration().then(() =>
-        tagsGeneration().then(() => fetchCurrentZakazAndWriteToXLSX(name))
-      );
-      resolve(count);
-    });
+    autofillAndWriteToXlsx()
+      .then(async (count) => {
+        await writeCurrent();
+        await qrGeneration().then(() =>
+          tagsGeneration().then(() => fetchCurrentZakazAndWriteToXLSX(name))
+        );
+        resolve(count);
+      })
+      .catch((error) => {
+        reject(error);
+      });
   });
 };
 

@@ -52,6 +52,9 @@ const {
   calcNomenclaturesAndWriteToJsonMM,
   setByWarehousesInfoMM,
   calcPricesTemplateAndWriteToXlsxMM,
+  manageAdvertsActivityMM,
+  calcMassAdvertsNewAndWriteToJsonMM,
+  updateAdvertsManagerRulesMM,
 } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
@@ -311,6 +314,58 @@ app.post("/api/getMassAdverts", authenticateToken, (req, res) => {
   res.send(JSON.stringify(massAdvertsAccount));
 });
 
+app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
+  const accountUid = req.body.uid;
+  const dateRange = req.body.dateRange;
+  const genForCampaignName = req.body.campaignName;
+  if (!accountUid || accountUid == "") return;
+
+  const secrets = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
+    )
+  ).byCampaignName;
+  const plusPhrasesTemplates = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        "plusPhrasesTemplates.json"
+      )
+    )
+  );
+  const massAdvertsAccount = {
+    plusPhrasesTemplates: plusPhrasesTemplates,
+    campaigns: {},
+  };
+  for (const [campaignName, _] of Object.entries(secrets)) {
+    if (!massAdvertsAccount.campaigns[campaignName])
+      massAdvertsAccount.campaigns[campaignName] = {};
+    if (campaignName != (genForCampaignName ?? "ИП Валерий")) continue;
+    const massAdvertsCampaign = calcMassAdvertsNewAndWriteToJsonMM(
+      accountUid,
+      campaignName,
+      dateRange
+    );
+    massAdvertsAccount.campaigns[campaignName] = massAdvertsCampaign;
+  }
+  res.send(JSON.stringify(massAdvertsAccount));
+});
+
+app.post("/api/updateAdvertsManagerRules", authenticateToken, (req, res) => {
+  const accountUid = req.body.uid;
+  const campaignName = req.body.campaignName;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  updateAdvertsManagerRulesMM(accountUid, campaignName, data).then((pr) =>
+    res.send(pr)
+  );
+});
+
 app.post("/api/getNomenclatures", authenticateToken, (req, res) => {
   const accountUid = req.body.uid;
   if (!accountUid || accountUid == "") return;
@@ -440,6 +495,18 @@ app.post("/api/setAdvertsCPMs", authenticateToken, async (req, res) => {
   res.send(JSON.stringify(result));
 });
 
+app.post("/api/manageAdvertsActivity", authenticateToken, async (req, res) => {
+  const accountUid = req.body.uid;
+  const campaignName = req.body.campaignName;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  const result = await manageAdvertsActivityMM(accountUid, campaignName, data);
+  res.send(JSON.stringify(result));
+});
+
 app.post(
   "/api/craftNecessaryFoldersAndFilesIfNeeded",
   authenticateToken,
@@ -535,7 +602,12 @@ app.get("/api/fetchByNowStats", authenticateToken, (req, res) => {
 
 app.post("/api/autofillCurrent", authenticateToken, (req, res) => {
   const name = req.body.sheetname;
-  autofillCurrent(name).then((count) => res.send({ count: count }));
+  autofillCurrent(name)
+    .then((count) => res.send({ count: count }))
+    .catch((error) => {
+      console.log(error);
+      res.status(500).send(error);
+    });
 });
 
 // app.get("/api/downloadQRs", async (req, res) => {

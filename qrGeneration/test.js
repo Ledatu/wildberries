@@ -21,7 +21,7 @@ const {
 // newTagsGeneration();
 // autofillCurrent("delicatus ПР 06 МК ТУЛА");
 // autoGenerateNewTags('perinka', 'Перинка');
-autoGenerateNewTags('mayusha', 'МАЮША');
+// autoGenerateNewTags('mayusha', 'МАЮША');
 // autoGenerateNewTags('delicatus', 'DELICATUS');
 // autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
 // exportAll()
