@@ -1,14 +1,24 @@
-const { autoAdvertsManagingMM } = require("./main");
+const { autoAdvertsManagingMM, autoAdvertsStopMM, fetchBalanceMM } = require("./main");
 const fs = require("fs");
 const path = require("path");
 
 const autoAdvertsManaging = async (uid, campaignName) => {
   await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
   while (true) {
-    await autoAdvertsManagingMM(uid, campaignName).then(() =>
-      console.log(uid, campaignName, "adverts managed.")
-    );
-    await new Promise((resolve) => setTimeout(resolve, 30 * 61 * 1000));
+    try {
+      await autoAdvertsManagingMM(uid, campaignName).then(() =>
+        console.log(uid, campaignName, "adverts managed.")
+      );
+      await new Promise((resolve) => setTimeout(resolve, 14 * 61 * 1000));
+    } catch (e) {
+      console.error(e);
+      resolve();
+    }
+    // await autoAdvertsStopMM(uid, campaignName).then(() =>
+    //   console.log(uid, campaignName, "stop advertsManagingRules updated.")
+    // );
+
+    await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
   }
 };
 

@@ -6,7 +6,7 @@ const afs = require("fs");
 const path = require("path");
 const { fetchHandStocks, sendEmail } = require("./google_sheets");
 const TelegramBot = require("node-telegram-bot-api");
-const { log } = require("console");
+const { log, error } = require("console");
 
 const sortData = (data) => {
   const header = data.shift(); // Remove the header row and store it in a variable
@@ -116,7 +116,7 @@ const getAdvertInfo = (authToken, params) => {
       },
     })
     .then((response) => response.data)
-    .catch((error) => console.error(error));
+    .catch((error) => console.error(error.response.data));
 };
 
 const createDelayedGenTask = (authToken, params) => {
@@ -133,6 +133,79 @@ const createDelayedGenTask = (authToken, params) => {
     .then((response) => response.data)
     .catch((error) => console.error(error.response.data));
 };
+
+const getBalance = (authToken) => {
+  return axios
+    .get("https://advert-api.wb.ru/adv/v1/balance", {
+      headers: {
+        Authorization: authToken,
+      },
+    })
+    .then((response) => response.data)
+    .catch((error) => console.log(error.response.data));
+};
+
+const fetchBalanceMM = (uid, campaignName) => {
+  return new Promise(async (resolve, reject) => {
+    const authToken = getAuthTokenMM(uid, campaignName);
+    if (!authToken) {
+      resolve({});
+      return;
+    }
+
+    getBalance(authToken)
+      .then((pr) => {
+        if (!pr) {
+          reject("bad balance", pr);
+          return;
+        }
+        afs.writeFileSync(
+          path.join(
+            __dirname,
+            "marketMaster",
+            uid,
+            campaignName,
+            "balance.json"
+          ),
+          JSON.stringify(pr)
+        );
+        resolve(pr);
+      })
+      .catch((e) => {
+        console.log(uid, campaignName, "balance", e);
+      });
+  });
+};
+
+async function fetchBalanceWithRetry(uid, campaignName) {
+  let retryCount = 0;
+  let balance = null;
+
+  while (retryCount < 2) {
+    try {
+      balance = await fetchBalanceMM(uid, campaignName);
+      break; // If successful, exit the loop
+    } catch (error) {
+      console.log(
+        uid,
+        campaignName,
+        `Error fetching balance: ${error.message}`
+      );
+      retryCount++;
+      console.log(uid, campaignName, `Retrying... Attempt ${retryCount}`);
+      await new Promise((resolve) => setTimeout(resolve, 4500));
+    }
+  }
+
+  if (balance === null) {
+    console.log(uid, campaignName, `Max retries reached. Using preset value.`);
+    balance = readIfExists(
+      path.join(__dirname, "marketMaster", uid, campaignName, "balance.json")
+    );
+  }
+
+  return balance;
+}
 
 const getDelayedGenTasksStatus = (authToken, params) => {
   return axios
@@ -352,7 +425,7 @@ const getAdvertsStatsMM = (authToken, params) => {
       },
     })
     .then((response) => response.data)
-    .catch((error) => console.error(error));
+    .catch((error) => console.error(error.response.data));
 };
 
 const getAdvertStatMpManager = (
@@ -857,7 +930,7 @@ const buildXlsx = (campaign, rewriteProfit = false) =>
     };
     const brand_sheets = {};
     for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
-      const brand = brand_names[art_data.brand];
+      const brand = brand_names[art_data.brand] ?? art_data.brand;
       // const fullBrand = brand + art.includes("_ЕН" ? " ЕН" : "");
       if (!(brand in brand_sheets)) brand_sheets[brand] = [[]];
       if (!(brand in stdProfitSumTKS)) stdProfitSumTKS[brand] = 0;
@@ -923,17 +996,25 @@ const buildXlsx = (campaign, rewriteProfit = false) =>
       const prime_cost = arts_data[vendorCode].prime_cost;
 
       const brand_art = arts.byArt[vendorCode].brand_art;
-      const ad = advertsAvgStatsByArt[brand_art]
-        ? getRoundValue(
-            advertsAvgStatsByArt[brand_art].sum,
-            advertsAvgStatsByArt[brand_art].orders
-          )
-        : 0;
-      const drr = ad / roz_price;
-      // const drr = advertsAvgStatsByArt[mapp[campaign]]
-      //   ? advertsAvgStatsByArt[mapp[campaign]].drr / 100
+      // const ad = advertsAvgStatsByArt[brand_art]
+      //   ? getRoundValue(
+      //       advertsAvgStatsByArt[brand_art].sum,
+      //       advertsAvgStatsByArt[brand_art].orders
+      //     )
       //   : 0;
-      // const ad = roz_price * drr;
+      // const type = brand_art;
+      // const type = mapp[campaign];
+      // const ad = advertsAvgStatsByArt[type]
+      //   ? getRoundValue(
+      //       advertsAvgStatsByArt[type].sum,
+      //       advertsAvgStatsByArt[type].orders
+      //     )
+      //   : 0;
+      // const drr = ad / roz_price;
+      const drr = advertsAvgStatsByArt[mapp[campaign]]
+        ? advertsAvgStatsByArt[mapp[campaign]].drr / 100
+        : 0;
+      const ad = roz_price * drr;
       const advert_sum_art_today = advertsStatsByArt[vendorCode]
         ? advertsStatsByArt[vendorCode][today_date_str]
           ? advertsStatsByArt[vendorCode][today_date_str].sum
@@ -1080,11 +1161,10 @@ const buildXlsx = (campaign, rewriteProfit = false) =>
       afs.writeFileSync(path_profit_trend, JSON.stringify(profit_trend));
     // -------------------------
 
-    return fs
-      .writeFile(
-        path.join(__dirname, "files", campaign, "data.xlsx"),
-        xlsx.build(xlsx_data)
-      )
+    fs.writeFile(
+      path.join(__dirname, "files", campaign, "data.xlsx"),
+      xlsx.build(xlsx_data)
+    )
       .then(() => {
         console.log("data.xlsx created.");
         resolve();
@@ -1212,8 +1292,8 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
     campaignName,
     "arts.json"
   );
-  // let arts = {};
-  if (afs.existsSync(artsPath)) arts = JSON.parse(afs.readFileSync(artsPath));
+  let arts = {};
+  // if (afs.existsSync(artsPath)) arts = JSON.parse(afs.readFileSync(artsPath));
   if (!("byArt" in arts)) arts.byArt = {};
   if (!("bySku" in arts)) arts.bySku = {};
   if (!("byNmId" in arts)) arts.byNmId = {};
@@ -1280,32 +1360,41 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
 };
 
 const writeNmDetailReportToJsonMM = (data, uid, campaignName) => {
-  const nmDetailReportPath = path.join(
-    __dirname,
-    "marketMaster",
-    uid,
-    campaignName,
-    "nmDetailReport.json"
-  );
-  let nmDetailReport = {};
+  return new Promise((resolve) => {
+    const nmDetailReportPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "nmDetailReport.json"
+    );
+    let nmDetailReport = {};
 
-  data.forEach((item) => {
-    const art = item.vendorCode.replace(/\s/g, "");
-    nmDetailReport[item.nmID] = {
-      art: art,
-      object: item.object,
-      brand: item.brandName + (art.includes("_ЕН") ? " ЕН" : ""),
-      statistics: {
-        buyoutsPercent:
-          item.statistics.selectedPeriod.conversions.buyoutsPercent,
-      },
-    };
+    data.forEach((item) => {
+      if (!item) {
+        console.log(item);
+        return;
+      }
+      const art = item.vendorCode.replace(/\s/g, "");
+      nmDetailReport[item.nmID] = {
+        art: art,
+        object: item.object,
+        brand: item.brandName + (art.includes("_ЕН") ? " ЕН" : ""),
+        statistics: {
+          buyoutsPercent:
+            item.statistics.selectedPeriod.conversions.buyoutsPercent,
+        },
+      };
+    });
+
+    return fs
+      .writeFile(nmDetailReportPath, JSON.stringify(nmDetailReport))
+      .then(() => {
+        console.log(uid, campaignName, "nmDetailReport.json created.");
+        resolve();
+      })
+      .catch((error) => console.error(error));
   });
-
-  return fs
-    .writeFile(nmDetailReportPath, JSON.stringify(nmDetailReport))
-    .then(() => console.log(uid, campaignName, "nmDetailReport.json created."))
-    .catch((error) => console.error(error));
 };
 
 const writeCardsTempToJson = (data, campaign) => {
@@ -1430,6 +1519,9 @@ const writeStocksToJson = async (data, campaign, date) => {
   if (Object.keys(jsonData).length == 0) {
     if (data && data.length) {
       data.forEach((item) => {
+        const { warehouseName } = item;
+        if (warehouseName == "Санкт-Петербург Шушары") return;
+
         const supplierArticle = artsBarcodes.reverse[item.barcode];
         if (supplierArticle in jsonData)
           jsonData[supplierArticle] += item.quantity;
@@ -1453,10 +1545,10 @@ const writeStocksToJson = async (data, campaign, date) => {
 
 const writeStocksToJsonMM = async (data, uid, campaignName) => {
   const today = new Date();
-  const str_date = today
-    .toLocaleDateString("ru-RU")
-    .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-    .slice(0, 10);
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  const str_date = getLocaleDateString(today).slice(0, 10);
+  const yesterdayStr = getLocaleDateString(yesterday).slice(0, 10);
   const arts = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
@@ -1469,14 +1561,12 @@ const writeStocksToJsonMM = async (data, uid, campaignName) => {
     campaignName,
     "stocks.json"
   );
-  let stocksCurrent = {};
-  if (afs.existsSync(stocksPath))
-    stocksCurrent = JSON.parse(afs.readFileSync(stocksPath));
+  let stocksCurrent = readIfExists(stocksPath);
 
   const stocks = {};
-  if (!(str_date in stocks)) stocks[str_date] = { all: {} };
 
   if (data && data.length) {
+    if (!(str_date in stocks)) stocks[str_date] = { all: {} };
     data.forEach((item) => {
       const warehouseName = item.warehouseName;
       if (!(warehouseName in stocks[str_date]))
@@ -1499,6 +1589,8 @@ const writeStocksToJsonMM = async (data, uid, campaignName) => {
         item.inWayFromClient;
       stocks[str_date][warehouseName][art].quantityFull += item.quantityFull;
 
+      if (warehouseName == "Санкт-Петербург Шушары") return;
+
       if (!(art in stocks[str_date].all))
         stocks[str_date].all[art] = {
           quantity: 0,
@@ -1511,6 +1603,8 @@ const writeStocksToJsonMM = async (data, uid, campaignName) => {
       stocks[str_date]["all"][art].inWayFromClient += item.inWayFromClient;
       stocks[str_date]["all"][art].quantityFull += item.quantityFull;
     });
+  } else if (!stocks[str_date]) {
+    stocks[str_date] = stocks[yesterdayStr];
   }
 
   for (const [strDate, dateData] of Object.entries(stocks)) {
@@ -1582,22 +1676,24 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
       orders[order_date_string] = { all: {} };
     }
 
-    const warehouseName = item.warehouseName;
-    if (!(warehouseName in orders[order_date_string])) {
-      orders[order_date_string][warehouseName] = {};
-    }
+    if (campaignName != "Клининг Сервис") {
+      const warehouseName = item.warehouseName;
+      if (!(warehouseName in orders[order_date_string])) {
+        orders[order_date_string][warehouseName] = {};
+      }
 
-    if (!(art in orders[order_date_string][warehouseName])) {
-      orders[order_date_string][warehouseName][art] = {
-        count: 0,
-        sum: 0,
-        sumWithSpp: 0,
-      };
+      if (!(art in orders[order_date_string][warehouseName])) {
+        orders[order_date_string][warehouseName][art] = {
+          count: 0,
+          sum: 0,
+          sumWithSpp: 0,
+        };
+      }
+      orders[order_date_string][warehouseName][art].count += 1;
+      orders[order_date_string][warehouseName][art].sum += get_item_price();
+      orders[order_date_string][warehouseName][art].sumWithSpp +=
+        get_item_price_spp();
     }
-    orders[order_date_string][warehouseName][art].count += 1;
-    orders[order_date_string][warehouseName][art].sum += get_item_price();
-    orders[order_date_string][warehouseName][art].sumWithSpp +=
-      get_item_price_spp();
 
     if (!(art in orders[order_date_string].all)) {
       orders[order_date_string].all[art] = { count: 0, sum: 0, sumWithSpp: 0 };
@@ -2615,7 +2711,9 @@ const getAdvertStatByMaskByDayAndWriteToJSONMpManager = async (campaign) => {
 
         continue;
       } else {
-        brand = brand_names[artsNmIdsFull[art_id].brand];
+        brand =
+          brand_names[artsNmIdsFull[art_id].brand] ??
+          artsNmIdsFull[art_id].brand;
       }
       // console.log(artsNmIdsFull[art_id].brand);
       if (!(brand in jsonData)) jsonData[brand] = {};
@@ -3253,11 +3351,13 @@ const fetchPricesAndWriteToJSON = (campaign) =>
   });
 
 const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
-  return fetchPricesAndWriteToJSON(campaign)
-    .then(async () => {
-      await buildXlsx(campaign, rewriteProfit);
-    })
-    .catch((error) => console.error(error));
+  return new Promise((resolve) => {
+    return fetchPricesAndWriteToJSON(campaign)
+      .then(async () => {
+        await buildXlsx(campaign, rewriteProfit).then(() => resolve());
+      })
+      .catch((error) => console.error(error));
+  });
 };
 
 const fetchWarehouses = (campaign) => {
@@ -3413,6 +3513,17 @@ const fetchAdvertsInfosAndWriteToJsonMM = async (uid, campaignName) => {
   const params = [[]];
   let count = 0;
   for (const [advertId, advertData] of Object.entries(adverts)) {
+    // if (advertData.status == 7) continue;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(advertData.changeTime);
+    endDate.setHours(0, 0, 0, 0);
+    const daysPassed = (today.getTime() - endDate.getTime()) / 86400 / 1000;
+    // console.log(new Date(advertData.endTime.slice(0, 10)), new Date(), dayyss);
+    if (daysPassed >= 30) {
+      continue;
+    }
+
     params[params.length - 1].push(advertData.advertId);
     count++;
     if (count % 50 == 0) params.push([]);
@@ -3424,16 +3535,28 @@ const fetchAdvertsInfosAndWriteToJsonMM = async (uid, campaignName) => {
       if (!pr) return;
       typeJsonData[i] = pr;
     });
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    console.log(
+      uid,
+      campaignName,
+      `${i + 1}/${params.length}`,
+      "infos updated."
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
   }
 
   for (const [type, stats] of Object.entries(typeJsonData)) {
     if (!stats.length) continue;
     for (let i = 0; i < stats.length; i++) {
       const advertId = stats[i].advertId;
+      if (stats[i].type == 8) {
+        if (!stats[i].autoParams.nms) {
+          console.log(stats[i]);
+        }
+      }
       jsonData[advertId] = stats[i];
       jsonData[advertId].updateTime = new Date().toLocaleString("ru-RU");
-      console.log(uid, campaignName, advertId, "infos updated.");
+      // console.log(uid, campaignName, advertId, "infos updated.");
     }
   }
 
@@ -3479,7 +3602,7 @@ const createNewRKs = async () => {
           sum: rk_data.budget,
           btype: 1,
         });
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await new Promise((resolve) => setTimeout(resolve, 10000));
       }
     }
     resolve();
@@ -4044,6 +4167,8 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
           advertsTypes
         )) {
           if (!art || !templateName) continue;
+          // if (art != "КПБ_ЕВРО_СТРАЙП_18-4726_ТКС") continue;
+          console.log(art, templateName, advertsType);
 
           for (const [id, advertData] of Object.entries(advertsInfos)) {
             if (!id || !advertData) continue;
@@ -4055,8 +4180,9 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
             if (advertData.name != art) continue;
             if (advertData.type != 8 && advertData.type != 6) continue;
 
-            if (!getAdvertsType(advertId, advertsInfos) != advertsType)
-              continue;
+            if (getAdvertsType(advertId, advertsInfos) != advertsType) continue;
+
+            if (!advertsWords[advertId]) continue;
 
             const words =
               advertData.type == 8
@@ -4075,29 +4201,48 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
               const toExclude = [];
               for (let i = 0; i < excluded.length; i++) {
                 const phrase = excluded[i];
+                // console.log(plusPhrasesTemplate.clusters.includes(phrase), phrase)
+                const ctrExcluded = stat[phrase] ? stat[phrase].ctr : 0;
+                const viewsExcluded = stat[phrase] ? stat[phrase].views : 0;
+                if (
+                  plusPhrasesTemplate.threshold &&
+                  viewsExcluded < plusPhrasesTemplate.threshold
+                )
+                  continue;
+                if (
+                  plusPhrasesTemplate.ctrThreshold &&
+                  ctrExcluded > plusPhrasesTemplate.ctrThreshold
+                )
+                  continue;
                 if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
                 toExclude.push(phrase);
               }
 
-              let needsUpdate = false;
+              let needsUpdate = toExclude.length != excluded.length;
               for (let i = 0; i < clusters.length; i++) {
-                const { cluster, count } = clusters[i];
+                const { cluster, count, keywords } = clusters[i];
                 if (plusPhrasesTemplate.threshold > count) continue;
 
-                // console.log(advertId, cluster, count, keywords);
+                // console.log(advertId, cluster, count, plusPhrasesTemplate.clusters);
 
-                const clusterKeywords = clusters[i].keywords ?? [];
-                clusterKeywords.push(cluster);
+                const clusterKeywordsTemp = new Array(keywords ?? []);
+                const clusterKeywords = clusterKeywordsTemp.filter(
+                  (value, index) => {
+                    return clusterKeywordsTemp.indexOf(value) === index;
+                  }
+                );
+                if (!clusterKeywords.includes(cluster))
+                  clusterKeywords.push(cluster);
                 const clusterStat = {
                   views: 0,
                   clicks: 0,
                   ctr: 0,
                 };
                 for (let j = 0; j < clusterKeywords.length; j++) {
-                  if (!stat[clusterKeywords[i]]) continue;
-                  clusterStat.views += stat[clusterKeywords[i]].views ?? 0;
-                  clusterStat.clicks += stat[clusterKeywords[i]].clicks ?? 0;
-                  clusterStat.sum += stat[clusterKeywords[i]].sum ?? 0;
+                  if (!stat[clusterKeywords[j]]) continue;
+                  clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
+                  clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
+                  clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
                 }
                 clusterStat.ctr = getRoundValue(
                   clusterStat.clicks,
@@ -4105,14 +4250,21 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                   true
                 );
 
-                if (clusterStat.ctr >= plusPhrasesTemplate.ctrThreshold)
+                if (
+                  plusPhrasesTemplate.ctrThreshold &&
+                  clusterStat.ctr >= plusPhrasesTemplate.ctrThreshold
+                ) {
+                  // console.log('ITS LESS', clusterStat.ctr,  plusPhrasesTemplate.ctrThreshold);
                   continue;
+                }
 
                 if (
                   !plusPhrasesTemplate.ctrThreshold &&
                   plusPhrasesTemplate.clusters.includes(cluster)
-                )
+                ) {
+                  // console.log(cluster);
                   continue;
+                }
 
                 if (!toExclude.includes(cluster)) {
                   needsUpdate = true;
@@ -4143,7 +4295,7 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                   advertId,
                   "установлены минус фразы",
                   templateName,
-                  toExclude
+                  toExclude.length
                 );
 
                 await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
@@ -4161,6 +4313,18 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                 const toExclude = [];
                 for (let i = 0; i < excluded.length; i++) {
                   const phrase = excluded[i];
+                  const ctrExcluded = stat[phrase] ? stat[phrase].ctr : 0;
+                  const viewsExcluded = stat[phrase] ? stat[phrase].views : 0;
+                  if (
+                    plusPhrasesTemplate.threshold &&
+                    viewsExcluded < plusPhrasesTemplate.threshold
+                  )
+                    continue;
+                  if (
+                    plusPhrasesTemplate.ctrThreshold &&
+                    ctrExcluded > plusPhrasesTemplate.ctrThreshold
+                  )
+                    continue;
                   if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
                   toExclude.push(phrase);
                 }
@@ -4220,7 +4384,7 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                     advertId,
                     "установлены минус фразы",
                     templateName,
-                    toExclude
+                    toExclude.length
                   );
 
                   await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
@@ -4455,7 +4619,7 @@ const depositAdvertsBudgetsAndWriteToJsonMM = async (
   campaignName,
   data
 ) => {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
 
     const advertsBudgetsPath = path.join(
@@ -4490,6 +4654,16 @@ const depositAdvertsBudgetsAndWriteToJsonMM = async (
       "adverts.json"
     );
     const adverts = readIfExists(advertsPath);
+    // const balancePath = path.join(
+    //   __dirname,
+    //   "marketMaster",
+    //   uid,
+    //   campaignName,
+    //   "balance.json"
+    // );
+    // const balance = readIfExists(balancePath);
+
+    const balance = await fetchBalanceWithRetry(uid, campaignName);
 
     const { advertsTypes } = data;
 
@@ -4524,11 +4698,23 @@ const depositAdvertsBudgetsAndWriteToJsonMM = async (
 
             console.log(uid, campaignName, art, advertId, mode, budget);
 
+            let payType = 0;
+            if (balance.net && balance.net >= budget) payType = 1;
+            if (balance.bonus && balance.bonus >= budget) payType = 3;
+
             const depositParams = {
               sum: budget,
-              type: 1,
+              type: payType,
               return: true,
             };
+
+            if (payType == 3) {
+              balance.bonus -= budget;
+            } else if (payType == 0) {
+              balance.balance -= budget;
+            } else {
+              balance.net -= budget;
+            }
 
             const newBudget = await depositAdvertBudget(
               authToken,
@@ -4577,7 +4763,7 @@ const depositAdvertsBudgetsAndWriteToJsonMM = async (
 };
 
 const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
 
     const advertsBudgetsPath = path.join(
@@ -4612,6 +4798,15 @@ const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
       "adverts.json"
     );
     const adverts = readIfExists(advertsPath);
+    // const balancePath = path.join(
+    //   __dirname,
+    //   "marketMaster",
+    //   uid,
+    //   campaignName,
+    //   "balance.json"
+    // );
+    // const balance = readIfExists(balancePath);
+    const balance = await fetchBalanceWithRetry(uid, campaignName);
 
     const toRestart = [];
     const depositAdvertsBudgets = async () => {
@@ -4637,6 +4832,7 @@ const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
             toRestart.push(advertId);
 
             const currentBudget = advertsBudgets[advertId];
+            // if (currentBudget) continue;
             if (currentBudget >= budgetToKeep) continue;
 
             let budget = budgetToKeep - currentBudget;
@@ -4645,29 +4841,43 @@ const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
             if (budget < 500) budget = 500;
             // if (buf)
 
+            let payType = 0;
+            if (balance.net && balance.net >= budget) payType = 1;
+            if (balance.bonus && balance.bonus >= budget) payType = 3;
+
             const depositParams = {
               sum: budget,
-              type: 1,
+              type: payType,
               return: true,
             };
+
+            if (payType == 3) {
+              balance.bonus -= budget;
+            } else if (payType == 0) {
+              balance.balance -= budget;
+            } else {
+              balance.net -= budget;
+            }
 
             const newBudget = await depositAdvertBudget(
               authToken,
               advertId,
               depositParams
             );
-            advertsBudgets[advertId] = newBudget.total;
+            if (newBudget) {
+              advertsBudgets[advertId] = newBudget.total;
 
-            console.log(
-              uid,
-              campaignName,
-              art,
-              advertId,
-              "баланс:",
-              currentBudget,
-              "пополнен на:",
-              budget
-            );
+              console.log(
+                uid,
+                campaignName,
+                art,
+                advertId,
+                "баланс:",
+                currentBudget,
+                "пополнен на:",
+                budget
+              );
+            }
 
             await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
           }
@@ -4716,11 +4926,20 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
       campaignName,
       "adverts.json"
     );
+    const advertsStocksThresholdPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsStocksThreshold.json"
+    );
     const advertsAutoBidsRules = readIfExists(advertsAutoBidsRulesPath);
     const advertsInfos = readIfExists(advertsInfosPath);
     const adverts = readIfExists(advertsPath);
+    const advertsStocksThreshold = readIfExists(advertsStocksThresholdPath);
 
-    const { advertsTypes, mode } = data;
+    const { advertsTypes, mode, stocksThreshold, maxBid, placementsRange } =
+      data;
 
     const setAdvertsCPMs = async () => {
       for (const [art, artData] of Object.entries(data.arts)) {
@@ -4785,8 +5004,13 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
               desiredDRR: desiredDRR,
               bidStep: bidStep,
               dateRange: dateRange,
+              maxBid: maxBid,
+              placementsRange: placementsRange,
+              dateRange: dateRange,
             };
           }
+          if (!advertsStocksThreshold[art]) advertsStocksThreshold[art] = {};
+          advertsStocksThreshold[art].stocksThreshold = stocksThreshold;
         } else if (mode == "Удалить правила") {
           console.log(uid, campaignName, art, mode);
           for (const [advertsType, value] of Object.entries(advertsTypes)) {
@@ -4794,6 +5018,8 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
             if (!advertsAutoBidsRules[art]) advertsAutoBidsRules[art] = {};
             advertsAutoBidsRules[art][advertsType] = undefined;
           }
+          if (!advertsStocksThreshold[art]) advertsStocksThreshold[art] = {};
+          advertsStocksThreshold[art].stocksThreshold = undefined;
         }
       }
     };
@@ -4802,6 +5028,10 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
       afs.writeFileSync(
         advertsAutoBidsRulesPath,
         JSON.stringify(advertsAutoBidsRules)
+      );
+      afs.writeFileSync(
+        advertsStocksThresholdPath,
+        JSON.stringify(advertsStocksThreshold)
       );
       resolve();
     });
@@ -4953,6 +5183,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
       return res;
     };
 
+    getPlacements(uid, campaignName);
     const campaignMassAdvertsData = calcMassAdvertsNewAndWriteToJsonMM(
       uid,
       campaignName
@@ -4973,11 +5204,10 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
           if (advertData.name != art) continue;
           if (advertData.type != 8 && advertData.type != 6) continue;
 
-          if (advertData.status == 9) {
+          if (advertData.status == 9 || advertData.status == 11) {
             activeAdvertsIds.push(advertId);
           }
         }
-        console.log(art, activeAdvertsIds);
         // for (const [advertsType, activeAdvertsIdsData] of Object.entries(
         //   activeAdvertsIds
         // )) {
@@ -5015,10 +5245,12 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
           if (daysInWork < 1) continue;
 
           const advertsType = getAdvertsType(advertId, advertsInfos);
-          const { desiredDRR } = bidsRules[advertsType] ?? {};
+          const { desiredDRR, maxBid, placementsRange } =
+            bidsRules[advertsType] ?? {};
           if (!desiredDRR) continue;
-          const advertsBudgetsToKeepData =
-            advertsBudgetsToKeep[art][advertsTypes];
+          const advertsBudgetsToKeepData = advertsBudgetsToKeep[art]
+            ? advertsBudgetsToKeep[art][advertsType]
+            : undefined;
           if (!advertsBudgetsToKeepData) continue;
 
           const min_recalc = (daysInWork) => {
@@ -5044,7 +5276,29 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
                 .slice(0, 10);
 
               const { sum, orders, clicks, views, sum_orders } =
-                campaignMassAdvertsData[art].advertsStats[strDate][advertsType];
+                campaignMassAdvertsData[art].advertsStats
+                  ? campaignMassAdvertsData[art].advertsStats[strDate]
+                    ? campaignMassAdvertsData[art].advertsStats[strDate][
+                        advertsType
+                      ]
+                      ? campaignMassAdvertsData[art].advertsStats[strDate][
+                          advertsType
+                        ]
+                      : {
+                          sum: 0,
+                          orders: 0,
+                          clicks: 0,
+                          views: 0,
+                          sum_orders: 0,
+                        }
+                    : { sum: 0, orders: 0, clicks: 0, views: 0, sum_orders: 0 }
+                  : { sum: 0, orders: 0, clicks: 0, views: 0, sum_orders: 0 };
+
+              if (
+                campaignMassAdvertsData[art].advertsStats &&
+                !campaignMassAdvertsData[art].advertsStats[strDate]
+              )
+                console.log(uid, campaignName, art, strDate);
 
               res.orders += orders;
               res.sum_orders += sum_orders;
@@ -5068,43 +5322,50 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             return res;
           };
 
-          const { cr, drr, views, orders } = min_recalc(daysInWork);
-          ///// TODO add active campaign sum check
-          // console.log(art, cpo);
+          const { index, updateTime, prevIndex, phrase } =
+            campaignMassAdvertsData[art].placements;
+          if (
+            placementsRange &&
+            placementsRange.from != 0 &&
+            placementsRange.to != 0
+          ) {
+            if (!updateTime) continue;
+            if (
+              (new Date().getTime() - new Date(updateTime).getTime()) /
+                1000 /
+                60 <
+              10
+            )
+              continue;
+            if (
+              advertsBidsLog[advertId]
+                ? advertsBidsLog[advertId].bids
+                  ? (new Date().getTime() -
+                      new Date(
+                        advertsBidsLog[advertId].bids.slice(-1)[0].time
+                      ).getTime()) /
+                      1000 /
+                      60 <
+                    30
+                  : false
+                : false
+            )
+              continue;
+            console.log(
+              art,
+              index,
+              new Date(updateTime).toLocaleString("ru-RU"),
+              maxBid,
+              placementsRange
+            );
 
-          const ordersTemp = { orders: 0, sum_orders: 0 };
-          for (const [_day, strDate] of Object.entries({
-            today: getLocaleDateString(today).slice(0, 10),
-            yesterday: getLocaleDateString(yesterday).slice(0, 10),
-          })) {
-            if (ordersData[strDate]) {
-              const sizes = arts.byBrandArt[art].sizes;
-              for (let j = 0; j < sizes.length; j++) {
-                const sku = sizes[j].skus[0];
-                const local_art = arts.bySku[sku].art;
-                ordersTemp.orders += ordersData[strDate].all[local_art]
-                  ? ordersData[strDate].all[local_art].count
-                  : 0;
-
-                ordersTemp.sum_orders += ordersData[strDate].all[local_art]
-                  ? ordersData[strDate].all[local_art].sum
-                  : 0;
-              }
-            }
+            if (placementsRange.from <= index && placementsRange.to >= index)
+              continue;
           }
-          ordersTemp.avgBill = getRoundValue(
-            ordersTemp.sum_orders,
-            ordersTemp.orders
-          );
 
-          const calculatedCPO = Math.round(
-            ordersTemp.avgBill * (desiredDRR / 100)
-          );
-          let bid = calculatedCPO * cr * 10;
-
-          if (views == undefined) continue;
-          if (cr == undefined || drr == undefined || orders == undefined)
-            continue;
+          // if (views == undefined) continue;
+          // if (cr == undefined || drr == undefined || orders == undefined)
+          // continue;
           if (!advertId || !type) continue;
 
           let currentBid = undefined;
@@ -5116,17 +5377,65 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             currentBid = tempParams ? tempParams.price : undefined;
             subjectId = tempParams ? tempParams.subjectId : undefined;
           }
-          // let bid = currentBid;
+          let bid = currentBid;
+          if (
+            placementsRange &&
+            placementsRange.from != 0 &&
+            placementsRange.to != 0
+          ) {
+            if (index > placementsRange.from || index == -1) {
+              bid = Math.round(bid * 1.1);
+            } else if (index < placementsRange.to) {
+              bid = Math.round(bid * 0.9);
+            }
+          } else {
+            const { cr, drr, views, orders } = min_recalc(daysInWork);
+            /// TODO add active campaign sum check
+            // console.log(art, cpo);
+
+            const ordersTemp = { orders: 0, sum_orders: 0 };
+            for (const [_day, strDate] of Object.entries({
+              today: getLocaleDateString(today).slice(0, 10),
+              yesterday: getLocaleDateString(yesterday).slice(0, 10),
+            })) {
+              if (ordersData[strDate]) {
+                const sizes = arts.byBrandArt[art].sizes;
+                for (let j = 0; j < sizes.length; j++) {
+                  const sku = sizes[j].skus[0];
+                  const local_art = arts.bySku[sku].art;
+                  ordersTemp.orders += ordersData[strDate].all[local_art]
+                    ? ordersData[strDate].all[local_art].count
+                    : 0;
+
+                  ordersTemp.sum_orders += ordersData[strDate].all[local_art]
+                    ? ordersData[strDate].all[local_art].sum
+                    : 0;
+                }
+              }
+            }
+            ordersTemp.avgBill = getRoundValue(
+              ordersTemp.sum_orders,
+              ordersTemp.orders
+            );
+
+            const calculatedCPO = Math.round(
+              ordersTemp.avgBill * (desiredDRR / 100)
+            );
+            bid = Math.round(calculatedCPO * cr * 10);
+          }
           // if (drr == desiredDRR) continue;
           // else if (drr < desiredDRR) bid += bidStep;
           // else if (drr > desiredDRR) bid -= bidStep;
           // let bid = Math.round(cr * 10 * desiredCPO);
 
           const minBid = type == 8 ? 125 : 200;
-
-          if (bid > advertsBudgetsToKeepData) bid = advertsBudgetsToKeepData;
+          if (maxBid) {
+            if (bid > maxBid) bid = maxBid;
+          } else if (advertsBudgetsToKeepData) {
+            if (bid > advertsBudgetsToKeepData) bid = advertsBudgetsToKeepData;
+          }
           if (bid < minBid) bid = minBid;
-          if (orders == 0) bid = minBid;
+          // if (orders == 0) bid = minBid;
           // else if (views < 1000 && bid > currentBid) break;
 
           const params = {
@@ -5144,8 +5453,8 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             uid,
             campaignName,
             art,
-            "drr:",
-            drr,
+            "index:",
+            index,
             "для",
             advertId,
             "установлена ставка",
@@ -5161,6 +5470,9 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
           advertsBidsLog[advertId].bids.push({
             time: new Date().toISOString(),
             val: bid,
+            index: index,
+            prevIndex: prevIndex,
+            phrase: phrase,
           });
         }
       }
@@ -5209,26 +5521,17 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
   daysCount = 2
 ) => {
   const authToken = getAuthTokenMM(uid, campaignName);
-  const advertsInfos = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsInfos.json"
-      )
-    )
+  const advertsInfos = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "advertsInfos.json")
   );
-  const advertsStatsByDay = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsStatsByDay.json"
-      )
+
+  const advertsStatsByDay = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsStatsByDay.json"
     )
   );
 
@@ -5242,17 +5545,20 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
     .toLocaleDateString("ru-RU")
     .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
     .slice(0, 10);
-  for (const [advertId, advertData] of Object.entries(advertsInfos)) {
+  for (const [advertId, advertData] of Object.entries(adverts)) {
     if (!advertId || !advertData) continue;
 
-    if (!adverts[advertId]) continue;
+    // if (!adverts[advertId]) {
+    //   console.log("ola soy dora");
+    //   continue;
+    // }
+    if (!advertsInfos[advertId]) continue;
 
     const now = new Date();
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
-    const endDate = new Date(advertData.endTime.slice(0, 10));
+    const endDate = new Date(advertsInfos[advertId].endTime.slice(0, 10));
     endDate.setHours(0, 0, 0, 0);
-
     const daysPassed = (today.getTime() - endDate.getTime()) / 86400 / 1000;
     // console.log(new Date(advertData.endTime.slice(0, 10)), new Date(), dayyss);
     if (daysPassed >= daysCount) {
@@ -5274,7 +5580,7 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
     const updateDate = getDateFromLocaleString(updateTime);
     const minutesPassed =
       (now.getTime() - (updateDate.getTime() - 1000 * 60 * 60 * 3)) / 60 / 1000;
-    if (minutesPassed < 30) continue;
+    if (minutesPassed < 20) continue;
     console.log(uid, campaignName, advertId, minutesPassed, updateTime);
 
     if (params[numOfButches].length == batchSize) {
@@ -5287,9 +5593,7 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
     const dates = [];
     const startDate = new Date(advertData.createTime);
     startDate.setHours(0, 0, 0, 0);
-    const daysBetween =
-      (today.getTime() - startDate.getTime()) / 86400 / 1000 -
-      (daysPassed > 0 ? daysPassed : 0);
+    const daysBetween = (today.getTime() - startDate.getTime()) / 86400 / 1000;
 
     for (let i = 0; i <= daysBetween; i++) {
       const tempDate = new Date(startDate);
@@ -5312,11 +5616,11 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
     // continue;
     params[numOfButches].push({
       id: advertData.advertId,
-      // interval: {
-      //   begin: "2019-01-01",
-      //   end: today_str,
-      // },
-      dates: dates,
+      interval: {
+        begin: "2022-01-01",
+        end: today_str,
+      },
+      // dates: dates,
     });
   }
   // return;
@@ -5332,9 +5636,7 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
       campaignName,
       "advertsStats.json"
     );
-    let jsonData = {};
-    if (afs.existsSync(advertsStatsPath))
-      jsonData = JSON.parse(afs.readFileSync(advertsStatsPath));
+    let jsonData = readIfExists(advertsStatsPath);
     await getAdvertsStatsMM(authToken, paramsToSend)
       .then(async (pr) => {
         if (!pr) return;
@@ -5364,9 +5666,17 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
               const dateData = jsonData[advertId].days[dateIndex];
               const date = dateData.date;
               // console.log(advertId, jsonData[advertId], date, dateData);
-              if (!(date in advertData.days)) advertData.days[date] = dateData;
-              else if (dateData.sum > advertData.days[date].sum)
-                advertData.days[date] = dateData;
+              const datePrIndex = advertData.days.findIndex(
+                (el) => el.date == date
+              );
+
+              if (datePrIndex == -1) {
+                console.log(advertId, date, "no data for date in db");
+                advertData.days[datePrIndex] = dateData;
+              } else if (dateData.sum > advertData.days[datePrIndex].sum) {
+                console.log(advertId, date, "date in db and bigger");
+                advertData.days[datePrIndex] = dateData;
+              }
             }
           }
           jsonData[advertId] = advertData;
@@ -6178,53 +6488,61 @@ const fetchArtsAndWriteToJsonMM = async (uid, campaignName) => {
       break;
     }
   }
-  Promise.all(promises).then(() =>
-    writeVendorCodesToJsonMM(cards, uid, campaignName)
-  );
+  Promise.all(promises).then(() => {
+    if (!cards || cards.length == 0) return;
+    writeVendorCodesToJsonMM(cards, uid, campaignName);
+  });
 };
 
 const fetchNmDetailReportAndWriteToJsonMM = (uid, campaignName) => {
-  const authToken = getAuthTokenMM(uid, campaignName);
+  return new Promise(async (resolve) => {
+    const authToken = getAuthTokenMM(uid, campaignName);
 
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
 
-  const monthAgo = new Date();
-  monthAgo.setDate(monthAgo.getDate() - 31);
+    const monthAgo = new Date();
+    monthAgo.setDate(monthAgo.getDate() - 31);
 
-  let cards = [];
-  for (let i = 1; i < 10; i++) {
-    const params = {
-      period: {
-        begin: getLocaleDateString(monthAgo).slice(0, 10) + " 00:00:00",
-        end: getLocaleDateString(yesterday).slice(0, 10) + " 00:00:00",
-      },
-      page: i,
-    };
-    let isNextPage = false;
-    getNmDetailReport(authToken, params)
-      .then(async (res) => {
-        // console.log(res.data.page, res.data.isNextPage);
+    let cards = [];
+    for (let i = 1; i < 10; i++) {
+      const params = {
+        period: {
+          begin: getLocaleDateString(monthAgo).slice(0, 10) + " 00:00:00",
+          end: getLocaleDateString(yesterday).slice(0, 10) + " 00:00:00",
+        },
+        page: i,
+      };
+      let isNextPage = false;
+      await getNmDetailReport(authToken, params)
+        .then(async (res) => {
+          // console.log(res.data.page, res.data.isNextPage);
+          if (!res) return;
 
-        cards = cards.concat(res.data.cards);
-        // console.log(cards, res.data.cards);
+          cards = cards.concat(res.data.cards);
+          // console.log(cards, res.data.cards);
 
-        if (!res.data.isNextPage) {
-          isNextPage = true;
-        } else {
-          await new Promise((resolve) => setTimeout(resolve, 22 * 1000));
-        }
-      })
-      .catch((e) => {
-        console.log(e.response.data);
-      });
+          if (!res.data.isNextPage) {
+            isNextPage = true;
+          } else {
+            console.log("waiting");
+            await new Promise((resolve) => setTimeout(resolve, 22 * 1000));
+            console.log("done waiting");
+          }
+        })
+        .catch((e) => {
+          console.log(e);
+        });
 
-    if (!isNextPage) {
-      break;
+      if (isNextPage) {
+        break;
+      }
     }
-  }
 
-  writeNmDetailReportToJsonMM(cards, uid, campaignName);
+    await writeNmDetailReportToJsonMM(cards, uid, campaignName).then(() =>
+      resolve()
+    );
+  });
 };
 
 const fetchCardsTempAndWriteToJSON = (campaign) => {
@@ -6385,7 +6703,9 @@ const writeOrdersToJson = (data, campaign, date) => {
     // ---------------------------
     // console.log(supplierArticle, artsBarcodesFull[supplierArticle], item.barcode);
     if (supplierArticle) {
-      const brand = brand_names[artsBarcodesFull[supplierArticle].brand];
+      const brand =
+        brand_names[artsBarcodesFull[supplierArticle].brand] ??
+        artsBarcodesFull[supplierArticle].brand;
       if (!(brand in byDayCampaignSum)) byDayCampaignSum[brand] = {};
       if (!(order_date_string in byDayCampaignSum[brand]))
         byDayCampaignSum[brand][order_date_string] = { count: 0, sum: 0 };
@@ -6485,6 +6805,16 @@ const fetchOrdersAndWriteToJsonMM = (uid, campaignName) => {
     return getOrders(authToken, params)
       .then((data) => {
         if (!data) return;
+        // afs.writeFileSync(
+        //   path.join(
+        //     __dirname,
+        //     "marketMaster",
+        //     uid,
+        //     campaignName,
+        //     "orders_full.json"
+        //   ),
+        //   JSON.stringify(data)
+        // );
         writeOrdersToJsonMM(data, uid, campaignName, date).then((pr) =>
           resolve()
         );
@@ -7021,6 +7351,16 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
       path.join(__dirname, "marketMaster", uid, campaignName, "adverts.json")
     )
   );
+  const advertsStocksThreshold = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsStocksThreshold.json"
+    )
+  );
+
   const advertsBudgets = JSON.parse(
     afs.readFileSync(
       path.join(
@@ -7222,23 +7562,31 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
             const { cluster, count, keywords } = wordsForId.clusters[j];
 
             const { stat } = advertsWords[advertId];
-            const clusterStat = { sum: 0, views: 0, clicks: 0, ctr: 0 };
-            if (keywords) {
-              keywords.push(cluster);
-              for (let k = 0; k < keywords.length; k++) {
-                const keyword = keywords[i];
-                if (!stat[keyword]) continue;
-                const { views, clicks, sum } = stat[keyword];
-                clusterStat.views += views;
-                clusterStat.clicks += clicks;
-                clusterStat.sum += sum;
+
+            const clusterKeywordsTemp = new Array(keywords ?? []);
+            const clusterKeywords = clusterKeywordsTemp.filter(
+              (value, index) => {
+                return clusterKeywordsTemp.indexOf(value) === index;
               }
-              clusterStat.ctr = getRoundValue(
-                clusterStat.clicks,
-                clusterStat.views,
-                true
-              );
+            );
+            if (!clusterKeywords.includes(cluster))
+              clusterKeywords.push(cluster);
+            const clusterStat = {
+              views: 0,
+              clicks: 0,
+              ctr: 0,
+            };
+            for (let j = 0; j < clusterKeywords.length; j++) {
+              if (!stat[clusterKeywords[j]]) continue;
+              clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
+              clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
+              clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
             }
+            clusterStat.ctr = getRoundValue(
+              clusterStat.clicks,
+              clusterStat.views,
+              true
+            );
 
             words.clusters.push({
               cluster: cluster,
@@ -7316,6 +7664,7 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
     jsonData[art].drrAI = advertsAutoBidsRules[art];
     jsonData[art].budgetToKeep = advertsBudgetsToKeep[art];
     jsonData[art].plusPhrasesTemplate = advertsPlusPhrasesTemplates[art];
+    jsonData[art].advertsStocksThreshold = advertsStocksThreshold[art];
 
     const sizes = artData.sizes;
     for (let i = 0; i < sizes.length; i++) {
@@ -7337,86 +7686,163 @@ const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
   return jsonData;
 };
 
+const getPlacements = (uid, campaignName) => {
+  const advertsManagerRules = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsManagerRules.json"
+    )
+  );
+  const advertsWords = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "advertsWords.json")
+  );
+
+  const arts = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
+  );
+  arts.byBrandArt = {};
+  for (const [nmId, artData] of Object.entries(arts.byNmId)) {
+    artData.nmId = nmId;
+    arts.byBrandArt[artData.art] = artData;
+  }
+
+  const currentPlacements = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "placements.json")
+  );
+
+  const jsonData = {};
+  for (const [art, advertsTypes] of Object.entries(advertsManagerRules)) {
+    const topPhrase = { phrase: "", count: 0 };
+
+    if (!art || !advertsTypes) continue;
+    for (const [advertsType, rules] of Object.entries(advertsTypes)) {
+      if (!advertsType || !rules) continue;
+      const { advertId, mode } = rules;
+      if (!advertId || !mode) continue;
+      //   console.log(art, advertsType, rules);
+
+      const words = advertsWords[advertId];
+      if (!words) continue;
+      if (advertsType == "search") {
+        const { keywords } = words.words ?? {};
+        if (!keywords || !keywords.length) continue;
+
+        const top = keywords[0];
+        // console.log(art, advertsType, top);
+
+        if (!topPhrase.count || topPhrase.count < top.count) {
+          topPhrase.phrase = top.keyword;
+          topPhrase.count = top.count;
+          //   console.log(art, advertsType, topPhrase);
+        }
+      } else {
+        const { clusters } = words ?? {};
+        if (!clusters || !clusters.length) continue;
+
+        const top = clusters[0];
+
+        if (!topPhrase.count || topPhrase.count < top.count) {
+          topPhrase.phrase = top.cluster;
+          topPhrase.count = top.count;
+          //   console.log(art, advertsType, topPhrase);
+        }
+      }
+    }
+
+    const phrasePlacementsPath = path.join(
+      __dirname,
+      "placementsByPhrases",
+      `${topPhrase.phrase.replace(/\s/g, "_")}.json`
+    );
+    const phrasePlacements = readIfExists(phrasePlacementsPath);
+    const { updateTime, data } = phrasePlacements;
+
+    const { nmId } = arts.byBrandArt[art] ?? {};
+    if (!nmId) continue;
+
+    const phrasePlacementsData = data ? data[nmId] : undefined;
+    if (!phrasePlacementsData)
+      jsonData[art] = { index: -1, updateTime, phrase: topPhrase.phrase };
+    else {
+      phrasePlacementsData.updateTime = updateTime;
+      phrasePlacementsData.phrase = topPhrase.phrase;
+      jsonData[art] = phrasePlacementsData;
+    }
+  }
+
+  afs.writeFileSync(
+    path.join(__dirname, "marketMaster", uid, campaignName, "placements.json"),
+    JSON.stringify(jsonData)
+  );
+};
+
 const calcMassAdvertsNewAndWriteToJsonMM = (
   uid,
   campaignName,
   dateRange = { to: "", from: "" }
 ) => {
-  const arts = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
+  const arts = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
+  );
+
+  const adverts = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "adverts.json")
+  );
+  const advertsStocksThreshold = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsStocksThreshold.json"
     )
   );
-  const adverts = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "adverts.json")
+
+  const advertsBudgets = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsBudgets.json"
     )
   );
-  const advertsBudgets = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsBudgets.json"
-      )
+  const advertsPlusPhrasesTemplates = readIfExists(
+    path.join(
+      __dirname,
+      "../prices/marketMaster",
+      uid,
+      campaignName,
+      "advertsPlusPhrasesTemplates.json"
     )
   );
-  const advertsPlusPhrasesTemplates = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "../prices/marketMaster",
-        uid,
-        campaignName,
-        "advertsPlusPhrasesTemplates.json"
-      )
+  const advertsBudgetsToKeep = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsBudgetsToKeep.json"
     )
   );
-  const advertsBudgetsToKeep = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsBudgetsToKeep.json"
-      )
+  const advertsWords = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "advertsWords.json")
+  );
+  const advertsAutoBidsRules = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsAutoBidsRules.json"
     )
   );
-  const advertsWords = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsWords.json"
-      )
-    )
-  );
-  const advertsAutoBidsRules = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsAutoBidsRules.json"
-      )
-    )
-  );
-  const advertsInfos = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsInfos.json"
-      )
-    )
+
+  const advertsInfos = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "advertsInfos.json")
   );
   const advertsBidsLogPath = path.join(
     __dirname,
@@ -7426,26 +7852,23 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     "advertsBidsLog.json"
   );
   const advertsBidsLog = readIfExists(advertsBidsLogPath);
-  const advertsStatsByDay = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsStatsByDay.json"
-      )
+  const advertsStatsByDay = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsStatsByDay.json"
     )
   );
-  const stocks = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "stocks.json")
-    )
+  const stocks = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "stocks.json")
   );
-  const orders = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "orders.json")
-    )
+  const orders = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "orders.json")
+  );
+  const placements = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "placements.json")
   );
   const advertsManagerRulesPath = path.join(
     __dirname,
@@ -7626,30 +8049,55 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
           ? advertsWords[advertId]
           : advertsWords[advertId].words
         : undefined;
+      const pluse = wordsForId
+        ? type == 6
+          ? wordsForId.pluse
+          : undefined
+        : undefined;
       if (wordsForId) {
-        words.excluded = wordsForId.excluded;
+        for (let j = 0; j < wordsForId.excluded.length; j++) {
+          const keyword = wordsForId.excluded[j];
+          const { stat } = advertsWords[advertId];
+          // if (!stat[keyword]) continue;
+          const { sum, ctr, clicks, views } = stat[keyword] ?? {};
+          // console.log(stat[keyword], keyword);
+          words.excluded.push({
+            cluster: keyword,
+            count: views,
+            sum: sum,
+            ctr: ctr,
+            clicks: clicks,
+          });
+        }
         if (type == 8) {
           for (let j = 0; j < wordsForId.clusters.length; j++) {
             const { cluster, count, keywords } = wordsForId.clusters[j];
 
             const { stat } = advertsWords[advertId];
-            const clusterStat = { sum: 0, views: 0, clicks: 0, ctr: 0 };
-            if (keywords) {
-              keywords.push(cluster);
-              for (let k = 0; k < keywords.length; k++) {
-                const keyword = keywords[i];
-                if (!stat[keyword]) continue;
-                const { views, clicks, sum } = stat[keyword];
-                clusterStat.views += views;
-                clusterStat.clicks += clicks;
-                clusterStat.sum += sum;
+            const clusterKeywordsTemp = new Array(keywords ?? []);
+            const clusterKeywords = clusterKeywordsTemp.filter(
+              (value, index) => {
+                return clusterKeywordsTemp.indexOf(value) === index;
               }
-              clusterStat.ctr = getRoundValue(
-                clusterStat.clicks,
-                clusterStat.views,
-                true
-              );
+            );
+            if (!clusterKeywords.includes(cluster))
+              clusterKeywords.push(cluster);
+            const clusterStat = {
+              views: 0,
+              clicks: 0,
+              ctr: 0,
+            };
+            for (let j = 0; j < clusterKeywords.length; j++) {
+              if (!stat[clusterKeywords[j]]) continue;
+              clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
+              clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
+              clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
             }
+            clusterStat.ctr = getRoundValue(
+              clusterStat.clicks,
+              clusterStat.views,
+              true
+            );
 
             words.clusters.push({
               cluster: cluster,
@@ -7672,6 +8120,22 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
               ctr: ctr,
               clicks: clicks,
             });
+          }
+          if (pluse) {
+            for (let j = 0; j < pluse.length; j++) {
+              const keyword = pluse[j];
+              const { stat } = advertsWords[advertId];
+              if (!stat[keyword]) continue;
+              const { sum, ctr, clicks, views } = stat[keyword] ?? {};
+              // console.log(stat[keyword], keyword);
+              words.clusters.push({
+                cluster: keyword,
+                count: views,
+                sum: sum,
+                ctr: ctr,
+                clicks: clicks,
+              });
+            }
           }
         }
       }
@@ -7705,10 +8169,10 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
   dateTo.setHours(0, 0, 0, 0);
 
   const today = new Date();
-  const todayStr = today
-    .toLocaleDateString("ru-RU")
-    .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-    .slice(0, 10);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const todayStr = getLocaleDateString(today).slice(0, 10);
+  const yesterdayStr = getLocaleDateString(yesterday).slice(0, 10);
 
   const jsonData = {};
   for (const [nmId, artData] of Object.entries(arts.byNmId)) {
@@ -7728,16 +8192,22 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     jsonData[art].budgetToKeep = advertsBudgetsToKeep[art];
     jsonData[art].plusPhrasesTemplate = advertsPlusPhrasesTemplates[art];
     jsonData[art].advertsManagerRules = advertsManagerRules[art];
+    jsonData[art].advertsStocksThreshold = advertsStocksThreshold[art];
+    jsonData[art].placements = placements[art];
 
     const sizes = artData.sizes;
     for (let i = 0; i < sizes.length; i++) {
       const sku = sizes[i].skus[0];
       const local_art = arts.bySku[sku].art;
-      jsonData[art].stocks += stocks[todayStr]
-        ? stocks[todayStr].all[local_art]
+      if (stocks[todayStr]) {
+        jsonData[art].stocks += stocks[todayStr].all[local_art]
           ? stocks[todayStr].all[local_art].quantity
-          : 0
-        : 0;
+          : 0;
+      } else if (stocks[yesterdayStr]) {
+        jsonData[art].stocks += stocks[yesterdayStr].all[local_art]
+          ? stocks[yesterdayStr].all[local_art].quantity
+          : 0;
+      }
     }
   }
 
@@ -7773,6 +8243,8 @@ const updateAdvertsManagerRulesMM = (uid, campaignName, data) => {
           advertsManagerRules[art][advertsType].mode = value;
           advertsManagerRules[art][advertsType].updateTime =
             new Date().toISOString();
+          advertsManagerRules[art][advertsType].advertId = undefined;
+          advertsManagerRules[art][advertsType].turnedOffByStocks = undefined;
         }
       }
 
@@ -7782,6 +8254,174 @@ const updateAdvertsManagerRulesMM = (uid, campaignName, data) => {
     );
 
     resolve();
+  });
+};
+
+const autoAdvertsStopMM = (uid, campaignName) => {
+  return new Promise(async (resolve, reject) => {
+    const advertsManagerRulesPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsManagerRules.json"
+    );
+    const advertsManagerRules = readIfExists(advertsManagerRulesPath);
+
+    const campaignMassAdvertsData = calcMassAdvertsNewAndWriteToJsonMM(
+      uid,
+      campaignName
+    );
+
+    const jsonData = {};
+
+    for (const [art, advertsTypes] of Object.entries(advertsManagerRules)) {
+      if (!campaignMassAdvertsData[art]) continue;
+
+      const { drrAI, advertsStocksThreshold } = campaignMassAdvertsData[art];
+      if (!drrAI) continue;
+
+      const { stocksThreshold } = advertsStocksThreshold ?? {};
+
+      // if (art == "КПБ_1.5_СЛВДР_3392_ТКС")
+      //   console.log(campaignMassAdvertsData[art], advertsTypes);
+
+      for (const [advertsType, rules] of Object.entries(advertsTypes)) {
+        const { desiredDRR } = drrAI[advertsType] ?? {};
+        if (!desiredDRR) continue;
+
+        const { mode, updateTime, advertId, turnedOffByStocks } = rules;
+        if (advertId && mode) {
+          const advertData = campaignMassAdvertsData[art].adverts
+            ? campaignMassAdvertsData[art].adverts[advertsType]
+              ? campaignMassAdvertsData[art].adverts[advertsType][advertId] ??
+                undefined
+              : undefined
+            : undefined;
+
+          if (!advertData) continue;
+
+          const { daysInWork } = advertData;
+          if (daysInWork < 2) continue;
+
+          const min_recalc = (daysInWork) => {
+            const res = {
+              cpo: 0,
+              sum: 0,
+              orders: 0,
+              sum_orders: 0,
+              views: 0,
+              cpm: 0,
+              cr: 0,
+              drr: 0,
+              clicks: 0,
+            };
+
+            for (let i = 0; i <= daysInWork; i++) {
+              const date = new Date();
+              date.setDate(date.getDate() - i);
+              date.setHours(0, 0, 0, 0);
+              const strDate = date
+                .toLocaleDateString("ru-RU")
+                .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
+                .slice(0, 10);
+
+              const { sum, orders, clicks, views, sum_orders } =
+                campaignMassAdvertsData[art].advertsStats
+                  ? campaignMassAdvertsData[art].advertsStats[strDate]
+                    ? campaignMassAdvertsData[art].advertsStats[strDate][
+                        advertsType
+                      ]
+                      ? campaignMassAdvertsData[art].advertsStats[strDate][
+                          advertsType
+                        ]
+                      : {
+                          sum: 0,
+                          orders: 0,
+                          clicks: 0,
+                          views: 0,
+                          sum_orders: 0,
+                        }
+                    : { sum: 0, orders: 0, clicks: 0, views: 0, sum_orders: 0 }
+                  : { sum: 0, orders: 0, clicks: 0, views: 0, sum_orders: 0 };
+
+              if (
+                campaignMassAdvertsData[art].advertsStats &&
+                !campaignMassAdvertsData[art].advertsStats[strDate]
+              )
+                console.log(uid, campaignName, art, strDate);
+
+              res.orders += orders;
+              res.sum_orders += sum_orders;
+              res.sum += sum;
+              res.views += views;
+              res.clicks += clicks;
+            }
+
+            res.orders = Math.round(res.orders * 100) / 100;
+            res.sum_orders = Math.round(res.sum_orders);
+            res.sum = Math.round(res.sum);
+            res.clicks = Math.round(res.clicks);
+            res.views = Math.round(res.views);
+            res.cpo = getRoundValue(res.sum, res.orders, false, res.sum);
+            res.cpm = getRoundValue(res.sum * 1000, res.views);
+            res.cr = getRoundValue(res.orders, res.views, true);
+            res.drr = getRoundValue(res.sum, res.sum_orders, true, 1);
+
+            // console.log(uid, campaignName, advertsType, res);
+
+            return res;
+          };
+
+          const { drr } = min_recalc(daysInWork);
+
+          if (drr / desiredDRR - 1 > 0.5) {
+            if (!jsonData[art]) jsonData[art] = {};
+            if (!jsonData[art][advertsType]) jsonData[art][advertsType] = {};
+            jsonData[art][advertsType].mode = false;
+            jsonData[art][advertsType].updateTime = new Date().toISOString();
+            jsonData[art][advertsType].advertId = undefined;
+            jsonData[art][advertsType].turnedOffByStocks = undefined;
+            jsonData[art][advertsType].turnedOffByDrr = true;
+            continue;
+          }
+        } else if (turnedOffByStocks) {
+          if (campaignMassAdvertsData[art].stocks > stocksThreshold) {
+            if (!jsonData[art]) jsonData[art] = {};
+            if (!jsonData[art][advertsType]) jsonData[art][advertsType] = {};
+            jsonData[art][advertsType].mode = true;
+            jsonData[art][advertsType].updateTime = new Date().toISOString();
+            jsonData[art][advertsType].advertId = undefined;
+            jsonData[art][advertsType].turnedOffByStocks = undefined;
+            continue;
+          }
+        }
+        if (campaignMassAdvertsData[art].stocks <= stocksThreshold) {
+          if (!jsonData[art]) jsonData[art] = {};
+          if (!jsonData[art][advertsType]) jsonData[art][advertsType] = {};
+          jsonData[art][advertsType].mode = false;
+          jsonData[art][advertsType].updateTime = new Date().toISOString();
+          jsonData[art][advertsType].advertId = undefined;
+          jsonData[art][advertsType].turnedOffByStocks = true;
+          jsonData[art][advertsType].turnedOffByDrr = undefined;
+          continue;
+        }
+      }
+    }
+
+    const advertsManagerRulesCurrent = readIfExists(advertsManagerRulesPath);
+    for (const [art, advertsTypes] of Object.entries(jsonData)) {
+      for (const [advertsType, rules] of Object.entries(advertsTypes)) {
+        advertsManagerRulesCurrent[art][advertsType] = rules;
+      }
+    }
+
+    afs.writeFileSync(
+      advertsManagerRulesPath,
+      JSON.stringify(advertsManagerRulesCurrent)
+    );
+    resolve();
+    // console.log(advertsManagerRules);
   });
 };
 
@@ -7806,6 +8446,11 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
       "advertsInfos.json"
     );
     const advertsInfos = readIfExists(advertsInfosPath);
+
+    if (Object.keys(advertsInfos).length < 1) {
+      resolve();
+      return;
+    }
 
     const advertsPath = path.join(
       __dirname,
@@ -7833,6 +8478,15 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
       "arts.json"
     );
     const arts = readIfExists(artsPath);
+    // const balancePath = path.join(
+    //   __dirname,
+    //   "marketMaster",
+    //   uid,
+    //   campaignName,
+    //   "balance.json"
+    // );
+    const balance = await fetchBalanceWithRetry(uid, campaignName);
+
     arts.byBrandArt = {};
     for (const [nmId, artData] of Object.entries(arts.byNmId)) {
       artData.nmId = parseInt(nmId);
@@ -7849,11 +8503,32 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
         await new Promise((resolve) => setTimeout(resolve, 120 * 1000));
         for (let i = 0; i < advertsIdsArray.length; i++) {
           const advertId = parseInt(advertsIdsArray[i]);
+
+          if (advertsBudgets[advertId] > 100) {
+            continue;
+          }
+
+          const budget = 500;
+
+          let payType = 0;
+          if (balance.net && balance.net >= budget) payType = 1;
+          if (balance.bonus && balance.bonus >= budget) payType = 3;
+
           const depositParams = {
-            sum: 500,
-            type: 1,
+            sum: budget,
+            type: payType,
             return: true,
           };
+
+          console.log(uid, campaignName, advertId, depositParams);
+
+          if (payType == 3) {
+            balance.bonus -= budget;
+          } else if (payType == 0) {
+            balance.balance -= budget;
+          } else {
+            balance.net -= budget;
+          }
 
           const newBudget = await depositAdvertBudget(
             authToken,
@@ -7883,7 +8558,7 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
       if (!advertId || !advertInfos) continue;
       if (!adverts[advertId]) continue;
 
-      const { type, status, createTime } = advertInfos;
+      const { type, status, createTime, name } = advertInfos;
       const advertsType = getAdvertsType(advertId, advertsInfos);
 
       if (![4, 9, 11].includes(status)) continue;
@@ -7917,10 +8592,11 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
           type: type,
           status: status,
           budget: budget,
+          name: name,
         };
       }
     }
-
+    const jsonData = {};
     const toCreateData = {};
     const toStartSearchData = [];
     for (const [art, advertsTypes] of Object.entries(advertsManagerRules)) {
@@ -7939,7 +8615,7 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
           }
         }
       }
-
+      // console.log(artsWithAdverts);
       for (const [advertsType, value] of Object.entries(advertsTypes)) {
         if (!advertsType) continue;
 
@@ -7953,22 +8629,72 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
               artsWithAdverts[art][advertsType]
             )) {
               if (!mode) {
-                console.log(advertId, "stop");
-                await changeAdvertActivity(authToken, "stop", {
-                  id: advertData.advertId,
-                });
+                if (advertData.status == 4) {
+                  console.log(uid, campaignName, advertId, "delete");
+                  await changeAdvertActivity(authToken, "delete", {
+                    id: advertData.advertId,
+                  });
+                } else {
+                  console.log(uid, campaignName, advertId, "stop");
+                  await changeAdvertActivity(authToken, "stop", {
+                    id: advertData.advertId,
+                  });
+                }
                 await new Promise((resolve) => setTimeout(resolve, 500));
               } else if (
                 new Date(advertData.createTime) < new Date(updateTime)
               ) {
-                console.log(advertId, "stop");
-                await changeAdvertActivity(authToken, "stop", {
-                  id: advertData.advertId,
-                });
+                needToCreate = true;
+                if (advertData.status == 4) {
+                  console.log(uid, campaignName, advertId, "delete");
+                  await changeAdvertActivity(authToken, "delete", {
+                    id: advertData.advertId,
+                  });
+                } else {
+                  console.log(uid, campaignName, advertId, "stop");
+                  await changeAdvertActivity(authToken, "stop", {
+                    id: advertData.advertId,
+                  });
+                }
+                // if (!jsonData[art]) jsonData[art] = {};
+                // if (!jsonData[art][advertsType])
+                //   jsonData[art][advertsType] =
+                //     advertsManagerRules[art][advertsType];
+                // jsonData[art][advertsType].advertId = undefined;
                 await new Promise((resolve) => setTimeout(resolve, 500));
               } else if (
                 new Date(advertData.createTime) >= new Date(updateTime)
               ) {
+                const firstSuch =
+                  artsWithAdverts[art][advertsType][
+                    Object.keys(artsWithAdverts[art][advertsType])[0]
+                  ];
+                if (!jsonData[art]) jsonData[art] = {};
+                if (!jsonData[art][advertsType])
+                  jsonData[art][advertsType] =
+                    advertsManagerRules[art][advertsType];
+                jsonData[art][advertsType].advertId = firstSuch.advertId;
+                if (advertId != firstSuch.advertId) {
+                  if (
+                    new Date(
+                      advertData.createTime > new Date(firstSuch.createTime)
+                    )
+                  ) {
+                    if (advertData.status == 4) {
+                      console.log(uid, campaignName, advertId, "delete");
+                      await changeAdvertActivity(authToken, "delete", {
+                        id: advertData.advertId,
+                      });
+                    } else {
+                      console.log(uid, campaignName, advertId, "stop");
+                      await changeAdvertActivity(authToken, "stop", {
+                        id: advertData.advertId,
+                      });
+                    }
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                  }
+                }
+
                 needToCreate = false;
                 if (advertData.status == 4) {
                   toStartSearchData.push(advertId);
@@ -7979,6 +8705,10 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
         }
         if (mode && needToCreate) {
           if (!toCreateData[advertsType]) toCreateData[advertsType] = {};
+          if (!arts.byBrandArt[art]) {
+            console.log(uid, campaignName, "no info", art);
+            continue;
+          }
 
           toCreateData[advertsType][art] = {
             nmId: arts.byBrandArt[art].nmId,
@@ -7999,22 +8729,58 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
     }
 
     for (const [advertsType, advertsTypeData] of Object.entries(toCreateData)) {
-      console.log(advertsType, advertsTypeData);
-      // continue
+      const checked = {};
+      for (const [art, artData] of Object.entries(advertsTypeData)) {
+        // console.log(art, artData, artsWithAdverts[art], advertsType);
+        const { advertId } = advertsManagerRules[art][advertsType];
+        if (advertId) continue;
+        // if (advertId) {
+        //   if ([9, 11, 4].includes(adverts[advertId].status)) continue;
+        // }
+        // if (artsWithAdverts[art]) {
+        //   if (artsWithAdverts[art][advertsType]) {
+        //   }
+        // }
+
+        checked[art] = artData;
+      }
+      console.log(advertsType, advertsTypeData, checked);
+      // continue;
 
       const createdAdvertsIds = await createMassAdvertsMM(
         uid,
         campaignName,
-        advertsTypeData
+        checked
       );
-
       console.log(createdAdvertsIds);
+
+      const createdAdvertsIdsArray = [];
+      for (const [art, advertId] of Object.entries(createdAdvertsIds)) {
+        if (!jsonData[art]) jsonData[art] = {};
+        if (!jsonData[art][advertsType])
+          jsonData[art][advertsType] = advertsManagerRules[art][advertsType];
+        jsonData[art][advertsType].advertId = advertId;
+        createdAdvertsIdsArray.push(advertId);
+      }
+
       if (advertsType == "search") {
-        await depositAndStart(createdAdvertsIds);
+        await depositAndStart(createdAdvertsIdsArray);
       }
     }
     await depositAndStart(toStartSearchData);
     afs.writeFileSync(advertsBudgetsPath, JSON.stringify(advertsBudgets));
+
+    const advertsManagerRulesCurrent = readIfExists(advertsManagerRulesPath);
+    for (const [art, advertsTypes] of Object.entries(jsonData)) {
+      for (const [advertsType, rules] of Object.entries(advertsTypes)) {
+        advertsManagerRulesCurrent[art][advertsType] = rules;
+      }
+    }
+    afs.writeFileSync(
+      advertsManagerRulesPath,
+      JSON.stringify(advertsManagerRulesCurrent)
+    );
+
     resolve();
   });
 };
@@ -8023,11 +8789,12 @@ const createMassAdvertsMM = (uid, campaignName, data) => {
   return new Promise((resolve, reject) => {
     // console.log(uid, campaignName, data);
     const authToken = getAuthTokenMM(uid, campaignName);
-    const arts = JSON.parse(
-      afs.readFileSync(
-        path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
-      )
+    const arts = readIfExists(
+      path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
     );
+    // const balance = readIfExists(
+    //   path.join(__dirname, "marketMaster", uid, campaignName, "balance.json")
+    // );
 
     const createAutoRK = (params) => {
       return axios
@@ -8095,8 +8862,9 @@ const createMassAdvertsMM = (uid, campaignName, data) => {
 
     // const searchCampaignsArtsDepositData = {};
     // const searchCampaignsArtsBiddedData = {};
-    const createdAdvertsIds = [];
+    const createdAdvertsIds = {};
     const createCampaigns = async () => {
+      const balance = await fetchBalanceWithRetry(uid, campaignName);
       for (const [art, artData] of Object.entries(data)) {
         if (!art || !artData) continue;
         const type = artData.type;
@@ -8113,23 +8881,37 @@ const createMassAdvertsMM = (uid, campaignName, data) => {
         if (!bid) continue;
         // console.log(type, nmId, object, objectId, budget, bid, art);
 
+        let payType = 0;
+        if (balance.net && balance.net >= budget) payType = 1;
+        if (balance.bonus && balance.bonus >= budget) payType = 3;
+
         if (type == "Авто") {
           const createParams = {
             type: 8,
             name: art,
             subjectId: objectId,
             sum: budget,
-            btype: 1,
+            btype: payType,
             on_pause: false,
             nms: [nmId],
             cpm: bid,
           };
 
+          console.log(uid, campaignName, art, createParams, balance);
+
+          if (payType == 3) {
+            balance.bonus -= budget;
+          } else if (payType == 0) {
+            balance.balance -= budget;
+          } else {
+            balance.net -= budget;
+          }
+
           // console.log(uid, campaignName, createParams);
 
           const newCampaignId = parseInt(await createAutoRK(createParams));
           if (!Number.isNaN(newCampaignId)) {
-            createdAdvertsIds.push(newCampaignId);
+            createdAdvertsIds[art] = newCampaignId;
             await updatePlacementsInAutoRK(newCampaignId, artData.placements);
           }
           await new Promise((resolve) => setTimeout(resolve, 22 * 1000));
@@ -8152,7 +8934,7 @@ const createMassAdvertsMM = (uid, campaignName, data) => {
           // };
 
           const newCampaignId = parseInt(await createSearchRK(createParams));
-          createdAdvertsIds.push(newCampaignId);
+          createdAdvertsIds[art] = newCampaignId;
 
           await new Promise((resolve) => setTimeout(resolve, 62 * 1000));
         }
@@ -8437,7 +9219,7 @@ const calcRNPByDayMetricsAndWriteToJSON = () => {
 };
 
 const calcAutoEnteredValuesAndWriteToJSON = () => {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const autoPriceRules = JSON.parse(
       afs.readFileSync(path.join(__dirname, `files/autoPriceRules.json`))
     );
@@ -8489,8 +9271,8 @@ const calcAutoEnteredValuesAndWriteToJSON = () => {
           //   console.log(obor, art, parseInt(value), temp);
           if (temp === null) throw new Error(`roi couldnt be found for ${art}`);
 
-          const res = artsData[art].prime_cost * (1 + temp / 100); // new Процент наценки к себестоимости
-          // const res = temp; // old just value
+          // const res = artsData[art].prime_cost * (1 + temp / 100); // new Процент наценки к себестоимости
+          const res = temp; // old just value
           // console.log(art, res, temp);
           return { val: res, ob: temp };
         }
@@ -8511,74 +9293,81 @@ const calcAutoEnteredValuesAndWriteToJSON = () => {
       afs.readFileSync(path.join(__dirname, `files/campaigns.json`))
     ).brands;
     for (const [campaign, brands] of Object.entries(campaign_brands)) {
-      const obor_data = {};
-      const xlsx_data = xlsx.parse(
-        path.join(__dirname, `files/${campaign}/data.xlsx`)
-      );
-      for (let i = 0; i < xlsx_data.length; i++) {
-        const label_row = xlsx_data[i].data[0];
-        for (let j = 1; j < xlsx_data[i].data.length; j++) {
-          const row = xlsx_data[i].data[j];
-          const art = row[0];
-          if (art == "") continue;
-          obor_data[art] =
-            !isNaN(row[label_row.indexOf("Оборачиваемость")]) &&
-            isFinite(row[label_row.indexOf("Оборачиваемость")])
-              ? row[label_row.indexOf("Оборачиваемость")]
-              : 29; /// set default obor for undefined arts
-          // if (art == "ПР_120_ГОЛУБОЙ_ОТК_2")
-          // console.log(row[0], obor_data[row[0]]);
+      await fetchDataAndWriteToXlsx(campaign).then(() => {
+        const obor_data = {};
+        const xlsx_data = xlsx.parse(
+          path.join(__dirname, `files/${campaign}/data.xlsx`)
+        );
+        console.log("THERE", xlsx_data);
+        for (let i = 0; i < xlsx_data.length; i++) {
+          const label_row = xlsx_data[i].data[0];
+          for (let j = 1; j < xlsx_data[i].data.length; j++) {
+            const row = xlsx_data[i].data[j];
+            const art = row[0];
+            if (art == "") continue;
+            obor_data[art] =
+              !isNaN(row[label_row.indexOf("Оборачиваемость")]) &&
+              isFinite(row[label_row.indexOf("Оборачиваемость")])
+                ? row[label_row.indexOf("Оборачиваемость")]
+                : 29; /// set default obor for undefined arts
+            // if (art == "ПР_120_ГОЛУБОЙ_ОТК_2")
+            // console.log(row[0], obor_data[row[0]]);
+          }
         }
-      }
 
-      // console.log(data);
-      const jsonData = {};
-      const artsBarcodesFull = JSON.parse(
-        afs.readFileSync(
-          path.join(__dirname, "files", campaign, `artsBarcodesFull.json`)
-        )
-      );
-      const stocks = JSON.parse(
-        afs.readFileSync(path.join(__dirname, "files", campaign, `stocks.json`))
-      ).today;
-      const orders = JSON.parse(
-        afs.readFileSync(path.join(__dirname, "files", campaign, `orders.json`))
-      );
-      for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
-        const brand = art_data.brand;
-        if (!(brand_names[brand] in jsonData))
-          jsonData[brand_names[brand]] = {};
-        try {
-          const { val, ob } = find_r(
-            art,
-            brand,
-            obor_data,
-            artsBarcodesFull,
-            stocks,
-            orders
-          );
-          // console.log(art, brand, val, ob);
-          jsonData[brand_names[brand]][art] = {
-            rentabelnost: undefined,
-            roi: undefined,
-            roz_price: val,
-            spp_price: undefined,
-            obor: ob,
-          };
-          // console.log(jsonData[brand][art]);
-        } catch (e) {
-          // console.log(e);
+        // console.log(data);
+        const jsonData = {};
+        const artsBarcodesFull = JSON.parse(
+          afs.readFileSync(
+            path.join(__dirname, "files", campaign, `artsBarcodesFull.json`)
+          )
+        );
+        const stocks = JSON.parse(
+          afs.readFileSync(
+            path.join(__dirname, "files", campaign, `stocks.json`)
+          )
+        ).today;
+        const orders = JSON.parse(
+          afs.readFileSync(
+            path.join(__dirname, "files", campaign, `orders.json`)
+          )
+        );
+        for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+          const brand = art_data.brand;
+          if (!((brand_names[brand] ?? brand) in jsonData))
+            jsonData[brand_names[brand] ?? brand] = {};
+          try {
+            const { val, ob } = find_r(
+              art,
+              brand,
+              obor_data,
+              artsBarcodesFull,
+              stocks,
+              orders
+            );
+            // console.log(art, brand, val, ob);
+            jsonData[brand_names[brand] ?? brand][art] = {
+              rentabelnost: val,
+              roi: undefined,
+              roz_price: undefined,
+              spp_price: undefined,
+              obor: ob,
+            };
+            // console.log(jsonData[brand][art]);
+          } catch (e) {
+            // console.log(e);
+          }
         }
-      }
-      // if (campaign == "mayusha") console.log(jsonData);
-      afs.writeFileSync(
-        path.join(__dirname, "files", campaign, "enteredValues.json"),
-        JSON.stringify(jsonData)
-      );
-      afs.writeFileSync(
-        path.join(__dirname, "files", campaign, "oborData.json"),
-        JSON.stringify(obor_data)
-      );
+        // if (campaign == "mayusha") console.log(jsonData);
+        afs.writeFileSync(
+          path.join(__dirname, "files", campaign, "enteredValues.json"),
+          JSON.stringify(jsonData)
+        );
+        afs.writeFileSync(
+          path.join(__dirname, "files", campaign, "oborData.json"),
+          JSON.stringify(obor_data)
+        );
+      });
     }
     resolve();
   });
@@ -8754,7 +9543,8 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
   }
   // console.log(data);
   for (const [index, brand] of Object.entries(brands)) {
-    // console.log(brand);
+    console.log(brand, json_data);
+    if (!json_data[brand]) continue;
     json_data[brand][0][19] = "Наценка";
     for (let i = 1; i < json_data[brand].length; i++) {
       let row = json_data[brand][i];
@@ -8791,17 +9581,19 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
         const expences = roz_price * (arts_data[vendorCode].expences / 100);
         const prime_cost = arts_data[vendorCode].prime_cost;
         const brand_art = arts.byArt[vendorCode].brand_art;
-        const ad = advertsAvgStatsByArt[brand_art]
-          ? getRoundValue(
-              advertsAvgStatsByArt[brand_art].sum,
-              advertsAvgStatsByArt[brand_art].orders
-            )
-          : 0;
-        const drr = ad / roz_price;
-        // const drr = advertsAvgStatsByArt[mapp[campaign]]
-        //   ? advertsAvgStatsByArt[mapp[campaign]].drr / 100
+        // const type = brand_art;
+        // const type = mapp[campaign];
+        // const ad = advertsAvgStatsByArt[type]
+        //   ? getRoundValue(
+        //       advertsAvgStatsByArt[type].sum,
+        //       advertsAvgStatsByArt[type].orders
+        //     )
         //   : 0;
-        // const ad = roz_price * drr;
+        // const drr = ad / roz_price;
+        const drr = advertsAvgStatsByArt[mapp[campaign]]
+          ? advertsAvgStatsByArt[mapp[campaign]].drr / 100
+          : 0;
+        const ad = roz_price * drr;
 
         const profit =
           -ad -
@@ -8907,6 +9699,45 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
     .catch((error) => console.error(error));
 };
 
+const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
+  if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE";
+  const code = vendorCode.split("_");
+  if (code.slice(-1) == "2") code.pop();
+  if (cut_namatr && code.includes("НАМАТРАСНИК")) code.splice(1, 1);
+  else if (code.includes("КПБ")) {
+    code.splice(3, 1);
+    if (code.includes("DELICATUS")) code.pop();
+  } else if (code.includes("ФТБЛ")) {
+    if (code.includes("МАЮ")) code.splice(-2, 1);
+    else if (code.includes("СС")) code.splice(-2, 1);
+    else if (code.includes("TF")) code.splice(-2, 1);
+    if (isNaN(parseInt(code.slice(-1)))) code.splice(-1, 1);
+    else code.splice(-2, 2);
+  } else code.splice(2, 1);
+
+  if (code.includes("ЕН")) code.splice(-2, 1);
+
+  return code.join("_");
+};
+
+const getGeneralMaskFromVendorCode = (vendorCode) => {
+  const mask = getMaskFromVendorCode(vendorCode, false);
+  const mask_array = mask.split("_");
+  let campaign_flag = mask_array[mask_array.length - 1];
+  if ("САВ" == campaign_flag) mask_array.pop();
+  campaign_flag = mask_array[mask_array.length - 1];
+
+  if (["ОТК", "ТКС", "DELICATUS", "ПРК"].includes(campaign_flag))
+    mask_array.pop();
+
+  return mask_array.join("_");
+};
+
+const readIfExists = (filepath, _default = {}) => {
+  let result = _default;
+  if (afs.existsSync(filepath)) result = JSON.parse(afs.readFileSync(filepath));
+  return result;
+};
 module.exports = {
   fetchStocksFromWarehouses,
   fetchDataAndWriteToXlsx,
@@ -8967,6 +9798,7 @@ module.exports = {
   createMassAdvertsMM,
   getAdvertsStatsMM,
   getAuthTokenMM,
+  fetchBalanceMM,
   depositAdvertsBudgetsAndWriteToJsonMM,
   autoDepositAdvertsBudgetsAndWriteToJsonMM,
   setAdvertsCPMsAndWriteToJsonMM,
@@ -8987,44 +9819,9 @@ module.exports = {
   calcMassAdvertsNewAndWriteToJsonMM,
   autoAdvertsManagingMM,
   updateAdvertsManagerRulesMM,
-};
-
-const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
-  if (!vendorCode) return "NO_SUCH_MASK_AVAILABLE";
-  const code = vendorCode.split("_");
-  if (code.slice(-1) == "2") code.pop();
-  if (cut_namatr && code.includes("НАМАТРАСНИК")) code.splice(1, 1);
-  else if (code.includes("КПБ")) {
-    code.splice(3, 1);
-    if (code.includes("DELICATUS")) code.pop();
-  } else if (code.includes("ФТБЛ")) {
-    if (code.includes("МАЮ")) code.splice(-2, 1);
-    else if (code.includes("СС")) code.splice(-2, 1);
-    else if (code.includes("TF")) code.splice(-2, 1);
-    if (isNaN(parseInt(code.slice(-1)))) code.splice(-1, 1);
-    else code.splice(-2, 2);
-  } else code.splice(2, 1);
-
-  if (code.includes("ЕН")) code.splice(-2, 1);
-
-  return code.join("_");
-};
-
-const getGeneralMaskFromVendorCode = (vendorCode) => {
-  const mask = getMaskFromVendorCode(vendorCode, false);
-  const mask_array = mask.split("_");
-  let campaign_flag = mask_array[mask_array.length - 1];
-  if ("САВ" == campaign_flag) mask_array.pop();
-  campaign_flag = mask_array[mask_array.length - 1];
-
-  if (["ОТК", "ТКС", "DELICATUS", "ПРК"].includes(campaign_flag))
-    mask_array.pop();
-
-  return mask_array.join("_");
-};
-
-const readIfExists = (filepath, _default = {}) => {
-  let result = _default;
-  if (afs.existsSync(filepath)) result = JSON.parse(afs.readFileSync(filepath));
-  return result;
+  autoAdvertsStopMM,
+  getPlacements,
+  fetchBalanceWithRetry,
+  fetchAdvertWords,
+  readIfExists,
 };

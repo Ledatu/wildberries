@@ -13,6 +13,7 @@ const autoBidder = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
+        // if (campaignName != "ТОРГМАКСИМУМ") continue;
         console.log(uid, campaignName);
         promises.push(
           autoSetAdvertsCPMsAndWriteToJsonMM(uid, campaignName).then(() =>
@@ -25,5 +26,5 @@ const autoBidder = async () => {
   });
 };
 
-scheduleJob("5 * * * *", () => autoBidder());
+scheduleJob("*/10 * * * *", () => autoBidder());
 // autoBidder();

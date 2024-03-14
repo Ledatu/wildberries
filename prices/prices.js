@@ -219,6 +219,8 @@ const calcAutoPrices = (autoSend = true) => {
     campaigns.forEach(async (campaign) => {
       // promises.push(await fetchDataAndWriteToXlsx(campaign));
       promises.push(await calculateNewValuesAndWriteToXlsx(campaign));
+      console.log('herere');
+      // promises.push(await calculateNewValuesAndWriteToXlsx(campaign));
       promises.push(await writePrices(campaign));
       if (autoSend) {
         for (const [index, brand] of Object.entries(brands[campaign])) {
@@ -316,7 +318,7 @@ const fetchAdvertsMM = async () => {
               await fetchSalesAndWriteToJsonMM(uid, campaignName),
               await fetchStocksAndWriteToJsonMM(uid, campaignName),
               await fetchAdvertsBudgetsAndWriteToJsonMM(uid, campaignName),
-              await fetchAdvertsWordsAndWriteToJsonMM(uid, campaignName),
+              // await fetchAdvertsWordsAndWriteToJsonMM(uid, campaignName),
             ]).then(() => resolve(uid, campaignName, "Adverts updated."));
           })
         );

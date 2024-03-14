@@ -300,9 +300,9 @@ async function writeDrrToDataSpreadsheet(auth) {
           "Trinity Fashion": "Trinity Fashion",
         };
         // console.log(row[0]);
-        // const type = brand_names[artsBarcodesFull[row[0]].brand];
+        const type = brand_names[artsBarcodesFull[row[0]].brand];
         // const type = getMaskFromVendorCode(row[0]);
-        const type = getMaskFromVendorCode(row[0]).slice(0, 2);
+        // const type = getMaskFromVendorCode(row[0]).slice(0, 2);
         // console.log(type);
         data[i][0] = drr[type] ? drr[type].drr ?? 0 : 0;
         // console.log(campaign, type, data[i]);
@@ -375,10 +375,28 @@ async function writeLogisticsToDataSpreadsheet(auth) {
         if (row[4] != seller_ids[campaign]) continue;
         if (!arts.byArt[row[0]]) continue;
         // const brand_art = arts.byArt[row[0]].brand_art;
-        const brand_art = arts.byArt[row[0]].art;
+        // const brand_art = arts.byArt[row[0]].art;
+
+        const res = { delivery: 0, orders: 0 };
+
+        const sizes = arts.byNmId[arts.byArt[row[0]].nmId].sizes;
+        // console.log(sizes);
+        for (let i = 0; i < sizes.length; i++) {
+          const sku = sizes[i].skus[0];
+          const local_art = arts.bySku[sku].art;
+          res.delivery += logistics[local_art]
+            ? logistics[local_art].delivery ?? 50
+            : 50;
+          res.orders += logistics[local_art]
+            ? logistics[local_art].orders ?? 1
+            : 1;
+          // console.log(logistics[local_art]);
+        }
+        // console.log(res);
+
         // if (row[0] == "ПР_120_БЕЛЫЙ_ОТК") console.log(findLastSaleSpp(row[0]));
         // console.log(type, spp[type]);
-        data[i][0] = logistics[brand_art] ? logistics[brand_art].avg ?? 50 : 50;
+        data[i][0] = getRoundValue(res.delivery, res.orders);
         // console.log(
         //   campaign,
         //   type,
@@ -710,7 +728,7 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
     const jsonData = { turn: [], hours: [] };
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `РОБОТ ЦЕН 2.0!1:2000`,
+      range: `РОБОТ ЦЕН 2.0!1:3000`,
       // valueRenderOption: "UNFORMATTED_VALUE",
     });
     const rows = res.data.values;
@@ -774,9 +792,14 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
     sheetData.sort((a, b) => a[0].localeCompare(b[0], "ru-RU"));
     sheetData.sort((a, b) => a[1].localeCompare(b[1], "ru-RU"));
 
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
+      range: `РОБОТ ЦЕН 2.0!2:3000`,
+    });
+
     await sheets.spreadsheets.values.update({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
-      range: `РОБОТ ЦЕН 2.0!2:2000`,
+      range: `РОБОТ ЦЕН 2.0!2:3000`,
       valueInputOption: "USER_ENTERED",
       resource: {
         values: sheetData,
@@ -3283,5 +3306,15 @@ const indexToColumn = (index) => {
 const readIfExists = (filepath, _default = {}) => {
   let result = _default;
   if (afs.existsSync(filepath)) result = JSON.parse(afs.readFileSync(filepath));
+  return result;
+};
+
+const getRoundValue = (a, b, isPercentage = false, def = 0) => {
+  let result = b ? a / b : def;
+  if (isPercentage) {
+    result = Math.round(result * 100 * 100) / 100;
+  } else {
+    result = Math.round(result);
+  }
   return result;
 };

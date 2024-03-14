@@ -55,6 +55,8 @@ const {
   manageAdvertsActivityMM,
   calcMassAdvertsNewAndWriteToJsonMM,
   updateAdvertsManagerRulesMM,
+  readIfExists,
+  getPlacements,
 } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
@@ -335,20 +337,38 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
       )
     )
   );
+
   const massAdvertsAccount = {
     plusPhrasesTemplates: plusPhrasesTemplates,
+    balances: {},
     campaigns: {},
   };
   for (const [campaignName, _] of Object.entries(secrets)) {
     if (!massAdvertsAccount.campaigns[campaignName])
       massAdvertsAccount.campaigns[campaignName] = {};
+    if (!massAdvertsAccount.balances[campaignName])
+      massAdvertsAccount.balances[campaignName] = {};
+
     if (campaignName != (genForCampaignName ?? "ИП Валерий")) continue;
+
+    const balance = readIfExists(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        campaignName,
+        "balance.json"
+      )
+    );
+
+    getPlacements(accountUid, campaignName);
     const massAdvertsCampaign = calcMassAdvertsNewAndWriteToJsonMM(
       accountUid,
       campaignName,
       dateRange
     );
     massAdvertsAccount.campaigns[campaignName] = massAdvertsCampaign;
+    massAdvertsAccount.balances[campaignName] = balance;
   }
   res.send(JSON.stringify(massAdvertsAccount));
 });

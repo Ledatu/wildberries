@@ -25,5 +25,5 @@ const {
 // autoGenerateNewTags('delicatus', 'DELICATUS');
 // autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
 // exportAll()
-// generateTagsRaspredelenniy()
+generateTagsRaspredelenniy()
 // fetchOTKArtMathcingAndWriteToJSON()

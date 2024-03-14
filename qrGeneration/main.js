@@ -13,7 +13,7 @@ const { type } = require("os");
  * @param {String} outPath: /path/to/created.zip
  * @returns {Promise}
  */
-function  zipDirectory(sourceDir, outPath) {
+function zipDirectory(sourceDir, outPath) {
   const archive = archiver("zip", { zlib: { level: 9 } });
   const stream = fs.createWriteStream(outPath);
 
@@ -220,6 +220,7 @@ async function autoGenerateNewTags(campaign, brand) {
         Перинка: pngImageEmbed.scale(0.06),
         "Trinity Fashion": pngImageEmbed.scale(0.06),
         "Creative Cotton": pngImageEmbed.scale(0.06),
+        "SLUMBER+": pngImageEmbed.scale(0.06),
       };
       const scalar = scalars[campaign];
       page.drawImage(pngImageEmbed, {
@@ -227,6 +228,7 @@ async function autoGenerateNewTags(campaign, brand) {
         y:
           113 -
           scalar.height +
+          (campaign == "SLUMBER+" ? 42 : 0) +
           (campaign != "delicatus" && campaign != "Amaze wear" ? 4 : 0),
         width: scalar.width,
         height: scalar.height,
@@ -242,7 +244,7 @@ async function autoGenerateNewTags(campaign, brand) {
         height: barcodeDims.height,
       });
 
-      const fontSizeBig = 14;
+      const fontSizeBig = type.length > 20 ? 10 : 14;
       const type_width = openSans.widthOfTextAtSize(type, fontSizeBig);
       page.drawText(type, {
         x: (169 - type_width) / 2,
@@ -305,6 +307,16 @@ async function autoGenerateNewTags(campaign, brand) {
         )
       )
     );
+    const artsBarcodesFullMayusha = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          __dirname,
+          "../prices/files",
+          "mayusha",
+          "artsBarcodesFull.json"
+        )
+      )
+    );
 
     const logo = await loadImage(
       path.join(__dirname, "files", "logos", `${brand}.png`)
@@ -312,11 +324,18 @@ async function autoGenerateNewTags(campaign, brand) {
     );
 
     for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
-      if (art_data.brand != brand) continue;
+      // if (art_data.brand != brand) continue;
+      if (!art.includes("СЛВДР")) continue;
+
+      const otkArt = art.split("_").slice(0, 3).concat(["ОТК"]).join("_");
+      console.log(art, art_data, otkArt);
       await makePdf(
         brand,
         art_data.brand_art.toUpperCase(),
-        art_data.color.toUpperCase(),
+        art_data.color
+          ? art_data.color.toUpperCase()
+          : artsBarcodesFullMayusha[otkArt].color.toUpperCase(),
+        // art_data.color.toUpperCase(),
         art_data.object.toUpperCase(),
         art_data.barcode,
         art_data.size,
@@ -498,7 +517,6 @@ function generateTagsRaspredelenniy() {
     const promises = [];
 
     for (const [campaign, brand_data] of Object.entries(brands)) {
-      if (campaign != "perinka") continue;
       const artsBarcodesFull = JSON.parse(
         fs.readFileSync(
           path.join(
@@ -511,8 +529,10 @@ function generateTagsRaspredelenniy() {
       );
       for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
         const array = art.split("_");
-        if (!art.includes("ФТБЛ")) continue;
-        if (!art.includes("TF")) continue;
+        // if (!art.includes("СЛВДР") && !art.includes("ПРСТР")) continue;
+        // if (art.includes("СЛВДР")) {
+        //   if (parseInt(array[3]) < 3000) continue;
+        // }
         if (!art.includes("_ПРК")) {
           if (array[0] == "ПР" || array[0] == "ПРПЭ") {
             if (
