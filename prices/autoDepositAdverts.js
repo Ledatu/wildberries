@@ -26,5 +26,5 @@ const autoDepositAdverts = async () => {
   });
 };
 
-scheduleJob("10 0 * * *", () => autoDepositAdverts());
-// autoDepositAdverts();
+// scheduleJob("10 0 * * *", () => autoDepositAdverts());
+autoDepositAdverts();

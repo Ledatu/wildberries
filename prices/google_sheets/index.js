@@ -223,9 +223,8 @@ async function writeDetailedByPeriod(auth, campaign) {
       //     ? delivery[type].average_delivery
       //     : "50"
       // }`.replace(".", ",");
-      data[i][0] = `${
-        delivery[type] ? delivery[type].avg : art.includes("_ЕН") ? "150" : "50"
-      }`.replace(".", ",");
+      data[i][0] = `${delivery[type] ? delivery[type].avg : art.includes("_ЕН") ? "150" : "50"
+        }`.replace(".", ",");
       // console.log(campaign, type, data[i]);
     }
 
@@ -363,7 +362,7 @@ async function writeLogisticsToDataSpreadsheet(auth) {
       const arts = readIfExists(
         path.join(
           __dirname,
-          `../marketMaster/332fa5da-8450-451a-b859-a84ca9951a34/${mapp[campaign]}/arts.json`
+          `../marketMaster/4a1f2828-9a1e-4bbf-8e07-208ba676a806/${mapp[campaign]}/arts.json`
         )
       );
 
@@ -460,21 +459,21 @@ async function writeSppToDataSpreadsheet(auth) {
       //   await fs.readFile(
       //     path.join(
       //       __dirname,
-      //       `../marketMaster/332fa5da-8450-451a-b859-a84ca9951a34/${mapp[campaign]}/sales.json`
+      //       `../marketMaster/4a1f2828-9a1e-4bbf-8e07-208ba676a806/${mapp[campaign]}/sales.json`
       //     )
       //   )
       // );
       const sppData = readIfExists(
         path.join(
           __dirname,
-          `../marketMaster/332fa5da-8450-451a-b859-a84ca9951a34/${mapp[campaign]}/sppData.json`
+          `../marketMaster/4a1f2828-9a1e-4bbf-8e07-208ba676a806/${mapp[campaign]}/sppData.json`
         )
       );
       const arts = JSON.parse(
         await fs.readFile(
           path.join(
             __dirname,
-            `../marketMaster/332fa5da-8450-451a-b859-a84ca9951a34/${mapp[campaign]}/arts.json`
+            `../marketMaster/4a1f2828-9a1e-4bbf-8e07-208ba676a806/${mapp[campaign]}/arts.json`
           )
         )
       );
@@ -577,7 +576,7 @@ async function calcAndWriteMinZakazToDataSpreadsheet(auth) {
       if (!max_zakaz) return art.includes("ФТБЛ") ? 1 : 1;
       return Math.ceil(
         (Math.ceil(max_zakaz / 2) * arts_data[art].pref_obor) /
-          arts_data[art].multiplicity
+        arts_data[art].multiplicity
       );
     };
 
@@ -757,8 +756,8 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
         // console.log(turn, jsonData[brand][art], jsonData[brand][art][turn]);
         jsonData[brand][art][turn] = row[j]
           ? parseFloat(
-              row[j].replace("%", "").replace(",", ".").replace(/\s/g, "")
-            )
+            row[j].replace("%", "").replace(",", ".").replace(/\s/g, "")
+          )
           : null;
       }
     }
@@ -1019,23 +1018,23 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
         data[brand][row[0]] = {
           rentabelnost: row[14]
             ? Number(
-                row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
-              )
+              row[14].replace("%", "").replace(",", ".").replace(/\s/g, "")
+            )
             : undefined,
           roi: row[15]
             ? Number(
-                row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
-              )
+              row[15].replace("%", "").replace(",", ".").replace(/\s/g, "")
+            )
             : undefined,
           roz_price: row[16]
             ? Number(
-                row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
-              )
+              row[16].replace("%", "").replace(",", ".").replace(/\s/g, "")
+            )
             : undefined,
           spp_price: row[17]
             ? Number(
-                row[17].replace("%", "").replace(",", ".").replace(/\s/g, "")
-              )
+              row[17].replace("%", "").replace(",", ".").replace(/\s/g, "")
+            )
             : undefined,
         };
       });
@@ -1255,7 +1254,7 @@ function updateRNP(auth) {
           jsonData[brand][metric].month.done = jsonData[brand][metric].month
             .plan
             ? jsonData[brand][metric].month.fact /
-              jsonData[brand][metric].month.plan
+            jsonData[brand][metric].month.plan
             : 0;
 
           if (metric_formula == "sum") {
@@ -1267,7 +1266,7 @@ function updateRNP(auth) {
               metric
             ].month.plan
               ? jsonData[brand][metric].month.prediction /
-                jsonData[brand][metric].month.plan
+              jsonData[brand][metric].month.plan
               : 0;
           }
           // else {
@@ -1300,7 +1299,7 @@ function updateRNP(auth) {
               str_date
             ].plan
               ? jsonData[brand][metric][str_date].fact /
-                jsonData[brand][metric][str_date].plan
+              jsonData[brand][metric][str_date].plan
               : 0;
           }
         }
@@ -1537,8 +1536,7 @@ function updatePlanFact(auth, campaign) {
           const index_of_column = i * unique_params.length + j + 2;
           const column_name = indexToColumn(index_of_column);
           formulas_to_concat.push(
-            `=${
-              param_map[unique_params[j]].formula
+            `=${param_map[unique_params[j]].formula
             }(${column_name}4:${column_name})`
           );
         }
@@ -1685,11 +1683,11 @@ function updatePlanFact(auth, campaign) {
             if (dates_datas[str_date][all_masks[j]]) {
               const date_sum_orders =
                 dates_datas[str_date][all_masks[j]][
-                  unique_params.indexOf("Заказы/Р")
+                unique_params.indexOf("Заказы/Р")
                 ];
               const date_sum =
                 dates_datas[str_date][all_masks[j]][
-                  unique_params.indexOf("Расход")
+                unique_params.indexOf("Расход")
                 ];
               avg_drr_by_mask[generalMaskForDrr].sum += isFinite(date_sum)
                 ? date_sum
@@ -1709,7 +1707,7 @@ function updatePlanFact(auth, campaign) {
                 generalMaskForDrr
               ].sum_orders
                 ? avg_drr_by_mask[generalMaskForDrr].sum /
-                  avg_drr_by_mask[generalMaskForDrr].sum_orders
+                avg_drr_by_mask[generalMaskForDrr].sum_orders
                 : 0;
             }
           }
@@ -1735,7 +1733,7 @@ function updatePlanFact(auth, campaign) {
         jsonDataDrr[generalMaskForDrr].drr = jsonDataDrr[generalMaskForDrr]
           .sum_orders
           ? jsonDataDrr[generalMaskForDrr].sum /
-            jsonDataDrr[generalMaskForDrr].sum_orders
+          jsonDataDrr[generalMaskForDrr].sum_orders
           : 0;
 
         jsonDataDrr[mask] = mask_data;
@@ -1765,11 +1763,10 @@ function updatePlanFact(auth, campaign) {
               drr: 0,
             };
 
-          advertStatsByMaskByDay[brand][str_date].stocks = `${
-            stocksRatio.byDate.byBrand[brand]
+          advertStatsByMaskByDay[brand][str_date].stocks = `${stocksRatio.byDate.byBrand[brand]
               ? stocksRatio.byDate.byBrand[brand][str_date]
               : 0
-          }/${stocksRatio.all.byBrand[brand]}`;
+            }/${stocksRatio.all.byBrand[brand]}`;
           advertStatsByMaskByDay[brand][str_date].orders = byDayCampaignSum[
             brand
           ]
@@ -1795,7 +1792,7 @@ function updatePlanFact(auth, campaign) {
           for (let j = 0; j < unique_params.length; j++) {
             to_push.push(
               advertStatsByMaskByDay[brand][str_date][
-                param_map[unique_params[j]].name
+              param_map[unique_params[j]].name
               ] ?? 0
             );
           }
@@ -2093,17 +2090,15 @@ function updateFactStatsByRK(auth, campaign) {
         // console.log(result);
       }
 
-      result.stocks = `${
-        parseInt(
-          Math.round(
-            (result.stocks / (date_range.from - date_range.to + 1)) * 10
-          )
-        ) / 10
-      }/${
-        nms_to_sum_orders[0]
+      result.stocks = `${parseInt(
+        Math.round(
+          (result.stocks / (date_range.from - date_range.to + 1)) * 10
+        )
+      ) / 10
+        }/${nms_to_sum_orders[0]
           ? stocksRatio.all[getMaskFromVendorCode(nms_to_sum_orders[0])]
           : 0
-      }`;
+        }`;
 
       result.drr = result.sum / result.sum_orders;
       result.avg_bill = result.sum_orders / result.orders;
@@ -2552,10 +2547,10 @@ function updateAnalyticsOrders(auth, campaign) {
 
             const analytics_data =
               new Date(st) >= new Date(advertsCreateDate[mask].createTime) &&
-              afs.existsSync(path.join(mainDlDir, `${date}.xlsx`))
+                afs.existsSync(path.join(mainDlDir, `${date}.xlsx`))
                 ? xlsx
-                    .parse(path.join(mainDlDir, `${date}.xlsx`))[0]
-                    .data.slice(-1)[0]
+                  .parse(path.join(mainDlDir, `${date}.xlsx`))[0]
+                  .data.slice(-1)[0]
                 : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
             // console.log(mainDlDir, analytics_data);
@@ -2568,7 +2563,7 @@ function updateAnalyticsOrders(auth, campaign) {
               rashod: parseInt(
                 String(
                   analytics_data[
-                    new Date(st) >= new Date("2023-07-14") ? 11 : 9
+                  new Date(st) >= new Date("2023-07-14") ? 11 : 9
                   ]
                 ).replace(/\s/g, "")
               ),
@@ -2636,8 +2631,8 @@ function updateAnalyticsOrders(auth, campaign) {
                 // ], temp[masks[j]][st], `${key}: ${value}`);
                 sheet_data[i][
                   1 +
-                    j * Object.keys(temp[masks[j]][st]).length +
-                    maskValuesStrartIndex
+                  j * Object.keys(temp[masks[j]][st]).length +
+                  maskValuesStrartIndex
                 ] = value;
                 maskValuesStrartIndex += 1;
               }
@@ -2805,8 +2800,8 @@ function updateLowRatingStocksSheet(auth) {
             data.feedbacksCount,
             data.feedbacksCount
               ? Math.ceil(
-                  (data.feedbacksCount * (4.7 - data.valuation ?? 0)) / 0.3
-                )
+                (data.feedbacksCount * (4.7 - data.valuation ?? 0)) / 0.3
+              )
               : 3,
             stocks[vendorCode] ?? 0,
             find_spp(vendorCode, spp_price_sheet),
@@ -3016,6 +3011,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
     try {
       const title = sourceSheet.properties.title;
       if (title == "Остатки руч.") continue;
+      if (title == "РОБОТ ЦЕН 2.0") continue;
       const sheet_data = await get_data(title);
       console.log(title, sheet_data);
 
@@ -3100,6 +3096,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
           },
         });
         await update_data(mask_title, mask_sheet_data);
+        await new Promise(resolve => setTimeout(resolve, 2 * 1000));
       }
     } catch (err) {
       console.error(err);

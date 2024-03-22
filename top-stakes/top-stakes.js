@@ -23,10 +23,10 @@ scheduleJob("58 * * * *", () => {
   calcAutoPrices();
 });
 scheduleJob("10 * * * *", () => RNPupdation());
-scheduleJob("58 * * * *", () => {
-  const now = new Date();
-  calcAndSendTrendsToTg(now);
-});
+// scheduleJob("58 * * * *", () => {
+//   const now = new Date();
+//   calcAndSendTrendsToTg(now);
+// });
 const flagFile = "top-stakes-flag.txt";
 
 function cleanup() {

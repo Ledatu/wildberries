@@ -7,18 +7,35 @@ const { scrapeWildberriesData } = require("./scraper");
 const getTopPhrases = async (uid, campaignName) => {
   const topPhrases = [];
 
-  const advertsManagerRules = readIfExists(
-    path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsManagerRules.json"
-    )
-  );
-  const advertsWords = readIfExists(
-    path.join(__dirname, "marketMaster", uid, campaignName, "advertsWords.json")
-  );
+  let advertsManagerRules = undefined
+  try {
+    advertsManagerRules = readIfExists(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsManagerRules.json"
+      )
+    );
+  }
+  catch (e) {
+    console.log(e);
+    return []
+  }
+
+  let advertsWords = undefined
+  try {
+    advertsWords = readIfExists(
+      path.join(__dirname, "marketMaster", uid, campaignName, "advertsWords.json")
+    );
+  }
+  catch (e) {
+    console.log(e);
+    return []
+  }
+
+
   for (const [art, advertsTypes] of Object.entries(advertsManagerRules)) {
     const topPhrase = {};
 
@@ -32,10 +49,30 @@ const getTopPhrases = async (uid, campaignName) => {
       const words = advertsWords[advertId];
       if (!words) continue;
       if (advertsType == "search") {
-        const { keywords } = words.words ?? {};
+        const { keywords, pluse } = words.words ?? {};
         if (!keywords || !keywords.length) continue;
 
+        if (pluse) {
+          for (let j = 0; j < pluse.length; j++) {
+            const keyword = pluse[j];
+            const { stat } = advertsWords[advertId];
+            if (!stat[keyword]) continue;
+            const { views } = stat[keyword] ?? {};
+            // console.log(stat[keyword], keyword);
+            keywords.push({
+              keyword: keyword,
+              count: views,
+            });
+          }
+        }
+
+        keywords.sort((a, b) => b.count - a.count);
+
         const top = keywords[0];
+        // for (const key of keywords) {
+        //   if (!topPhrases.includes(key.keyword))
+        //     topPhrases.push(key.keyword);
+        // }
         // console.log(art, advertsType, top);
 
         if (!topPhrase.count || topPhrase.count < top.count) {
@@ -48,6 +85,10 @@ const getTopPhrases = async (uid, campaignName) => {
         if (!clusters || !clusters.length) continue;
 
         const top = clusters[0];
+        // for (const key of clusters) {
+        //   if (!topPhrases.includes(key.cluster))
+        //     topPhrases.push(key.cluster);
+        // }
 
         if (!topPhrase.count || topPhrase.count < top.count) {
           topPhrase.phrase = top.cluster;
@@ -66,11 +107,17 @@ const getTopPhrases = async (uid, campaignName) => {
 };
 
 const start = async () => {
+
   while (true) {
-    const customers = readIfExists(
-      path.join(__dirname, "marketMaster", "customers.json")
-    );
-    const topPhrases = [];
+    let customers = undefined
+    try {
+      customers = readIfExists(
+        path.join(__dirname, "marketMaster", "customers.json")
+      );
+    }
+    catch (e) { continue }
+
+    const topPhrases = []
     for (const [uid, customerData] of Object.entries(customers)) {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
@@ -86,15 +133,26 @@ const start = async () => {
       }
     }
     console.log(topPhrases, topPhrases.length);
+    // await scrapeWildberriesData(topPhrases)
 
-    const placements = await scrapeWildberriesData(topPhrases);
-
-    fs.writeFileSync(
-      path.join(__dirname, "placements.json"),
-      JSON.stringify(placements)
-    );
+    const batches = []
+    for (let i = 0; i < topPhrases.length; i++) {
+      // console.log(i, i % (topPhrases.length / 10));
+      if (i % Math.ceil(topPhrases.length / 100) == 0) {
+        batches.push([]);
+      }
+      batches[batches.length - 1].push(topPhrases[i])
+    }
+    const batchProms = []
+    // console.log(topPhrases.length);
+    for (let i = 0; i < batches.length; i++) {
+      batchProms.push(scrapeWildberriesData(batches[i]));
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    await Promise.all(batchProms);
   }
+
 };
 
 start();
-//  scheduleJob("31 * * * *", () => start());
+//  scheduleJob("*/10 * * * *", () => start());

@@ -10,19 +10,19 @@ const autoSetMinusPhrases = async (uid, campaignName) => {
   let lastUpdate = undefined;
   await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
   while (true) {
-    if (
-      lastUpdate &&
-      (new Date().getTime() - lastUpdate.getTime()) / 1000 < 900
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
-      continue;
-    }
+    // if (
+    //   lastUpdate &&
+    //   (new Date().getTime() - lastUpdate.getTime()) / 1000 < 120
+    // ) {
+    //   await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
+    //   continue;
+    // }
     await fetchAdvertsWordsAndWriteToJsonMM(uid, campaignName);
     await autoSetMinusPhrasesMM(uid, campaignName).then(() =>
       console.log(uid, campaignName, "Adverts minus phrases set.")
     );
     lastUpdate = new Date();
-    // await new Promise((resolve) => setTimeout(resolve, 10 * 61 * 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
   }
 };
 
