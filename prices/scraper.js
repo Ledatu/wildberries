@@ -26,6 +26,7 @@ async function scrapeWildberriesData(searchPhrases) {
 
     const allCardDataList = { updateTime: undefined };
 
+    let firstAdvertIndexFlag = 0;
     let retryCount = 0;
     for (let page = 1; page <= 3; page++) {
       // retryCount = 0;
@@ -53,19 +54,25 @@ async function scrapeWildberriesData(searchPhrases) {
         // Save the data to a file or do further processing
         let old = undefined
         try {
-          old = readIfExists(path.join(directory, `${searchPhrase.replace(/\s/g, "_")}.json`));
+          old = readIfExists(path.join(directory, `${searchPhrase.replace(/\s/g, "_").replace(/\//g, "_")}.json`));
         }
         catch (e) { return }
         // fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 
         // Update allCardDataList with the fetched data
         // You can customize this part based on the structure of the response data
+
+
         if (data && data.data && data.data.products && data.data.products.length == 100) {
           const myData = {}
           for (let i = 0; i < data.data.products.length; i++) {
+
             const cur = data.data.products[i];
-            const { id } = cur;
             cur.index = i + 1 + ((page - 1) * 100);
+            const { id, log } = cur;
+            if (page == 1) {
+              if (log && log.cpm && !firstAdvertIndexFlag) { firstAdvertIndexFlag = 1; allCardDataList.firstAdvertIndex = cur.index; }
+            }
             cur.prevIndex = old ? old.data ? old.data[id] ? old.data[id].index : undefined : undefined : undefined;
             cur.prevPrevIndex = old ? old.data ? old.data[id] ? old.data[id].prevIndex : undefined : undefined : undefined;
             myData[id] = cur;
@@ -100,7 +107,7 @@ async function scrapeWildberriesData(searchPhrases) {
 
       allCardDataList.updateTime = new Date().toISOString();
 
-      const allDataFilePath = path.join(directory, `${searchPhrase.replace(/\s/g, "_").replace(/\\/g, "_")}.json`);
+      const allDataFilePath = path.join(directory, `${searchPhrase.replace(/\s/g, "_").replace(/\//g, "_")}.json`);
       fs.writeFileSync(allDataFilePath, JSON.stringify(allCardDataList, null, 2));
 
       scrapedData[searchPhrase] = allCardDataList;

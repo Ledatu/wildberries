@@ -5,6 +5,7 @@ const path = require("path");
 
 const autoDepositAdverts = async () => {
   return new Promise(async (resolve, reject) => {
+    console.log(new Date())
     const customers = JSON.parse(
       fs.readFileSync(path.join(__dirname, "marketMaster", "customers.json"))
     );
@@ -25,6 +26,9 @@ const autoDepositAdverts = async () => {
     await Promise.all(promises).then(() => resolve());
   });
 };
-
-// scheduleJob("10 0 * * *", () => autoDepositAdverts());
-autoDepositAdverts();
+scheduleJob("1 * * * *", () => {
+  if (new Date().getHours() != 1) { console.log('Too early.');; return; }
+  autoDepositAdverts();
+});
+// autoDepositAdverts();
+// scheduleJob("22 22 * * *", () => { console.log('MEMEME'); });  

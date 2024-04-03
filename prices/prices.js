@@ -314,11 +314,11 @@ const fetchAdvertsMM = async () => {
           new Promise(async (resolve, reject) => {
             Promise.all([
               await fetchArtsAndWriteToJsonMM(uid, campaignName),
+              await new Promise(resolve => setTimeout(resolve, 15 * 1000)),
               await fetchOrdersAndWriteToJsonMM(uid, campaignName),
               await fetchSalesAndWriteToJsonMM(uid, campaignName),
               await fetchStocksAndWriteToJsonMM(uid, campaignName),
               await fetchAdvertsBudgetsAndWriteToJsonMM(uid, campaignName),
-              // await fetchAdvertsWordsAndWriteToJsonMM(uid, campaignName),
             ]).then(() => resolve(uid, campaignName, "Adverts updated."));
           })
         );

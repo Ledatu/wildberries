@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { fetchOrdersAndWriteToJsonMM, readIfExists } = require("./main");
 
 const autoTest = async () => {
   return new Promise(async (resolve, reject) => {
@@ -12,18 +13,31 @@ const autoTest = async () => {
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
         console.log(uid, campaignName);
-        // if (campaignName != "ИП Валерий" && campaignName != "ТОРГМАКСИМУМ") {
-          // fs.writeFileSync(
-          //   path.join(
-          //     __dirname,
-          //     "marketMaster",
-          //     uid,
-          //     campaignName,
-          //     "advertsPlusPhrasesTemplates.json"
-          //   ),
-          //   JSON.stringify({})
-          // );
-        // }
+
+        const advertsAutoBidsRulesPath = path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsAutoBidsRules.json"
+        );
+        const advertsAutoBidsRules = readIfExists(advertsAutoBidsRulesPath);
+        let needToChange = false;
+        for (const [art, artData] of Object.entries(advertsAutoBidsRules)) {
+          // console.log(art, artData);
+          if (artData.placementsRange.from != artData.placementsRange.to) {
+            needToChange = true;
+            const median = Math.ceil((artData.placementsRange.to - artData.placementsRange.from) / 2)
+            artData.placementsRange.from = median;
+            artData.placementsRange.to = median;
+            advertsAutoBidsRules[art] = artData;
+          }
+        }
+
+        if (needToChange) {
+          console.log(uid, campaignName, 'advertsAutoBidsRules updated');
+          fs.writeFileSync(advertsAutoBidsRulesPath, JSON.stringify(advertsAutoBidsRules))
+        }
       }
     }
     await Promise.all(promises).then(() => resolve());

@@ -8,6 +8,7 @@ const getTopPhrases = async (uid, campaignName) => {
   const topPhrases = [];
 
   let advertsManagerRules = undefined
+  let advertsSelectedPhrases = undefined
   try {
     advertsManagerRules = readIfExists(
       path.join(
@@ -16,6 +17,15 @@ const getTopPhrases = async (uid, campaignName) => {
         uid,
         campaignName,
         "advertsManagerRules.json"
+      )
+    );
+    advertsSelectedPhrases = readIfExists(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsSelectedPhrases.json"
       )
     );
   }
@@ -39,61 +49,68 @@ const getTopPhrases = async (uid, campaignName) => {
   for (const [art, advertsTypes] of Object.entries(advertsManagerRules)) {
     const topPhrase = {};
 
-    if (!art || !advertsTypes) continue;
-    for (const [advertsType, rules] of Object.entries(advertsTypes)) {
-      if (!advertsType || !rules) continue;
-      const { advertId, mode } = rules;
-      if (!advertId || !mode) continue;
-      //   console.log(art, advertsType, rules);
+    if (advertsSelectedPhrases[art] && advertsSelectedPhrases[art].phrase) {
+      topPhrase.count = 10;
+      topPhrase.phrase = advertsSelectedPhrases[art].phrase;
+    }
+    else {
 
-      const words = advertsWords[advertId];
-      if (!words) continue;
-      if (advertsType == "search") {
-        const { keywords, pluse } = words.words ?? {};
-        if (!keywords || !keywords.length) continue;
+      if (!art || !advertsTypes) continue;
+      for (const [advertsType, rules] of Object.entries(advertsTypes)) {
+        if (!advertsType || !rules) continue;
+        const { advertId, mode } = rules;
+        if (!advertId || !mode) continue;
+        //   console.log(art, advertsType, rules);
 
-        if (pluse) {
-          for (let j = 0; j < pluse.length; j++) {
-            const keyword = pluse[j];
-            const { stat } = advertsWords[advertId];
-            if (!stat[keyword]) continue;
-            const { views } = stat[keyword] ?? {};
-            // console.log(stat[keyword], keyword);
-            keywords.push({
-              keyword: keyword,
-              count: views,
-            });
+        const words = advertsWords[advertId];
+        if (!words) continue;
+        if (advertsType == "search") {
+          const { keywords, pluse } = words.words ?? {};
+          if (!keywords || !keywords.length) continue;
+
+          if (pluse) {
+            for (let j = 0; j < pluse.length; j++) {
+              const keyword = pluse[j];
+              const { stat } = advertsWords[advertId];
+              if (!stat[keyword]) continue;
+              const { views } = stat[keyword] ?? {};
+              // console.log(stat[keyword], keyword);
+              keywords.push({
+                keyword: keyword,
+                count: views,
+              });
+            }
           }
-        }
 
-        keywords.sort((a, b) => b.count - a.count);
+          keywords.sort((a, b) => b.count - a.count);
 
-        const top = keywords[0];
-        // for (const key of keywords) {
-        //   if (!topPhrases.includes(key.keyword))
-        //     topPhrases.push(key.keyword);
-        // }
-        // console.log(art, advertsType, top);
+          const top = keywords[0];
+          // for (const key of keywords) {
+          //   if (!topPhrases.includes(key.keyword))
+          //     topPhrases.push(key.keyword);
+          // }
+          // console.log(art, advertsType, top);
 
-        if (!topPhrase.count || topPhrase.count < top.count) {
-          topPhrase.phrase = top.keyword;
-          topPhrase.count = top.count;
-          //   console.log(art, advertsType, topPhrase);
-        }
-      } else {
-        const { clusters } = words ?? {};
-        if (!clusters || !clusters.length) continue;
+          if (!topPhrase.count || topPhrase.count < top.count) {
+            topPhrase.phrase = top.keyword;
+            topPhrase.count = top.count;
+            //   console.log(art, advertsType, topPhrase);
+          }
+        } else {
+          const { clusters } = words ?? {};
+          if (!clusters || !clusters.length) continue;
 
-        const top = clusters[0];
-        // for (const key of clusters) {
-        //   if (!topPhrases.includes(key.cluster))
-        //     topPhrases.push(key.cluster);
-        // }
+          const top = clusters[0];
+          // for (const key of clusters) {
+          //   if (!topPhrases.includes(key.cluster))
+          //     topPhrases.push(key.cluster);
+          // }
 
-        if (!topPhrase.count || topPhrase.count < top.count) {
-          topPhrase.phrase = top.cluster;
-          topPhrase.count = top.count;
-          //   console.log(art, advertsType, topPhrase);
+          if (!topPhrase.count || topPhrase.count < top.count) {
+            topPhrase.phrase = top.cluster;
+            topPhrase.count = top.count;
+            //   console.log(art, advertsType, topPhrase);
+          }
         }
       }
     }

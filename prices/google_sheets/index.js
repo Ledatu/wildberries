@@ -391,7 +391,8 @@ async function writeLogisticsToDataSpreadsheet(auth) {
             : 1;
           // console.log(logistics[local_art]);
         }
-        // console.log(res);
+        // if (row[0] == 'КПБ_1.5_СЛВДР_2496_ОТК')
+        //   console.log(res, logistics[row[0]]);
 
         // if (row[0] == "ПР_120_БЕЛЫЙ_ОТК") console.log(findLastSaleSpp(row[0]));
         // console.log(type, spp[type]);
@@ -725,6 +726,7 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
     const sheets = google.sheets({ version: "v4", auth });
 
     const jsonData = { turn: [], hours: [] };
+    const temp_jsonData = { turn: [], hours: [] };
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `РОБОТ ЦЕН 2.0!1:3000`,
@@ -739,28 +741,32 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
 
     jsonData.hours = ["00", "05", "11", "17"];
     jsonData.turn = label_row.slice(brand_index + 1, brand_index + 9);
+    temp_jsonData.hours = ["00", "05", "11", "17"];
+    temp_jsonData.turn = label_row.slice(brand_index + 1, brand_index + 9);
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row[art_index] || row[art_index] == "") continue;
 
       const brand = row[brand_index];
-      if (!(brand in jsonData)) jsonData[brand] = {};
+      if (!(brand in temp_jsonData)) temp_jsonData[brand] = {};
 
       const art = row[art_index];
-      if (!(art in jsonData[brand])) jsonData[brand][art] = {};
+      if (!(art in temp_jsonData[brand])) temp_jsonData[brand][art] = {};
 
       // console.log(row, art, brand);
       for (let j = brand_index + 1; j < brand_index + 9; j++) {
-        const turn = jsonData.turn[j - 2];
+        const turn = temp_jsonData.turn[j - 2];
         // console.log(turn, jsonData[brand][art], jsonData[brand][art][turn]);
-        jsonData[brand][art][turn] = row[j]
+        temp_jsonData[brand][art][turn] = row[j]
           ? parseFloat(
             row[j].replace("%", "").replace(",", ".").replace(/\s/g, "")
           )
           : null;
       }
     }
+
+
 
     const campaigns = readIfExists(
       path.join(__dirname, "../files/campaigns.json")
@@ -773,6 +779,9 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
       for (const [art, artData] of Object.entries(arts)) {
         const { brand } = artData;
         if (!jsonData[brand]) jsonData[brand] = {};
+
+        jsonData[brand][art] = temp_jsonData[brand][art];
+
         if (!jsonData[brand][art]) jsonData[brand][art] = {};
       }
     }
@@ -1764,8 +1773,8 @@ function updatePlanFact(auth, campaign) {
             };
 
           advertStatsByMaskByDay[brand][str_date].stocks = `${stocksRatio.byDate.byBrand[brand]
-              ? stocksRatio.byDate.byBrand[brand][str_date]
-              : 0
+            ? stocksRatio.byDate.byBrand[brand][str_date]
+            : 0
             }/${stocksRatio.all.byBrand[brand]}`;
           advertStatsByMaskByDay[brand][str_date].orders = byDayCampaignSum[
             brand
@@ -3034,8 +3043,8 @@ async function copyZakazToOtherSpreadsheet(auth) {
 
         if (
           (mask == "СТРАЙП" && title == "DELICATUS") ||
-          mask.includes("НАМАТРАСНИК") ||
-          (mask.includes("МОНТЕ") && title == "DELICATUS")
+
+          (mask.includes("МОНТЕ"))
         )
           continue;
         if (!masks.includes(mask)) masks.push(mask);

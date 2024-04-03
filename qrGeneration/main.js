@@ -325,7 +325,7 @@ async function autoGenerateNewTags(campaign, brand) {
 
     for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
       // if (art_data.brand != brand) continue;
-      if (!art.includes("СЛВДР")) continue;
+      if (!art.includes("НАМАТРАСНИК")) continue;
 
       const otkArt = art.split("_").slice(0, 3).concat(["ОТК"]).join("_");
       console.log(art, art_data, otkArt);
@@ -529,7 +529,7 @@ function generateTagsRaspredelenniy() {
       );
       for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
         const array = art.split("_");
-        // if (!art.includes("СЛВДР") && !art.includes("ПРСТР")) continue;
+        if (!art.includes("НАМАТРАСНИК") || !art.includes("ТКС")) continue;
         // if (art.includes("СЛВДР")) {
         //   if (parseInt(array[3]) < 3000) continue;
         // }

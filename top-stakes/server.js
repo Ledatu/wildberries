@@ -57,6 +57,7 @@ const {
   updateAdvertsManagerRulesMM,
   readIfExists,
   getPlacements,
+  updateAdvertsSelectedPhrasesMM,
 } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
@@ -252,27 +253,35 @@ app.post("/api/getDeliveryOrders", authenticateToken, (req, res) => {
 
 app.post("/api/setPlusPhraseTemplate", authenticateToken, (req, res) => {
   const accountUid = req.body.uid;
+  const campaignName = req.body.campaignName;
   const data = req.body.data;
   if (!accountUid || accountUid == "") return;
 
-  const plusPhrasesTemplates = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        __dirname,
-        "../prices/marketMaster",
-        accountUid,
-        "plusPhrasesTemplates.json"
-      )
+  const plusPhrasesTemplates = readIfExists(
+    path.join(
+      __dirname,
+      "../prices/marketMaster",
+      accountUid,
+      campaignName,
+      "plusPhrasesTemplates.json"
     )
-  );
+  )
+
+  data.updateTime = new Date().toISOString();
+
   if (data.mode == "Установить") plusPhrasesTemplates[data.name] = data;
   else if (data.mode == "Удалить") plusPhrasesTemplates[data.name] = undefined;
+  else if (data.mode == "Переименовать") {
+    plusPhrasesTemplates[data.oldName] = undefined;
+    plusPhrasesTemplates[data.name] = data;
+  };
 
   fs.writeFileSync(
     path.join(
       __dirname,
       "../prices/marketMaster",
       accountUid,
+      campaignName,
       "plusPhrasesTemplates.json"
     ),
     JSON.stringify(plusPhrasesTemplates)
@@ -291,18 +300,9 @@ app.post("/api/getMassAdverts", authenticateToken, (req, res) => {
       path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
     )
   ).byCampaignName;
-  const plusPhrasesTemplates = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        __dirname,
-        "../prices/marketMaster",
-        accountUid,
-        "plusPhrasesTemplates.json"
-      )
-    )
-  );
+
   const massAdvertsAccount = {
-    plusPhrasesTemplates: plusPhrasesTemplates,
+    plusPhrasesTemplates: {},
     campaigns: {},
   };
   for (const [campaignName, _] of Object.entries(secrets)) {
@@ -311,6 +311,16 @@ app.post("/api/getMassAdverts", authenticateToken, (req, res) => {
       campaignName,
       dateRange
     );
+    const plusPhrasesTemplates = readIfExists(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        campaignName,
+        "plusPhrasesTemplates.json"
+      )
+    );
+    massAdvertsAccount.plusPhrasesTemplates[campaignName] = plusPhrasesTemplates;
     massAdvertsAccount.campaigns[campaignName] = massAdvertsCampaign;
   }
   res.send(JSON.stringify(massAdvertsAccount));
@@ -327,19 +337,10 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
       path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
     )
   ).byCampaignName;
-  const plusPhrasesTemplates = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        __dirname,
-        "../prices/marketMaster",
-        accountUid,
-        "plusPhrasesTemplates.json"
-      )
-    )
-  );
 
   const massAdvertsAccount = {
-    plusPhrasesTemplates: plusPhrasesTemplates,
+    fetchedPlacements: {},
+    plusPhrasesTemplates: {},
     balances: {},
     campaigns: {},
   };
@@ -348,6 +349,8 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
       massAdvertsAccount.campaigns[campaignName] = {};
     if (!massAdvertsAccount.balances[campaignName])
       massAdvertsAccount.balances[campaignName] = {};
+    if (!massAdvertsAccount.plusPhrasesTemplates[campaignName])
+      massAdvertsAccount.plusPhrasesTemplates[campaignName] = {};
 
     if (campaignName != (genForCampaignName ?? "ИП Валерий")) continue;
 
@@ -369,6 +372,16 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
     );
     massAdvertsAccount.campaigns[campaignName] = massAdvertsCampaign;
     massAdvertsAccount.balances[campaignName] = balance;
+    const plusPhrasesTemplates = readIfExists(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        campaignName,
+        "plusPhrasesTemplates.json"
+      )
+    );
+    massAdvertsAccount.plusPhrasesTemplates[campaignName] = plusPhrasesTemplates;
   }
   res.send(JSON.stringify(massAdvertsAccount));
 });
@@ -382,6 +395,19 @@ app.post("/api/updateAdvertsManagerRules", authenticateToken, (req, res) => {
   if (!data || data == "") return;
 
   updateAdvertsManagerRulesMM(accountUid, campaignName, data).then((pr) =>
+    res.send(pr)
+  );
+});
+
+app.post("/api/updateAdvertsSelectedPhrases", authenticateToken, (req, res) => {
+  const accountUid = req.body.uid;
+  const campaignName = req.body.campaignName;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  updateAdvertsSelectedPhrasesMM(accountUid, campaignName, data).then((pr) =>
     res.send(pr)
   );
 });

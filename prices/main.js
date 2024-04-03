@@ -6,7 +6,7 @@ const afs = require("fs");
 const path = require("path");
 const { fetchHandStocks, sendEmail } = require("./google_sheets");
 const TelegramBot = require("node-telegram-bot-api");
-const { log, error } = require("console");
+const csv = require("csvtojson");
 
 const sortData = (data) => {
   const header = data.shift(); // Remove the header row and store it in a variable
@@ -121,13 +121,13 @@ const getAdvertInfo = (authToken, params) => {
 
 const createDelayedGenTask = (authToken, params) => {
   return axios
-    .post(
-      "https://statistics-api.wildberries.ru/api/v1/delayed-gen/tasks/create",
-      params,
+    .get(
+      "https://seller-analytics-api.wildberries.ru/api/v1/paid_storage",
       {
         headers: {
           Authorization: authToken,
         },
+        params: params,
       }
     )
     .then((response) => response.data)
@@ -209,11 +209,10 @@ async function fetchBalanceWithRetry(uid, campaignName) {
 
 const getDelayedGenTasksStatus = (authToken, params) => {
   return axios
-    .get("https://statistics-api.wildberries.ru/api/v1/delayed-gen/tasks", {
+    .get(`https://seller-analytics-api.wildberries.ru/api/v1/paid_storage/tasks/${params.ids[0]}/status`, {
       headers: {
         Authorization: authToken,
       },
-      data: params,
     })
     .then((response) => response.data)
     .catch((error) => console.log(error.response.data));
@@ -222,12 +221,11 @@ const getDelayedGenTasksStatus = (authToken, params) => {
 const downloadDelayedGenTaskData = (authToken, params) => {
   return axios
     .get(
-      "https://statistics-api.wildberries.ru/api/v1/delayed-gen/tasks/download",
+      `https://seller-analytics-api.wildberries.ru/api/v1/paid_storage/tasks/${params.id}/download`,
       {
         headers: {
           Authorization: authToken,
         },
-        data: params,
       }
     )
     .then((response) => response.data)
@@ -280,50 +278,53 @@ const getPaidStorageCostMM = (uid, campaignName) => {
         dateFrom: getLocaleDateString(lbd).slice(0, 10),
         dateTo: getLocaleDateString(rbd).slice(0, 10),
       };
-      const taskId = (
-        await createDelayedGenTask(authToken, {
-          type: "paid_storage",
-          params: params,
-        })
-      ).data.taskId;
-      console.log(
-        uid,
-        campaignName,
-        "paid storage delayed",
-        "task:",
-        taskId,
-        params,
-        "created"
-      );
-      taskIds.push(taskId);
+      console.log(params);
+      try {
+        const response = await createDelayedGenTask(authToken, params);
+        const taskId = response ? response.data ? response.data.taskId : undefined : undefined;
+        console.log(
+          uid,
+          campaignName,
+          "paid storage delayed",
+          "task:",
+          taskId,
+          params,
+          "created"
+        );
+        if (taskId)
+          taskIds.push(taskId);
+      } catch (e) { console.log((e)); }
       await new Promise((resolve) => setTimeout(resolve, 65 * 1000));
     }
 
+    if (!taskIds.length) return;
+
     let readyForDownload = false;
     for (let i = 0; i < 10; i++) {
+
+
       const statusesResponse = await getDelayedGenTasksStatus(authToken, {
         ids: taskIds,
       });
-      const statuses = statusesResponse ? statusesResponse.data.tasks : [];
-      if (statuses.length) {
+      const statusData = statusesResponse ? statusesResponse.data : undefined;
+      if (statusData) {
         let ready = true;
-        for (let j = 0; j < statuses.length; j++) {
-          const { id, status } = statuses[j];
-          console.log(
-            uid,
-            campaignName,
-            "paid storage delayed",
-            "try:",
-            i,
-            "task:",
-            j,
-            id,
-            status
-          );
-          if (status != "done") {
-            ready = false;
-          }
+
+        const { id, status } = statusData;
+        console.log(
+          uid,
+          campaignName,
+          "paid storage delayed",
+          "try:",
+          i,
+          "task:",
+          id,
+          status
+        );
+        if (status != "done") {
+          ready = false;
         }
+
         readyForDownload = ready;
       }
 
@@ -340,6 +341,14 @@ const getPaidStorageCostMM = (uid, campaignName) => {
         const data = await downloadDelayedGenTaskData(authToken, {
           id: taskIds[i],
         });
+        console.log(
+          uid,
+          campaignName,
+          "paid storage delayed",
+          "task:",
+          taskIds[i],
+          'fetched'
+        );
 
         for (let j = 0; j < data.length; j++) {
           const { barcode, warehousePrice, date } = data[j];
@@ -425,7 +434,11 @@ const getAdvertsStatsMM = (authToken, params) => {
       },
     })
     .then((response) => response.data)
-    .catch((error) => console.error(error.response.data));
+    .catch(async (error) => {
+      console.error(error.response.data); if (error.response.data && error.response.data.code == 429) {
+        await new Promise(resolve => setTimeout(resolve, 2 * 60 * 1000))
+      }
+    });
 };
 
 const getAdvertStatMpManager = (
@@ -756,7 +769,11 @@ const getOrders = (authToken, params) => {
       params: params,
     })
     .then((response) => response.data)
-    .catch((error) => console.error(error));
+    .catch(async (error) => {
+      console.error(error.response.data); if (error.response.data && error.response.data.code == 429) {
+        await new Promise(resolve => setTimeout(resolve, 2 * 60 * 1000))
+      }
+    });
 };
 
 const getSales = (authToken, params) => {
@@ -768,7 +785,11 @@ const getSales = (authToken, params) => {
       params: params,
     })
     .then((response) => response.data)
-    .catch((error) => console.error(error));
+    .catch(async (error) => {
+      console.error(error.response.data); if (error.response.data && error.response.data.code == 429) {
+        await new Promise(resolve => setTimeout(resolve, 2 * 60 * 1000))
+      }
+    });
 };
 
 const fetchOfficesAndWriteToJsonMM = (uid, campaignName) => {
@@ -992,29 +1013,33 @@ const buildXlsx = (campaign, rewriteProfit = false) =>
       const commission = roz_price * (commision_percent / 100);
       const delivery = arts_data[vendorCode].delivery;
       const tax = roz_price * (arts_data[vendorCode].tax / 100);
-      const expences = roz_price * (arts_data[vendorCode].expences / 100);
+      // const expences = roz_price * (arts_data[vendorCode].expences / 100);
+      const expences = campaign == "TKS" ? roz_price * 0.05 : arts_data[vendorCode].expences;
       const prime_cost = arts_data[vendorCode].prime_cost;
 
       const brand_art = arts.byArt[vendorCode].brand_art;
-      // const ad = advertsAvgStatsByArt[brand_art]
-      //   ? getRoundValue(
-      //       advertsAvgStatsByArt[brand_art].sum,
-      //       advertsAvgStatsByArt[brand_art].orders
-      //     )
-      //   : 0;
+      // const brand_art = arts.byArt[vendorCode].art;
+      const ad = advertsAvgStatsByArt[brand_art]
+        ? getRoundValue(
+          advertsAvgStatsByArt[brand_art].sum,
+          advertsAvgStatsByArt[brand_art].orders,
+          false,
+          advertsAvgStatsByArt[brand_art].sum
+        )
+        : 0;
       // const type = brand_art;
       // const type = mapp[campaign];
       // const ad = advertsAvgStatsByArt[type]
       //   ? getRoundValue(
-      //       advertsAvgStatsByArt[type].sum,
-      //       advertsAvgStatsByArt[type].orders
-      //     )
+      //     advertsAvgStatsByArt[type].sum,
+      //     advertsAvgStatsByArt[type].orders
+      //   )
       //   : 0;
-      // const drr = ad / roz_price;
-      const drr = advertsAvgStatsByArt[mapp[campaign]]
-        ? advertsAvgStatsByArt[mapp[campaign]].drr / 100
-        : 0;
-      const ad = roz_price * drr;
+      const drr = ad / roz_price;
+      // const drr = advertsAvgStatsByArt[mapp[campaign]]
+      //   ? advertsAvgStatsByArt[mapp[campaign]].drr / 100
+      //   : 0;
+      // const ad = roz_price * drr;
       const advert_sum_art_today = advertsStatsByArt[vendorCode]
         ? advertsStatsByArt[vendorCode][today_date_str]
           ? advertsStatsByArt[vendorCode][today_date_str].sum
@@ -1316,6 +1341,8 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
         objectId: item.subjectID,
         brand: item.brand + (art.includes("_ЕН") ? " ЕН" : ""),
         size: size,
+        photos: item.photos,
+        imtId: item.imtID,
         // color: item.colors[0],
         barcode: size_data.skus[0],
         nmId: item.nmID,
@@ -1329,6 +1356,8 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
         objectId: item.subjectID,
         brand: item.brand + (art.includes("_ЕН") ? " ЕН" : ""),
         size: size,
+        photos: item.photos,
+        imtId: item.imtID,
         // color: item.colors[0],
         barcode: size_data.skus[0],
         nmId: item.nmID,
@@ -1348,6 +1377,9 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
       brand: item.brand + (art.includes("_ЕН") ? " ЕН" : ""),
       sizes: item.sizes,
       colors: item.colors,
+      photos: item.photos,
+      imtId: item.imtID,
+      nmId: item.nmID,
       title: item.title,
       // volume: volume,
     };
@@ -1631,6 +1663,7 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
   );
   const sppData = readIfExists(sppDataPath);
 
+  console.log(uid, campaignName);
   const arts = JSON.parse(
     afs.readFileSync(
       path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
@@ -1645,13 +1678,21 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
     "orders.json"
   );
   let ordersCurrent = {};
-  if (afs.existsSync(ordersPath))
-    ordersCurrent = JSON.parse(afs.readFileSync(ordersPath));
+  try {
+    if (afs.existsSync(ordersPath))
+      ordersCurrent = JSON.parse(afs.readFileSync(ordersPath));
+  }
+  catch (e) {
+    console.log(uid, campaignName, e);
+    // return;
+  }
 
   const orders = {};
   data.forEach((item) => {
     if (!(item.barcode in arts.bySku)) return;
     if (item.orderType.includes('Возврат')) return;
+
+
     const art = arts.bySku[item.barcode].art;
     const brand_art = arts.bySku[item.barcode].brand_art;
     const brand = arts.bySku[item.barcode].brand;
@@ -1670,9 +1711,11 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
       return;
     }
     const order_date_string = item.date.slice(0, 10);
-    if (item.isCancel /*|| order_date_string == today*/) {
-      return;
-    }
+    // if (item.isCancel) return;
+    if (order_date_string == '2024-03-30')
+      console.log(item);
+
+
 
     if (!(order_date_string in orders)) {
       orders[order_date_string] = { all: {} };
@@ -1777,11 +1820,12 @@ const writeSalesToJsonMM = (data, uid, campaignName, date) => {
   const sales = { byObject: {} };
   data.forEach((item) => {
     if (!(item.barcode in arts.bySku)) return;
+    // console.log(item);
     const art = arts.bySku[item.barcode].art;
     const brand = arts.bySku[item.barcode].brand;
     const object = arts.bySku[item.barcode].object;
 
-    if (item.orderType != "Клиентский") return;
+    if (item.orderType != "Клиентский") { console.log(item); return };
 
     const sale_date = new Date(item.date);
     if (sale_date < dateFrom) {
@@ -3823,9 +3867,13 @@ const fetchAdvertsWordsAndWriteToJsonMM = async (uid, campaignName) => {
     await fetchAdvertWords(authToken, queryParams, type)
       .then(async (pr) => {
         if (!pr) return;
-        // console.log(pr);
+
+        // if (id == "15910048") {
+        //   console.log(pr);
+        // }
 
         const currentStat = advertsWords[id] ? advertsWords[id].stat ?? {} : {};
+        const statOnMinus = advertsWords[id] ? advertsWords[id].statOnMinus ?? {} : {};
         const stat = {};
         if (type == 8) {
           await fetchAdvertWords(authToken, queryParams, type, true).then(
@@ -3875,39 +3923,44 @@ const fetchAdvertsWordsAndWriteToJsonMM = async (uid, campaignName) => {
             }
           );
           await new Promise((resolve) => setTimeout(resolve, 500));
-        } else if (type == 6) {
-          for (let i = 0; i < pr.stat.length; i++) {
-            const keywordStat = pr.stat[i];
-            const { keyword, views, clicks, sum } = keywordStat;
+        } else if (type == 6 || type == 9) {
 
-            if (keyword == "Всего по кампании") continue;
+          if (pr.stat) {
 
-            if (
-              keyword === undefined ||
-              views === undefined ||
-              clicks === undefined
-            ) {
-              continue;
+            for (let i = 0; i < pr.stat.length; i++) {
+              const keywordStat = pr.stat[i];
+              const { keyword, views, clicks, sum } = keywordStat;
+
+              if (keyword == "Всего по кампании") continue;
+
+              if (
+                keyword === undefined ||
+                views === undefined ||
+                clicks === undefined
+              ) {
+                continue;
+              }
+
+              if (!stat[keyword])
+                stat[keyword] = {
+                  keyword: keyword,
+                  views: 0,
+                  clicks: 0,
+                  sum: 0,
+                  ctr: 0,
+                };
+
+              stat[keyword].views += views;
+              stat[keyword].clicks += clicks;
+              stat[keyword].sum += sum;
+              stat[keyword].ctr = getRoundValue(
+                stat[keyword].clicks,
+                stat[keyword].views,
+                true
+              );
             }
-
-            if (!stat[keyword])
-              stat[keyword] = {
-                keyword: keyword,
-                views: 0,
-                clicks: 0,
-                sum: 0,
-                ctr: 0,
-              };
-
-            stat[keyword].views += views;
-            stat[keyword].clicks += clicks;
-            stat[keyword].sum += sum;
-            stat[keyword].ctr = getRoundValue(
-              stat[keyword].clicks,
-              stat[keyword].views,
-              true
-            );
           }
+
         }
 
         for (const [keyword, keywordStat] of Object.entries(stat)) {
@@ -3915,12 +3968,16 @@ const fetchAdvertsWordsAndWriteToJsonMM = async (uid, campaignName) => {
         }
 
         pr.stat = currentStat;
+        pr.statOnMinus = statOnMinus;
+
+        // console.log(pr, currentStat, stat);
 
         jsonData[id] = pr;
         console.log(uid, campaignName, "fetched", id, "words");
       })
       .catch((e) => {
         console.log(
+          e,
           uid,
           campaignName,
           "couldn't fetch",
@@ -4135,6 +4192,7 @@ const changeAdvertName = (authToken, params) => {
 const autoSetMinusPhrasesMM = async (uid, campaignName) => {
   return new Promise((resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
+    const startTime = new Date();
 
     const advertsWordsPath = path.join(
       __dirname,
@@ -4158,6 +4216,7 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
       __dirname,
       "marketMaster",
       uid,
+      campaignName,
       "plusPhrasesTemplates.json"
     );
     const plusPhrasesTemplates = readIfExists(plusPhrasesTemplatesPath);
@@ -4177,114 +4236,283 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
       "adverts.json"
     );
     const adverts = readIfExists(advertsPath);
+    const advertsManagerRulesPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsManagerRules.json"
+    );
+    const advertsManagerRules = readIfExists(advertsManagerRulesPath);
 
     const excludeMinusPhrases = async () => {
-      for (const [art, advertsTypes] of Object.entries(
+      for (const [art, templateName] of Object.entries(
         advertsPlusPhrasesTemplates
       )) {
-        for (const [advertsType, templateName] of Object.entries(
-          advertsTypes
-        )) {
-          if (!art || !templateName) continue;
-          // if (art != "КПБ_ЕВРО_СТРАЙП_18-4726_ТКС") continue;
-          // console.log(art, templateName, advertsType);
+        if (!art || !templateName) continue;
+        if (!advertsManagerRules[art]) continue
+        for (const [advertsType, advertsTypeData] of Object.entries(advertsManagerRules[art])) {
 
-          for (const [id, advertData] of Object.entries(advertsInfos)) {
-            if (!id || !advertData) continue;
-            const advertId = advertData.advertId;
+          if (!advertsType || !advertsTypeData) continue;
+          const { advertId, mode } = advertsTypeData;
+          if (!mode || !advertId) continue;
 
-            if (!adverts[advertId]) continue;
-            // if (advertId != "15294130") continue;
+          if (!adverts[advertId]) continue;
+          if (!advertsInfos[advertId]) continue;
 
-            if (advertData.status != 11 && advertData.status != 9) continue;
-            if (advertData.name != art) continue;
-            if (advertData.type != 8 && advertData.type != 6 && advertData.type != 9) continue;
+          const { name, type, status, createTime } = advertsInfos[advertId]
+          if (name != art) continue;
+          if (![8, 6, 9].includes(type)) continue;
+          if (status != 9) continue;
 
-            if (getAdvertsType(advertId, advertsInfos) != advertsType) continue;
+          if (!advertsWords[advertId]) continue;
 
-            if (!advertsWords[advertId]) continue;
+          const words =
+            type == 8
+              ? advertsWords[advertId]
+              : advertsWords[advertId].words;
 
-            const words =
-              advertData.type == 8
-                ? advertsWords[advertId]
-                : advertsWords[advertId].words;
+          if (!words) continue;
+          const stat = advertsWords[advertId].stat ?? {};
+          const statOnMinus = advertsWords[advertId].statOnMinus ?? {};
 
-            if (!words) continue;
-            const { stat } = advertsWords[advertId];
+          const plusPhrasesTemplate = plusPhrasesTemplates[templateName];
+          if (!plusPhrasesTemplate) continue;
+          const autoPhrasesTemplate = plusPhrasesTemplate.autoPhrasesTemplate
 
-            const plusPhrasesTemplate = plusPhrasesTemplates[templateName];
-            if (!plusPhrasesTemplate) continue;
-            const autoPhrasesTemplate = plusPhrasesTemplate.autoPhrasesTemplate
+          const addOrNot = (phrase) => {
+            const { includes, notIncludes } = autoPhrasesTemplate;
 
-            const addOrNot = (phrase) => {
-              const { includes, notIncludes } = autoPhrasesTemplate;
+            let addFlagInc = 0;
+            for (let j = 0; j < includes.length; j++) {
+              const rule = includes[j];
 
-              let addFlagInc = 0;
-              for (let j = 0; j < includes.length; j++) {
-                const rule = includes[j];
+              if (!rule || rule == '') continue
 
-                if (!rule || rule == '') continue
+              const rulesForAnd = rule.split('+');
 
-                const rulesForAnd = rule.split('+');
-
-                let tempFlagInc = 0;
-                for (let k = 0; k < rulesForAnd.length; k++) {
-                  const ruleForAdd = rulesForAnd[k];
-                  if (phrase.includes(ruleForAdd)) {
-                    tempFlagInc++;
-                  }
+              let tempFlagInc = 0;
+              for (let k = 0; k < rulesForAnd.length; k++) {
+                const ruleForAdd = rulesForAnd[k];
+                if (phrase.includes(ruleForAdd)) {
+                  tempFlagInc++;
                 }
-                addFlagInc += (tempFlagInc == rulesForAnd.length ? 1 : 0);
               }
-
-              let addFlagNotInc = 0;
-              for (let j = 0; j < notIncludes.length; j++) {
-                const rule = notIncludes[j];
-
-                if (!rule || rule == '') continue
-
-                const rulesForAnd = rule.split('+');
-
-                let tempFlagNotInc = 0;
-
-                for (let k = 0; k < rulesForAnd.length; k++) {
-                  const ruleForAdd = rulesForAnd[k];
-                  if (phrase.includes(ruleForAdd)) {
-                    tempFlagNotInc++;
-                  }
-                }
-
-                addFlagNotInc += tempFlagNotInc;
-              }
-
-              console.log((addFlagInc && !addFlagNotInc), addFlagInc, addFlagInc, phrase, plusPhrasesTemplate.autoPhrasesTemplate);
-              return addFlagInc && !addFlagNotInc
+              addFlagInc += (tempFlagInc == rulesForAnd.length ? 1 : 0);
             }
 
-            if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-              || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-              const newClusters = []
-              for (const phrase of plusPhrasesTemplate.clusters) {
+            let addFlagNotInc = 0;
+            for (let j = 0; j < notIncludes.length; j++) {
+              const rule = notIncludes[j];
+
+              if (!rule || rule == '') continue
+
+              const rulesForAnd = rule.split('+');
+
+              let tempFlagNotInc = 0;
+
+              for (let k = 0; k < rulesForAnd.length; k++) {
+                const ruleForAdd = rulesForAnd[k];
+                if (phrase.includes(ruleForAdd)) {
+                  tempFlagNotInc++;
+                }
+              }
+
+              addFlagNotInc += tempFlagNotInc;
+            }
+
+            // console.log((addFlagInc && !addFlagNotInc), addFlagInc, addFlagInc, phrase, plusPhrasesTemplate.autoPhrasesTemplate);
+            return addFlagInc && !addFlagNotInc
+          }
+
+          if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+            || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+            const newClusters = []
+            for (const phrase of plusPhrasesTemplate.clusters) {
+              if (addOrNot(phrase)) {
+                if (!newClusters.includes(phrase)) {
+                  newClusters.push(phrase)
+                }
+              }
+            }
+            plusPhrasesTemplate.clusters = newClusters
+          }
+
+
+          const isFixed = plusPhrasesTemplate.isFixed ?? false;
+
+          const { excluded, clusters, keywords } = words;
+          if (clusters) {
+            const toExclude = [];
+            for (let i = 0; i < excluded.length; i++) {
+              const phrase = excluded[i];
+              // console.log(plusPhrasesTemplate.clusters.includes(phrase), phrase)
+              const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
+              const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
+              if (
+                plusPhrasesTemplate.threshold &&
+                viewsExcluded < plusPhrasesTemplate.threshold
+              )
+                continue;
+              if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
+                plusPhrasesTemplate.ctrThreshold &&
+                ctrExcluded > plusPhrasesTemplate.ctrThreshold
+              )
+                continue;
+
+              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
                 if (addOrNot(phrase)) {
-                  if (!newClusters.includes(phrase)) {
-                    newClusters.push(phrase)
+                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                    plusPhrasesTemplate.clusters.push(phrase);
                   }
                 }
               }
-              plusPhrasesTemplate.clusters = newClusters
+
+              if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
+              toExclude.push(phrase);
             }
 
+            let needsUpdate = toExclude.length != excluded.length;
+            for (let i = 0; i < clusters.length; i++) {
+              const { cluster, count, keywords } = clusters[i];
 
-            const isFixed = plusPhrasesTemplate.isFixed ?? false;
+              const phrase = cluster;
+              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+                if (addOrNot(phrase)) {
+                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                    plusPhrasesTemplate.clusters.push(phrase);
+                  }
+                }
+              }
 
-            const { excluded, clusters, keywords } = words;
-            if (clusters) {
+              if (plusPhrasesTemplate.threshold > count) continue;
+              // console.log(advertId, cluster, count, plusPhrasesTemplate.clusters);
+
+              const clusterKeywordsTemp = new Array(keywords ?? []);
+              const clusterKeywords = clusterKeywordsTemp.filter(
+                (value, index) => {
+                  return clusterKeywordsTemp.indexOf(value) === index;
+                }
+              );
+              if (!clusterKeywords.includes(cluster))
+                clusterKeywords.push(cluster);
+              const clusterStat = {
+                views: 0,
+                clicks: 0,
+                ctr: 0,
+                sum: 0,
+              };
+              for (let j = 0; j < clusterKeywords.length; j++) {
+                if (!stat[clusterKeywords[j]]) continue;
+                clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
+                clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
+                clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
+              }
+              clusterStat.ctr = getRoundValue(
+                clusterStat.clicks,
+                clusterStat.views,
+                true
+              );
+
+              if (plusPhrasesTemplate.ctrThreshold) {
+
+                if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(cluster) && !toExclude.includes(cluster)) {
+                  needsUpdate = true;
+                  toExclude.push(cluster);
+                  statOnMinus[cluster] = clusterStat;
+                  continue;
+                };
+
+                if (
+                  clusterStat.ctr >= plusPhrasesTemplate.ctrThreshold
+                )
+                  continue;
+
+                if (!toExclude.includes(cluster)) {
+                  needsUpdate = true;
+                  statOnMinus[cluster] = clusterStat;
+                  toExclude.push(cluster);
+                }
+              } else {
+                if (plusPhrasesTemplate.clusters.includes(cluster))
+                  continue;
+
+
+                if (!toExclude.includes(cluster)) {
+                  needsUpdate = true;
+                  statOnMinus[cluster] = clusterStat;
+                  toExclude.push(cluster);
+                }
+              }
+
+              if (plusPhrasesTemplate.secondThreshold && plusPhrasesTemplate.secondThreshold > count) {
+                if (plusPhrasesTemplate.secondCtrThreshold && plusPhrasesTemplate.secondCtrThreshold >
+                  clusterStat.ctr) {
+                  if (!toExclude.includes(cluster)) {
+                    needsUpdate = true;
+                    statOnMinus[cluster] = clusterStat;
+                    toExclude.push(cluster);
+                  }
+                }
+              }
+
+            }
+            // console.log(toExclude);
+            if (toExclude.length > 1000) {
+              console.log("more than a 1000");
+              continue;
+            }
+            if (needsUpdate) {
+              const params = {
+                excluded: toExclude,
+              };
+
+              await setExcludedPhrasesAdvert(
+                authToken,
+                advertId,
+                params,
+                type
+              );
+
+              console.log(
+                uid,
+                campaignName,
+                art,
+                advertId,
+                "установлены минус фразы",
+                templateName,
+                toExclude.length,
+              );
+
+              await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
+            } else {
+              console.log(
+                uid,
+                campaignName,
+                art,
+                advertId,
+                "не требует изменения минус фраз"
+              );
+            }
+          } else if (keywords) {
+            if (!isFixed) {
               const toExclude = [];
               for (let i = 0; i < excluded.length; i++) {
                 const phrase = excluded[i];
-                // console.log(plusPhrasesTemplate.clusters.includes(phrase), phrase)
-                const ctrExcluded = stat[phrase] ? stat[phrase].ctr : 0;
-                const viewsExcluded = stat[phrase] ? stat[phrase].views : 0;
+
+                if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+                  || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+                  if (addOrNot(phrase)) {
+                    if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                      plusPhrasesTemplate.clusters.push(phrase);
+                    }
+                  }
+                }
+
+                const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
+                const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
                 if (
                   plusPhrasesTemplate.threshold &&
                   viewsExcluded < plusPhrasesTemplate.threshold
@@ -4295,26 +4523,15 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                   ctrExcluded > plusPhrasesTemplate.ctrThreshold
                 )
                   continue;
-
-                if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-                  || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-                  if (addOrNot(phrase)) {
-                    if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                      plusPhrasesTemplate.clusters.push(phrase);
-                    }
-                  }
-                }
-
                 if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
                 toExclude.push(phrase);
               }
 
               let needsUpdate = toExclude.length != excluded.length;
-              for (let i = 0; i < clusters.length; i++) {
-                const { cluster, count, keywords } = clusters[i];
-                if (plusPhrasesTemplate.threshold > count) continue;
+              for (let i = 0; i < keywords.length; i++) {
+                const { keyword, count } = keywords[i];
+                const phrase = keyword;
 
-                const phrase = cluster;
                 if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
                   || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
                   if (addOrNot(phrase)) {
@@ -4324,69 +4541,57 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                   }
                 }
 
-                // console.log(advertId, cluster, count, plusPhrasesTemplate.clusters);
+                if (plusPhrasesTemplate.threshold > count) continue;
 
-                if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(cluster) && !toExclude.includes(cluster)) {
-                  console.log('ITS FUCKING DOGSHIT', cluster, count);
-                  needsUpdate = true;
-                  toExclude.push(cluster);
-                  continue;
-                }
+                if (plusPhrasesTemplate.ctrThreshold) {
 
-                const clusterKeywordsTemp = new Array(keywords ?? []);
-                const clusterKeywords = clusterKeywordsTemp.filter(
-                  (value, index) => {
-                    return clusterKeywordsTemp.indexOf(value) === index;
+                  if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(keyword) && !toExclude.includes(keyword)) {
+                    needsUpdate = true;
+                    toExclude.push(keyword);
+                    statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                    continue;
+                  };
+
+                  if (
+                    stat[keyword] &&
+                    stat[keyword].ctr >= plusPhrasesTemplate.ctrThreshold
+                  )
+                    continue;
+
+                  if (!toExclude.includes(keyword)) {
+                    needsUpdate = true;
+                    statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                    toExclude.push(keyword);
                   }
-                );
-                if (!clusterKeywords.includes(cluster))
-                  clusterKeywords.push(cluster);
-                const clusterStat = {
-                  views: 0,
-                  clicks: 0,
-                  ctr: 0,
-                  sum: 0,
-                };
-                for (let j = 0; j < clusterKeywords.length; j++) {
-                  if (!stat[clusterKeywords[j]]) continue;
-                  clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
-                  clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
-                  clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
-                }
-                clusterStat.ctr = getRoundValue(
-                  clusterStat.clicks,
-                  clusterStat.views,
-                  true
-                );
+                } else {
+                  if (plusPhrasesTemplate.clusters.includes(keyword))
+                    continue;
 
-                if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
-                  plusPhrasesTemplate.ctrThreshold &&
-                  clusterStat.ctr >= plusPhrasesTemplate.ctrThreshold
-                ) {
-                  console.log('ITS LESS', clusterStat.ctr, plusPhrasesTemplate.ctrThreshold);
-                  continue;
+
+                  if (!toExclude.includes(keyword)) {
+                    needsUpdate = true;
+                    statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                    toExclude.push(keyword);
+                  }
                 }
 
-                if (
-                  !plusPhrasesTemplate.ctrThreshold &&
-                  plusPhrasesTemplate.clusters.includes(cluster)
-                ) {
-                  // console.log(cluster);
-                  console.log('IS IN CLUSTERS', cluster, plusPhrasesTemplate.clusters.includes(cluster));
-                  continue;
+                if (plusPhrasesTemplate.secondThreshold && plusPhrasesTemplate.secondThreshold > count) {
+                  if (plusPhrasesTemplate.secondCtrThreshold && stat[keyword] && plusPhrasesTemplate.secondCtrThreshold >
+                    stat[keyword].ctr) {
+                    if (!toExclude.includes(keyword)) {
+                      needsUpdate = true;
+                      statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                      toExclude.push(keyword);
+                    }
+                  }
                 }
-
-                if (!toExclude.includes(cluster)) {
-                  needsUpdate = true;
-                  toExclude.push(cluster);
-                }
+                // console.log(advertId, cluster, count, keywords);
               }
               // console.log(toExclude);
               if (toExclude.length > 1000) {
                 console.log("more than a 1000");
                 continue;
-              }
-              if (needsUpdate) {
+              } else if (needsUpdate) {
                 const params = {
                   excluded: toExclude,
                 };
@@ -4395,8 +4600,11 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                   authToken,
                   advertId,
                   params,
-                  advertData.type
+                  type
                 );
+                await setPlusPhrasesAdvert(authToken, advertId, {
+                  pluse: [],
+                });
 
                 console.log(
                   uid,
@@ -4405,10 +4613,10 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                   advertId,
                   "установлены минус фразы",
                   templateName,
-                  toExclude.length,
+                  toExclude.length
                 );
 
-                await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
+                await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
               } else {
                 console.log(
                   uid,
@@ -4418,213 +4626,83 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                   "не требует изменения минус фраз"
                 );
               }
-            } else if (keywords) {
-              if (!isFixed) {
-                const toExclude = [];
-                for (let i = 0; i < excluded.length; i++) {
-                  const phrase = excluded[i];
+            } else {
+              const toPlus = plusPhrasesTemplate.clusters;
 
-                  if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-                    || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-                    if (addOrNot(phrase)) {
-                      if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                        plusPhrasesTemplate.clusters.push(phrase);
-                      }
-                    }
-                  }
-
-                  const ctrExcluded = stat[phrase] ? stat[phrase].ctr : 0;
-                  const viewsExcluded = stat[phrase] ? stat[phrase].views : 0;
-                  if (
-                    plusPhrasesTemplate.threshold &&
-                    viewsExcluded < plusPhrasesTemplate.threshold
-                  )
-                    continue;
-                  if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
-                    plusPhrasesTemplate.ctrThreshold &&
-                    ctrExcluded > plusPhrasesTemplate.ctrThreshold
-                  )
-                    continue;
-                  if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
-                  toExclude.push(phrase);
-                }
-
-                let needsUpdate = toExclude.length != excluded.length;
-                for (let i = 0; i < keywords.length; i++) {
-                  const { keyword, count } = keywords[i];
-
-                  if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-                    || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-                    const { includes, notIncludes } = autoPhrasesTemplate;
-                    let addFlagInc = 0;
-                    for (let j = 0; j < includes.length; j++) {
-                      const rule = includes[j];
-
-                      if (!rule || rule == '') continue
-
-                      const rulesForAnd = rule.split('+');
-
-                      let tempFlagInc = 1;
-                      for (let k = 0; k < rulesForAnd.length; k++) {
-                        const ruleForAdd = rulesForAnd[k];
-                        if (!phrase.includes(ruleForAdd)) {
-                          addFlagInc = 0;
-                          break;
-                        }
-                      }
-                      addFlagInc += tempFlagInc
-                    }
-
-                    let addFlagNotInc = 0;
-                    for (let j = 0; j < notIncludes.length; j++) {
-                      const rule = notIncludes[j];
-
-                      if (!rule || rule == '') continue
-
-                      const rulesForAnd = rule.split('+');
-
-                      let tempFlagNotInc = 1;
-
-                      for (let k = 0; k < rulesForAnd.length; k++) {
-                        const ruleForAdd = rulesForAnd[k];
-                        if (phrase.includes(ruleForAdd)) {
-                          tempFlagNotInc = 0;
-                          break;
-                        }
-                      }
-
-                      addFlagNotInc += tempFlagNotInc;
-                    }
-
-                    if (addFlagInc && addFlagNotInc) {
-                      plusPhrasesTemplate.clusters.push(phrase);
-                    }
-
-                  }
-
-                  if (plusPhrasesTemplate.ctrThreshold) {
-                    if (plusPhrasesTemplate.threshold > count) continue;
-
-                    if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(keyword) && !toExclude.includes(keyword)) {
-                      // if (advertId == '15352349') {
-                      //   console.log(keyword);
-                      // }
-                      needsUpdate = true;
-                      toExclude.push(keyword);
-                      continue;
-                    };
-
-                    if (
-                      stat[keyword] &&
-                      stat[keyword].ctr >= plusPhrasesTemplate.ctrThreshold
-                    )
-                      continue;
-
-                    if (!toExclude.includes(keyword)) {
-                      needsUpdate = true;
-                      toExclude.push(keyword);
-                    }
-                  } else {
-                    if (plusPhrasesTemplate.clusters.includes(keyword))
-                      continue;
-
-                    if (plusPhrasesTemplate.threshold > count) continue;
-
-                    if (!toExclude.includes(keyword)) {
-                      needsUpdate = true;
-                      toExclude.push(keyword);
-                    }
-                  }
-
-                  // console.log(advertId, cluster, count, keywords);
-                }
-                // console.log(toExclude);
-                if (toExclude.length > 1000) {
-                  console.log("more than a 1000");
-                  continue;
-                } else if (needsUpdate) {
-                  const params = {
-                    excluded: toExclude,
-                  };
-
-                  await setExcludedPhrasesAdvert(
-                    authToken,
-                    advertId,
-                    params,
-                    advertData.type
-                  );
-                  await setPlusPhrasesAdvert(authToken, advertId, {
-                    pluse: [],
-                  });
-
-                  console.log(
-                    uid,
-                    campaignName,
-                    art,
-                    advertId,
-                    "установлены минус фразы",
-                    templateName,
-                    toExclude.length
-                  );
-
-                  await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
-                } else {
-                  console.log(
-                    uid,
-                    campaignName,
-                    art,
-                    advertId,
-                    "не требует изменения минус фраз"
-                  );
-                }
-              } else {
-                const toPlus = plusPhrasesTemplate.clusters;
-
-                if (toPlus.length > 100) {
-                  console.log("more than a 100");
-                  continue;
-                }
-                const params = {
-                  pluse: toPlus,
-                };
-
-                await setPlusPhrasesAdvert(authToken, advertId, params);
-                await setPlusPhrasesActivityAdvert(authToken, {
-                  id: advertId,
-                  fixed: true,
-                });
-
-                console.log(
-                  uid,
-                  campaignName,
-                  art,
-                  advertId,
-                  "установлены плюс фразы",
-                  templateName,
-                  toPlus
-                );
-
-                await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
+              if (toPlus.length > 100) {
+                console.log("more than a 100");
+                continue;
               }
+              const params = {
+                pluse: toPlus,
+              };
+
+              await setPlusPhrasesAdvert(authToken, advertId, params);
+              await setPlusPhrasesActivityAdvert(authToken, {
+                id: advertId,
+                fixed: true,
+              });
+
+              console.log(
+                uid,
+                campaignName,
+                art,
+                advertId,
+                "установлены плюс фразы",
+                templateName,
+                toPlus
+              );
+
+              await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
             }
-
-            plusPhrasesTemplates[templateName] = plusPhrasesTemplate;
-
           }
+
+          plusPhrasesTemplates[templateName] = plusPhrasesTemplate;
+
+          advertsWords[advertId].statOnMinus = statOnMinus;
+
         }
       }
     };
 
     excludeMinusPhrases().then(() => {
-      resolve();
+      const currentPlusPhrasesTemplates = readIfExists(path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "plusPhrasesTemplates.json"
+      ))
+      for (const [name, data] of Object.entries(plusPhrasesTemplates)) {
+        if (new Date(currentPlusPhrasesTemplates[name].updateTime) > startTime) {
+          console.log(uid, campaignName, name, 'plus phrases template was updated after the start of this exec.');
+          continue;
+        };
+
+        currentPlusPhrasesTemplates[name] = data;
+      }
       afs.writeFileSync(
         path.join(
           __dirname,
           "marketMaster",
           uid,
+          campaignName,
           "plusPhrasesTemplates.json"
         ),
-        JSON.stringify(plusPhrasesTemplates))
+        JSON.stringify(currentPlusPhrasesTemplates));
+
+      afs.writeFileSync(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsWords.json"
+        ),
+        JSON.stringify(advertsWords));
+
+
+      resolve();
     });
   });
 };
@@ -4721,14 +4799,16 @@ const manageAdvertsActivityMM = async (uid, campaignName, data) => {
           let nms = [];
           if (advertData.type == 8) {
             nms = advertData.autoParams.nms ?? [];
-          } else {
-            const tempParams = advertData.params;
-            if (!tempParams) continue;
-            const temp = tempParams[0].nms ?? [];
+          } else if (advertData.type == 9) {
+            nms = advertData.unitedParams ? advertData.unitedParams[0].nms ?? [] : [];
+          } else if (advertData.type == 6) {
+            const temp = advertData.params ? advertData.params[0].nms : [];
             for (let i = 0; i < temp.length; i++) {
               nms.push(temp[i].nm);
             }
           }
+
+
           const nmId = artsData.byBrandArt[art]
             ? parseInt(artsData.byBrandArt[art].nmId)
             : undefined;
@@ -4763,8 +4843,6 @@ const setAdvertsPlusPhrasesTemplatesMM = async (uid, campaignName, data) => {
       advertsPlusPhrasesTemplatesPath
     );
 
-    const { advertsTypes } = data;
-
     const setAdvertsPlusPhrasesTemplates = async () => {
       for (const [art, artData] of Object.entries(data.arts)) {
         if (!art || !artData) continue;
@@ -4774,24 +4852,20 @@ const setAdvertsPlusPhrasesTemplatesMM = async (uid, campaignName, data) => {
 
         console.log(uid, campaignName, art, mode, templateName);
 
-        for (const [advertsType, advertsTypeValue] of Object.entries(
-          advertsTypes
-        )) {
-          if (!advertsType || !advertsTypeValue) continue;
-          if (mode == "Установить") {
-            if (!templateName) continue;
-            if (!advertsPlusPhrasesTemplates[art])
-              advertsPlusPhrasesTemplates[art] = {};
+        if (mode == "Установить") {
+          if (!templateName) continue;
+          if (!advertsPlusPhrasesTemplates[art])
+            advertsPlusPhrasesTemplates[art] = {};
 
-            advertsPlusPhrasesTemplates[art][advertsType] = templateName;
-          } else if (mode == "Удалить") {
-            if (!advertsPlusPhrasesTemplates[art])
-              advertsPlusPhrasesTemplates[art] = {};
+          advertsPlusPhrasesTemplates[art] = templateName;
+        } else if (mode == "Удалить") {
+          if (!advertsPlusPhrasesTemplates[art])
+            advertsPlusPhrasesTemplates[art] = {};
 
-            advertsPlusPhrasesTemplates[art][advertsType] = undefined;
-          }
+          advertsPlusPhrasesTemplates[art] = undefined;
         }
       }
+
     };
 
     setAdvertsPlusPhrasesTemplates().then(() => {
@@ -5029,7 +5103,7 @@ const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
             let budget = budgetToKeep - currentBudget;
             // if (budget < 125) continue;
             budget = Math.ceil(budget / 50) * 50;
-            if (budget < 500) budget = 500;
+            if (budget < 500 || isNaN(budget)) budget = 500;
             // if (buf)
 
             let payType = 0;
@@ -5133,12 +5207,21 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
       campaignName,
       "advertsStocksThreshold.json"
     );
+    const advertsManagerRulesPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsManagerRules.json"
+    );
+    const bidsLog = {}
+    const advertsManagerRules = readIfExists(advertsManagerRulesPath);
     const advertsAutoBidsRules = readIfExists(advertsAutoBidsRulesPath);
     const advertsInfos = readIfExists(advertsInfosPath);
     const adverts = readIfExists(advertsPath);
     const advertsStocksThreshold = readIfExists(advertsStocksThresholdPath);
 
-    const { advertsTypes, mode, stocksThreshold, maxBid, placementsRange } =
+    const { mode, stocksThreshold, maxBid, placementsRange, advertsTypes } =
       data;
 
     const setAdvertsCPMs = async () => {
@@ -5150,30 +5233,35 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
           let { bid } = artData;
           if (bid === undefined) continue;
 
-          for (const [advertId, advertData] of Object.entries(advertsInfos)) {
-            if (!advertId || !advertData) continue;
+          for (const [advertsType, advertsTypeData] of Object.entries(advertsManagerRules[art])) {
+
+            if (!advertsType || !advertsTypeData) continue;
+            const { advertId, mode } = advertsTypeData;
+            if (!mode || !advertId) continue;
 
             if (!adverts[advertId]) continue;
+            if (!advertsInfos[advertId]) continue;
 
-            if (advertData.name != art) continue;
-            if (advertData.type != 8 && advertData.type != 6) continue;
-            if (advertData.status != 9) continue;
-
-            const advertsType = getAdvertsType(advertId, advertsInfos);
             if (!advertsTypes[advertsType]) continue;
 
-            console.log(uid, campaignName, advertId, mode, bid);
+            const { name, type, status } = advertsInfos[advertId]
+            if (name != art) continue;
+            if (![8, 6, 9].includes(type)) continue;
+            if (status != 9) continue;
+
+            console.log(uid, campaignName, art, advertId, mode, bid);
 
             let subjectId = undefined;
-            if (advertData.type == 6) {
-              const tempParams = advertsInfos[advertId].params;
-              if (!tempParams) {
-                continue;
-              }
-              subjectId = tempParams[0] ? tempParams[0].subjectId : undefined;
+            if (type == 6) {
+              const tempParams = advertsInfos[advertId].params[0];
+              subjectId = tempParams ? tempParams.subjectId : undefined;
+            }
+            else if (type == 9) {
+              const tempParams = advertsInfos[advertId].unitedParams[0];
+              subjectId = tempParams ? tempParams.subject ? tempParams.subject.id : undefined : undefined;
             }
 
-            const minBid = advertData.type == 8 ? 125 : 150;
+            const minBid = type == 8 ? 125 : 150;
             if (bid < minBid) bid = minBid;
 
             const params = {
@@ -5185,39 +5273,48 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
             if (subjectId) {
               params["param"] = subjectId;
             }
+            if (type == 9) {
+              params["instrument"] = 4
+              await setAdvertCPM(authToken, params);
+              await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
+
+              params["instrument"] = 6
+            }
 
             await setAdvertCPM(authToken, params);
             await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
+
+            if (!(advertId in bidsLog))
+              bidsLog[advertId] = { bids: [] };
+
+            bidsLog[advertId].bids.push({
+              time: new Date().toISOString(),
+              val: bid,
+              index: -1,
+              prevIndex: -1,
+            });
           }
         } else if (mode == "Автоставки") {
-          const { desiredDRR, dateRange, bidStep } = artData;
+          const { desiredDRR } = artData;
           if (desiredDRR == undefined) continue;
-          console.log(uid, campaignName, art, mode, desiredDRR);
+          console.log(uid, campaignName, art, mode, desiredDRR, maxBid, placementsRange);
 
-          for (const [advertsType, value] of Object.entries(advertsTypes)) {
-            if (!advertsType || !value) continue;
-            if (!advertsAutoBidsRules[art]) advertsAutoBidsRules[art] = {};
-            if (!advertsAutoBidsRules[art][advertsType])
-              advertsAutoBidsRules[art][advertsType] = undefined;
+          if (!advertsAutoBidsRules[art]) advertsAutoBidsRules[art] = {};
 
-            advertsAutoBidsRules[art][advertsType] = {
-              desiredDRR: desiredDRR,
-              bidStep: bidStep,
-              dateRange: dateRange,
-              maxBid: maxBid,
-              placementsRange: placementsRange,
-              dateRange: dateRange,
-            };
-          }
+          advertsAutoBidsRules[art] = {
+            desiredDRR: desiredDRR,
+            maxBid: maxBid,
+            placementsRange: placementsRange,
+          };
+
           if (!advertsStocksThreshold[art]) advertsStocksThreshold[art] = {};
           advertsStocksThreshold[art].stocksThreshold = stocksThreshold;
         } else if (mode == "Удалить правила") {
           console.log(uid, campaignName, art, mode);
-          for (const [advertsType, value] of Object.entries(advertsTypes)) {
-            if (!advertsType || !value) continue;
-            if (!advertsAutoBidsRules[art]) advertsAutoBidsRules[art] = {};
-            advertsAutoBidsRules[art][advertsType] = undefined;
-          }
+
+          if (!advertsAutoBidsRules[art]) advertsAutoBidsRules[art] = {};
+          advertsAutoBidsRules[art] = undefined;
+
           if (!advertsStocksThreshold[art]) advertsStocksThreshold[art] = {};
           advertsStocksThreshold[art].stocksThreshold = undefined;
         }
@@ -5233,6 +5330,24 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
         advertsStocksThresholdPath,
         JSON.stringify(advertsStocksThreshold)
       );
+      if (mode == 'Установить') {
+        const advertsBidsLogPath = path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsBidsLog.json"
+        );
+        const advertsBidsLog = readIfExists(advertsBidsLogPath);
+        for (const [advertId, data] of Object.entries(bidsLog)) {
+          if (!advertsBidsLog[advertId]) advertsBidsLog[advertId] = { bids: [] }
+          advertsBidsLog[advertId].bids = advertsBidsLog[advertId].bids.concat(data.bids)
+        }
+        afs.writeFileSync(
+          advertsBidsLogPath,
+          JSON.stringify(advertsBidsLog)
+        );
+      }
       resolve();
     });
   });
@@ -5248,6 +5363,22 @@ const getRoundValue = (a, b, isPercentage = false, def = 0) => {
   return result;
 };
 
+const getDateNDaysAgo = (n) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - n);
+  return date;
+}
+
+const getDaysInWork = (createTime) => {
+  const today = getDateNDaysAgo(0);
+  const startDate = new Date(createTime);
+  startDate.setHours(0, 0, 0, 0);
+  const daysInWork =
+    (today.getTime() - startDate.getTime()) / 86400 / 1000;
+  return daysInWork
+}
+
 const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
   return new Promise((resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
@@ -5259,6 +5390,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
       campaignName,
       "advertsAutoBidsRules.json"
     );
+    const advertsAutoBidsRules = readIfExists(advertsAutoBidsRulesPath);
     const advertsInfosPath = path.join(
       __dirname,
       "marketMaster",
@@ -5272,13 +5404,6 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
       uid,
       campaignName,
       "adverts.json"
-    );
-    const advertsStatsByDayPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsStatsByDay.json"
     );
     const ordersPath = path.join(
       __dirname,
@@ -5302,160 +5427,72 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
       "advertsBidsLog.json"
     );
     const advertsBidsLog = readIfExists(advertsBidsLogPath);
-    const advertsAutoBidsRules = readIfExists(advertsAutoBidsRulesPath);
     const advertsInfos = readIfExists(advertsInfosPath);
     const adverts = readIfExists(advertsPath);
-    const advertsStatsByDay = readIfExists(advertsStatsByDayPath);
     const ordersData = readIfExists(ordersPath);
+
     const arts = readIfExists(artsPath);
-
-    const advertsBudgetsToKeep = readIfExists(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsBudgetsToKeep.json"
-      )
-    );
-
     arts.byBrandArt = {};
     for (const [nmId, artData] of Object.entries(arts.byNmId)) {
       arts.byBrandArt[artData.art] = artData;
     }
 
-    // const recalc = (art, daysCount, advertsIds) => {
-    //   const res = {
-    //     cpo: 0,
-    //     sum: 0,
-    //     orders: 0,
-    //     sum_orders: 0,
-    //     views: 0,
-
-    //     cpm: 0,
-    //     cr: 0,
-    //     drr: 0,
-    //   };
-
-    //   for (let i = 0; i <= daysCount; i++) {
-    //     const date = new Date();
-    //     date.setDate(date.getDate() - i);
-    //     date.setHours(0, 0, 0, 0);
-    //     const strDate = date
-    //       .toLocaleDateString("ru-RU")
-    //       .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-    //       .slice(0, 10);
-
-    //     if (ordersData[strDate]) {
-    //       const sizes = arts.byBrandArt[art].sizes;
-    //       for (let j = 0; j < sizes.length; j++) {
-    //         const sku = sizes[j].skus[0];
-    //         const local_art = arts.bySku[sku].art;
-    //         res.orders += ordersData[strDate].all[local_art]
-    //           ? ordersData[strDate].all[local_art].count
-    //           : 0;
-
-    //         res.sum_orders += ordersData[strDate].all[local_art]
-    //           ? ordersData[strDate].all[local_art].sum
-    //           : 0;
-    //       }
-    //     }
-
-    //     for (let j = 0; j < advertsIds.length; j++) {
-    //       const advertId = advertsIds[j];
-    //       const dateData = advertsStatsByDay[advertId]
-    //         ? advertsStatsByDay[advertId].days[strDate]
-    //         : undefined;
-    //       if (!dateData) continue;
-    //       res.sum += dateData.sum;
-    //       res.views += dateData.views;
-    //     }
-    //   }
-
-    //   res.orders = Math.round(res.orders);
-    //   res.sum_orders = Math.round(res.sum_orders);
-    //   res.sum = Math.round(res.sum);
-    //   res.cpo = getRoundValue(res.sum, res.orders, false, res.sum);
-    //   res.cpm = getRoundValue(res.sum * 1000, res.views);
-    //   res.cr = getRoundValue(res.orders, res.views, true);
-    //   res.drr = getRoundValue(res.sum, res.sum_orders, true, 1);
-
-    //   // console.log(art, daysCount, res);
-    //   return res;
-    // };
-
-    getPlacements(uid, campaignName);
-    const campaignMassAdvertsData = calcMassAdvertsNewAndWriteToJsonMM(
+    const advertsManagerRulesPath = path.join(
+      __dirname,
+      "marketMaster",
       uid,
-      campaignName
+      campaignName,
+      "advertsManagerRules.json"
     );
+    const advertsManagerRules = readIfExists(advertsManagerRulesPath);
+
+    let campaignMassAdvertsData = {}
+    try {
+      getPlacements(uid, campaignName);
+      campaignMassAdvertsData = calcMassAdvertsNewAndWriteToJsonMM(
+        uid,
+        campaignName
+      );
+    }
+    catch (e) {
+      console.log(e);
+      resolve();
+      return;
+    }
 
     const setAdvertsCPMs = async () => {
       for (const [art, bidsRules] of Object.entries(advertsAutoBidsRules)) {
         if (!art || !bidsRules) continue;
         if (!(art in arts.byBrandArt)) continue;
 
-        const bidStep = 5;
+        if (!advertsManagerRules[art]) continue;
+        for (const [advertsType, advertsTypeData] of Object.entries(advertsManagerRules[art])) {
 
-        // const advertsIds = {};
-        const activeAdvertsIds = [];
-        for (const [advertId, advertData] of Object.entries(advertsInfos)) {
-          if (!advertId || !advertData) continue;
+          if (!advertsType || !advertsTypeData) continue;
+          const { advertId, mode } = advertsTypeData;
+          if (!mode || !advertId) continue;
+
           if (!adverts[advertId]) continue;
-          if (advertData.name != art) continue;
-          if (advertData.type != 8 && advertData.type != 6 && advertData.type != 9) continue;
+          if (!advertsInfos[advertId]) continue;
 
-          if (advertData.status == 9) {
-            activeAdvertsIds.push(advertId);
+          const { name, type, status, createTime } = advertsInfos[advertId]
+          if (name != art) continue;
+          if (![8, 6, 9].includes(type)) continue;
+          if (status != 9) continue;
+
+          const daysInWork = getDaysInWork(createTime);
+
+          const isByDrr = (placementsRange) => {
+            return (placementsRange && placementsRange.from == 0 && placementsRange.to == 0) || advertsType == "carousel"
           }
-        }
-        // for (const [advertsType, activeAdvertsIdsData] of Object.entries(
-        //   activeAdvertsIds
-        // )) {
-        //   for (let i = 0; i < activeAdvertsIdsData.length; i++) {
-        //     const activeId = activeAdvertsIdsData[i]
-        //     for (const [advertId, advertData] of Object.entries(advertsInfos)) {
-        //     if (!advertId || !advertData) continue;
-        //     if (!adverts[advertId]) continue;
-        //     if (advertData.name != art) continue;
-        //     if (advertData.type != 8 && advertData.type != 6) continue;
 
-        //     if (getAdvertsType(advertId, advertsInfos) == advertsType) continue;
-
-        //     if (new Date(advertsInfos[]))
-
-        //     if (!activeAdvertsIds[advertsType])
-        //       activeAdvertsIds[advertsType] = [];
-        //     activeAdvertsIds[advertsType].push(advertId);
-        //   }
-        // }
-
-        for (let i = 0; i < activeAdvertsIds.length; i++) {
-          const { advertId, type, createTime } =
-            advertsInfos[activeAdvertsIds[i]];
-
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const yesterday = new Date(today);
-          yesterday.setDate(yesterday.getDate() - 1);
-          const startDate = new Date(createTime.slice(0, 10));
-          startDate.setHours(0, 0, 0, 0);
-          const daysInWork =
-            (today.getTime() - startDate.getTime()) / 86400 / 1000;
-
-
-
-          const advertsType = getAdvertsType(advertId, advertsInfos);
           const { desiredDRR, maxBid, placementsRange } =
-            bidsRules[advertsType] ?? {};
-          if (!desiredDRR) continue;
-          const advertsBudgetsToKeepData = advertsBudgetsToKeep[art]
-            ? advertsBudgetsToKeep[art][advertsType]
-            : undefined;
-          if (!advertsBudgetsToKeepData) continue;
-          if (!placementsRange || (placementsRange && placementsRange.from == 0 && placementsRange.to == 0)) {
-            if (daysInWork < 1) continue;
-          }
+            bidsRules ?? {};
+
+          if (!desiredDRR || !maxBid || !placementsRange) continue;
+
+          // if (isByDrr(placementsRange) && daysInWork < 1) continue;
+
           const min_recalc = (daysInWork) => {
             const res = {
               cpo: 0,
@@ -5530,11 +5567,31 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
 
           const { index, updateTime, prevIndex, phrase } =
             campaignMassAdvertsData[art].placements;
-          if (
-            placementsRange &&
-            placementsRange.from != 0 &&
-            placementsRange.to != 0
-          ) {
+
+          let currentBid = undefined;
+          let subjectId = undefined;
+          if (type == 8) {
+            if (!advertsInfos[advertId].autoParams) continue;
+            currentBid = advertsInfos[advertId].autoParams.cpm;
+          } else if (type == 6) {
+            if (!advertsInfos[advertId].params) continue;
+            const tempParams = advertsInfos[advertId].params[0];
+            currentBid = tempParams ? tempParams.price : undefined;
+            subjectId = tempParams ? tempParams.subjectId : undefined;
+          }
+          else if (type == 9) {
+            if (!advertsInfos[advertId].unitedParams) continue;
+            const tempParams = advertsInfos[advertId].unitedParams[0];
+            currentBid = tempParams ? tempParams.searchCPM : undefined;
+            subjectId = tempParams ? tempParams.subject ? tempParams.subject.id : undefined : undefined;
+          }
+
+          const ordersTemp = { orders: 0, sum_orders: 0 };
+          const minBid = type == 8 ? 125 : 150;
+          let bid = currentBid;
+          let rollback = false;
+
+          if (!isByDrr(placementsRange)) {
             if (!updateTime) continue;
             if (
               (new Date().getTime() - new Date(updateTime).getTime()) /
@@ -5543,16 +5600,15 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
               60
             )
               continue;
-            if (
-              prevBids
-                ? (new Date(updateTime).getTime() <=
-                  new Date(
-                    prevBids.slice(-1)[0].time
-                  ).getTime())
-                : false
+            if (prevBids && prevBids.length > 0) {
+              if (new Date(updateTime).getTime() <=
+                new Date(
+                  prevBids.slice(-1)[0].time
+                ).getTime()) continue;
 
-            )
-              continue;
+              bid = prevBids.slice(-1)[0].val ?? currentBid;
+            }
+
             // console.log(
             //   art,
             //   index,
@@ -5562,51 +5618,36 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             // );
 
 
-          }
+            // if (prevBids && prevBids.length >= 3) {
+            //   const prevData = prevBids.slice(-3);
+            //   // console.log(prevData);
+            //   if (!prevData[2].rollback) {
+            //     if (prevData[0].index != -1 && prevData[1].index != -1 && prevData[2].index != -1) {
+            //       if (prevData[2].val > prevData[1].val && prevData[1].val > prevData[0].val && prevData[1].index <= prevData[2].index) {
+            //         bid = Math.round(bid - 10);
+            //         rollback = true;
+            //       }
+            //     }
+            //   } else {
+            //     if (prevData[2].index == index) {
+            //       bid = Math.round(bid - 10);
+            //       rollback = true;
+            //     }
+            //   }
+            // }
 
-          // if (views == undefined) continue;
-          // if (cr == undefined || drr == undefined || orders == undefined)
-          // continue;
-          if (!advertId || !type) continue;
-
-          let currentBid = undefined;
-          let subjectId = undefined;
-          if (type == 8) {
-            currentBid = advertsInfos[advertId].autoParams.cpm;
-          } else if (type == 6) {
-            const tempParams = advertsInfos[advertId].params[0];
-            currentBid = tempParams ? tempParams.price : undefined;
-            subjectId = tempParams ? tempParams.subjectId : undefined;
-          }
-          else if (type == 9) {
-            const tempParams = advertsInfos[advertId].unitedParams[0];
-            currentBid = tempParams ? tempParams.searchCPM : undefined;
-            subjectId = tempParams ? tempParams.subject ? tempParams.subject.id : undefined : undefined;
-          }
-
-          const ordersTemp = { orders: 0, sum_orders: 0 };
-          const minBid = type == 8 ? 125 : 150;
-          let bid = currentBid;
-          if (
-            placementsRange &&
-            placementsRange.from != 0 &&
-            placementsRange.to != 0
-          ) {
-            if (prevBids) {
-              bid = prevBids.slice(-1)[0].val ?? currentBid;
-            }
-
-            if (index > placementsRange.to || index == -1) {
-              bid = Math.round(bid * 1.1);
+            if (rollback) { }
+            else if (index > placementsRange.to || index == -1) {
+              bid = Math.round(bid + 10);
             } else if (index < placementsRange.from) {
-              bid = Math.round(bid * 0.9);
+              bid = Math.round(bid - 10);
             }
             else if (campaignMassAdvertsData[art].placements) {
               const { prevIndex, prevPrevIndex } = campaignMassAdvertsData[art].placements;
 
               if (!prevIndex || !prevPrevIndex || prevIndex == -1 || prevPrevIndex == -1) continue;
               if (prevIndex <= placementsRange.to && prevIndex >= placementsRange.from && prevPrevIndex <= placementsRange.to && prevPrevIndex >= placementsRange.from) {
-                bid = Math.round(bid * 0.95);
+                bid = Math.round(bid - 5);
               } else {
                 if (placementsRange.from <= index && placementsRange.to >= index)
                   continue;
@@ -5615,12 +5656,11 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             }
           }
           else {
-            const { cr, drr, views, orders } = min_recalc(daysInWork);
-            /// TODO add active campaign sum check
+            const { cr } = min_recalc(daysInWork);
 
             for (const [_day, strDate] of Object.entries({
-              today: getLocaleDateString(today).slice(0, 10),
-              yesterday: getLocaleDateString(yesterday).slice(0, 10),
+              today: getLocaleDateString(getDateNDaysAgo(0)).slice(0, 10),
+              yesterday: getLocaleDateString(getDateNDaysAgo(1)).slice(0, 10),
             })) {
               if (ordersData[strDate]) {
                 const sizes = arts.byBrandArt[art].sizes;
@@ -5658,11 +5698,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
           // else if (drr > desiredDRR) bid -= bidStep;
           // let bid = Math.round(cr * 10 * desiredCPO);
 
-          if (maxBid) {
-            if (bid > maxBid) bid = maxBid;
-          } else if (advertsBudgetsToKeepData) {
-            if (bid > advertsBudgetsToKeepData) bid = advertsBudgetsToKeepData;
-          }
+          if (bid > maxBid) bid = maxBid;
           if (bid < minBid) bid = minBid;
 
           // else if (views < 1000 && bid > currentBid) break;
@@ -5676,6 +5712,10 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             params["param"] = subjectId;
           }
           if (type == 9) {
+            params["instrument"] = 4
+            await setAdvertCPM(authToken, params);
+            await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
+
             params["instrument"] = 6
           }
 
@@ -5709,6 +5749,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             index: index,
             prevIndex: prevIndex,
             phrase: phrase,
+            rollback: rollback,
           });
         }
       }
@@ -5770,6 +5811,15 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
       "advertsStatsByDay.json"
     )
   );
+  const advertsStats = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsStats.json"
+    )
+  );
 
   const adverts = readIfExists(
     path.join(__dirname, "marketMaster", uid, campaignName, "adverts.json")
@@ -5784,6 +5834,8 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
   for (const [advertId, advertData] of Object.entries(adverts)) {
     if (!advertId || !advertData) continue;
 
+
+    if (advertId != '15957333') continue;
     // if (!adverts[advertId]) {
     //   console.log("ola soy dora");
     //   continue;
@@ -5816,7 +5868,7 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
     const updateDate = getDateFromLocaleString(updateTime);
     const minutesPassed =
       (now.getTime() - (updateDate.getTime() - 1000 * 60 * 60 * 3)) / 60 / 1000;
-    if (minutesPassed < 20) continue;
+    // if (minutesPassed < 20) continue;
     console.log(uid, campaignName, advertId, minutesPassed, updateTime);
 
     if (params[numOfButches].length == batchSize) {
@@ -5827,19 +5879,13 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
     // console.log(uid, campaignName, advertId);
 
     const dates = [];
-    const startDate = new Date(advertData.createTime);
+    const startDate = new Date(advertsInfos[advertId].createTime);
     startDate.setHours(0, 0, 0, 0);
     const daysBetween = (today.getTime() - startDate.getTime()) / 86400 / 1000;
 
-    for (let i = 0; i <= daysBetween; i++) {
-      const tempDate = new Date(startDate);
-      tempDate.setHours(0, 0, 0, 0);
-      tempDate.setDate(startDate.getDate() + i);
-      const strTempDate = tempDate
-        .toLocaleString("ru-RU")
-        .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-        .slice(0, 10);
-      dates.push(strTempDate);
+    for (let i = 0; i <= 0; i++) {
+      console.log(getDateNDaysAgo(i), getDateNDaysAgo(i).toISOString());
+      dates.push(getDateNDaysAgo(i).toISOString().slice(0, 10));
     }
     // console.log(
     //   advertId,
@@ -5892,6 +5938,7 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
             console.log("Skipped:", params[i], pr[j]);
             continue;
           }
+          console.log(advertData, advertData.days);
           advertData.updateTime = new Date().toLocaleString("ru-RU");
           if (advertId in jsonData) {
             for (
@@ -5901,14 +5948,15 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
             ) {
               const dateData = jsonData[advertId].days[dateIndex];
               const date = dateData.date;
-              // console.log(advertId, jsonData[advertId], date, dateData);
+
+              // if (advertId == "15907474")
+              //   console.log(advertId, jsonData[advertId], date, dateData);
               const datePrIndex = advertData.days.findIndex(
                 (el) => el.date == date
               );
-
               if (datePrIndex == -1) {
-                console.log(advertId, date, "no data for date in db");
-                advertData.days[datePrIndex] = dateData;
+                // console.log(advertId, date, "no data for date in db");
+                advertData.days.push(dateData);
               } else if (dateData.sum > advertData.days[datePrIndex].sum) {
                 console.log(advertId, date, "date in db and bigger");
                 advertData.days[datePrIndex] = dateData;
@@ -6250,19 +6298,20 @@ const getAdvertsStatByDayMM = (uid, campaignName) => {
     const status = advertsInfos[advertId].status;
     const updateTime = stats.updateTime;
     const artsToSumUp = [];
-    const splitted = name.split("/")[0];
+    const splitted = name;
     if (!(splitted in arts.byArt)) {
       let nms = [];
       if (type == 8) {
         nms = advertsInfos[advertId].autoParams.nms ?? [];
-      } else {
-        const tempParams = advertsInfos[advertId].params;
-        if (!tempParams) continue;
-        const temp = tempParams[0].nms ?? [];
+      } else if (type == 9) {
+        nms = advertsInfos[advertId].unitedParams ? advertsInfos[advertId].unitedParams[0].nms ?? [] : [];
+      } else if (type == 6) {
+        const temp = advertsInfos[advertId].params ? advertsInfos[advertId].params[0].nms : [];
         for (let i = 0; i < temp.length; i++) {
           nms.push(temp[i].nm);
         }
       }
+
 
       for (let i = 0; i < nms.length; i++) {
         if (!arts.byNmId[nms[i]]) continue;
@@ -7032,19 +7081,20 @@ const fetchOrdersAndWriteToJsonMM = (uid, campaignName, daysAgo = undefined) => 
   return new Promise((resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
     const dateFrom = new Date();
-    dateFrom.setDate(dateFrom.getDate() - (daysAgo ?? 14));
+    dateFrom.setDate(dateFrom.getDate() - (daysAgo ?? 30));
     const date = dateFrom.toISOString().slice(0, 10);
     console.log(date);
     const params = {
       dateFrom: date,
-      flag: daysAgo ? 1 : 0,
+      flag: daysAgo === undefined ? 0 : 1,
+      // flag: 1,
     };
     return getOrders(authToken, params)
       .then((data) => {
         if (!data) return;
         // afs.writeFileSync(
         //   path.join(
-        //     __dirname,
+        //     __dirname, 
         //     "marketMaster",
         //     uid,
         //     campaignName,
@@ -7060,15 +7110,16 @@ const fetchOrdersAndWriteToJsonMM = (uid, campaignName, daysAgo = undefined) => 
   });
 };
 
-const fetchSalesAndWriteToJsonMM = (uid, campaignName) => {
+const fetchSalesAndWriteToJsonMM = (uid, campaignName, daysAgo) => {
   return new Promise((resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
     const dateFrom = new Date();
-    dateFrom.setDate(dateFrom.getDate() - 30);
-    const date = dateFrom.toISOString().slice(0, 10);
+    dateFrom.setDate(dateFrom.getDate() - daysAgo ?? 35);
+    const date = getLocaleDateString(dateFrom).slice(0, 10);
     console.log(date);
     const params = {
       dateFrom: date,
+      flag: daysAgo === undefined ? 0 : 1,
     };
     return getSales(authToken, params)
       .then((data) => {
@@ -7126,7 +7177,6 @@ const calcSmartDetailedByPeriodAndWriteToJSON = (campaign) => {
 
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = getLocaleDateString(yesterday).slice(0, 10);
 
   const jsonData = {};
 
@@ -7150,84 +7200,90 @@ const calcSmartDetailedByPeriodAndWriteToJSON = (campaign) => {
     if (!data[art]) continue;
     const { volume, ktr } = data[art];
 
-    if (!orders[yesterdayStr].all[art]) {
-      const koef = tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100;
-      jsonData[art].delivery +=
-        (tariffs["Краснодар"].boxDeliveryBase / koef) *
-        (volume < 1 ? volume : 1);
-      if (volume > 1) {
+    for (let daysAgo = 1; daysAgo <= 7; daysAgo++) {
+
+      const yesterdayStr = getLocaleDateString(getDateNDaysAgo(daysAgo)).slice(0, 10);
+      // const yesterdayStr = getLocaleDateString(yesterday).slice(0, 10);
+      if (!orders[yesterdayStr].all[art]) {
+        const koef = tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100;
         jsonData[art].delivery +=
-          (volume - 1) * (tariffs["Краснодар"].boxDeliveryLiter / koef);
+          (tariffs["Краснодар"].boxDeliveryBase / koef) *
+          (volume < 1 ? volume : 1);
+        if (volume > 1) {
+          jsonData[art].delivery +=
+            (volume - 1) * (tariffs["Краснодар"].boxDeliveryLiter / koef);
+        }
+
+        jsonData[art].delivery += (1 - buyoutsPercent / 100) * 50;
+        jsonData[art].delivery *= ktr ?? 1;
+
+        jsonData[art].orders += 1;
       }
 
-      jsonData[art].delivery += (1 - buyoutsPercent / 100) * 50;
-      jsonData[art].delivery *= ktr ?? 1;
+      for (const [warehouseName, warehouseData] of Object.entries(
+        orders[yesterdayStr]
+      )) {
+        if (warehouseName == "all") continue;
 
-      jsonData[art].orders = 1;
-    }
+        const warehouseOrders = { orders: 0, sum_orders: 0, delivery: 0 };
 
-    for (const [warehouseName, warehouseData] of Object.entries(
-      orders[yesterdayStr]
-    )) {
-      if (warehouseName == "all") continue;
+        const ordersData = warehouseData[art] ?? {};
+        const { count, sum } = ordersData;
+        if (count === undefined || sum === undefined) continue;
 
-      const warehouseOrders = { orders: 0, sum_orders: 0, delivery: 0 };
+        warehouseOrders.orders += count;
+        warehouseOrders.sum_orders += sum;
 
-      const ordersData = warehouseData[art] ?? {};
-      const { count, sum } = ordersData;
-      if (count === undefined || sum === undefined) continue;
+        const boxDeliveryBase = tariffs[warehouseName]
+          ? tariffs[warehouseName].boxDeliveryBase
+          : tariffs["Краснодар"].boxDeliveryBase /
+          (tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100);
+        const boxDeliveryLiter = tariffs[warehouseName]
+          ? tariffs[warehouseName].boxDeliveryLiter
+          : tariffs["Краснодар"].boxDeliveryLiter /
+          (tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100);
 
-      warehouseOrders.orders += count;
-      warehouseOrders.sum_orders += sum;
-      console.log(warehouseName, tariffs[warehouseName], art);
+        warehouseOrders.delivery +=
+          count * boxDeliveryBase * (volume < 1 ? volume : 1);
+        if (volume > 1) {
+          warehouseOrders.delivery += count * ((volume - 1) * boxDeliveryLiter);
+        }
 
-      const boxDeliveryBase = tariffs[warehouseName]
-        ? tariffs[warehouseName].boxDeliveryBase
-        : tariffs["Краснодар"].boxDeliveryBase /
-        (tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100);
-      const boxDeliveryLiter = tariffs[warehouseName]
-        ? tariffs[warehouseName].boxDeliveryLiter
-        : tariffs["Краснодар"].boxDeliveryLiter /
-        (tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100);
+        warehouseOrders.delivery += count * (1 - buyoutsPercent / 100) * 50;
+        warehouseOrders.delivery *= ktr ?? 1;
+        // if (art == "ПР_160_ФИОЛЕТОВЫЙ_ОТК")
+        //   console.log(
+        //     count,
+        //     volume,
+        //     count * tariffs[warehouseName].boxDeliveryBase,
+        //     count * ((volume - 1) * tariffs[warehouseName].boxDeliveryLiter),
+        //     count * (1 - buyoutsPercent / 100) * 50
+        //   );
 
-      warehouseOrders.delivery +=
-        count * boxDeliveryBase * (volume < 1 ? volume : 1);
-      if (volume > 1) {
-        warehouseOrders.delivery += count * ((volume - 1) * boxDeliveryLiter);
+        // if (art == "ПР_160_ФИОЛЕТОВЫЙ_ОТК")
+        //   console.log(
+        //     art,
+        //     jsonData[art],
+        //     sum,
+        //     count,
+        //     warehouseOrders,
+        //     warehouseName,
+        //     buyoutsPercent,
+        //     tariffs[warehouseName]
+        //   );
+
+        jsonData[art].delivery += warehouseOrders.delivery;
+        jsonData[art].orders += warehouseOrders.orders;
+        jsonData[art].sum_orders += warehouseOrders.sum_orders;
+        jsonData[art].avg =
+          getRoundValue(jsonData[art].delivery, jsonData[art].orders, true) / 100;
+
+        // jsonData[art].orders += warehouseOrders.orders;
+        // jsonData[art].delivery +=
+        // if (art == 'КПБ_1.5_СЛВДР_2496_ОТК')
+        //   console.log(warehouseName, tariffs[warehouseName], art, warehouseOrders, jsonData[art], yesterdayStr);
       }
-
-      warehouseOrders.delivery += count * (1 - buyoutsPercent / 100) * 50;
-      warehouseOrders.delivery *= ktr ?? 1;
-      // if (art == "ПР_160_ФИОЛЕТОВЫЙ_ОТК")
-      //   console.log(
-      //     count,
-      //     volume,
-      //     count * tariffs[warehouseName].boxDeliveryBase,
-      //     count * ((volume - 1) * tariffs[warehouseName].boxDeliveryLiter),
-      //     count * (1 - buyoutsPercent / 100) * 50
-      //   );
-
-      // if (art == "ПР_160_ФИОЛЕТОВЫЙ_ОТК")
-      //   console.log(
-      //     art,
-      //     jsonData[art],
-      //     sum,
-      //     count,
-      //     warehouseOrders,
-      //     warehouseName,
-      //     buyoutsPercent,
-      //     tariffs[warehouseName]
-      //   );
-
-      jsonData[art].delivery += warehouseOrders.delivery;
-      jsonData[art].orders += warehouseOrders.orders;
-      jsonData[art].sum_orders += warehouseOrders.sum_orders;
-
-      // jsonData[art].orders += warehouseOrders.orders;
-      // jsonData[art].delivery +=
     }
-    jsonData[art].avg =
-      getRoundValue(jsonData[art].delivery, jsonData[art].orders, true) / 100;
   }
 
   afs.writeFileSync(
@@ -7577,460 +7633,136 @@ const getAdvertsType = (advertId, advertsInfos) => {
   return advertType;
 };
 
-const calcMassAdvertsAndWriteToJsonMM = (uid, campaignName, dateRange) => {
-  const arts = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
-    )
-  );
-  const adverts = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "adverts.json")
-    )
-  );
-  const advertsStocksThreshold = readIfExists(
-    path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsStocksThreshold.json"
-    )
-  );
-
-  const advertsBudgets = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsBudgets.json"
-      )
-    )
-  );
-  const advertsPlusPhrasesTemplates = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "../prices/marketMaster",
-        uid,
-        campaignName,
-        "advertsPlusPhrasesTemplates.json"
-      )
-    )
-  );
-  const advertsBudgetsToKeep = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsBudgetsToKeep.json"
-      )
-    )
-  );
-  const advertsWords = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsWords.json"
-      )
-    )
-  );
-  const advertsAutoBidsRules = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsAutoBidsRules.json"
-      )
-    )
-  );
-  const advertsInfos = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsInfos.json"
-      )
-    )
-  );
-  const advertsBidsLogPath = path.join(
-    __dirname,
-    "marketMaster",
-    uid,
-    campaignName,
-    "advertsBidsLog.json"
-  );
-  const advertsBidsLog = readIfExists(advertsBidsLogPath);
-  const advertsStatsByDay = JSON.parse(
-    afs.readFileSync(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "advertsStatsByDay.json"
-      )
-    )
-  );
-  const stocks = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "stocks.json")
-    )
-  );
-  const orders = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "orders.json")
-    )
-  );
-
-  arts.byBrandArt = {};
-  for (const [nmId, artData] of Object.entries(arts.byNmId)) {
-    arts.byBrandArt[artData.art] = artData;
-  }
-
-  const advertsStatsByArt = {};
-  for (const [advertId, advertStats] of Object.entries(advertsStatsByDay)) {
-    if (!advertId || !advertStats) continue;
-    const art = advertsInfos[advertId].name;
-    if (!(art in advertsStatsByArt)) advertsStatsByArt[art] = {};
-    // console.log(artsToSumOrders);
-
-    for (const [date, dateData] of Object.entries(advertStats.days)) {
-      if (!(date in advertsStatsByArt[art]))
-        advertsStatsByArt[art][date] = {
-          orders: 0,
-          sum_orders: 0,
-          sum: 0,
-          views: 0,
-          clicks: 0,
-        };
-
-      advertsStatsByArt[art][date].sum += dateData.sum ?? 0;
-      advertsStatsByArt[art][date].views += dateData.views ?? 0;
-      advertsStatsByArt[art][date].clicks += dateData.clicks ?? 0;
-    }
-  }
-
-  ////// orders
-  if (orders) {
-    for (const [date, ordersData] of Object.entries(orders)) {
-      for (const [local_art, artOrdersData] of Object.entries(ordersData.all)) {
-        if (!(local_art in arts.byArt)) continue;
-        const art = arts.byArt[local_art].brand_art;
-        if (!(art in advertsStatsByArt)) advertsStatsByArt[art] = {};
-
-        if (!(date in advertsStatsByArt[art]))
-          advertsStatsByArt[art][date] = {
-            orders: 0,
-            sum_orders: 0,
-            sum: 0,
-            views: 0,
-            clicks: 0,
-          };
-
-        advertsStatsByArt[art][date].orders += artOrdersData.count;
-        advertsStatsByArt[art][date].sum_orders += artOrdersData.sum;
-      }
-    }
-  }
-
-  const artsWithAdverts = {};
-  for (const [advertId, advertInfos] of Object.entries(advertsInfos)) {
-    if (!advertId || !advertInfos) continue;
-    const type = advertInfos.type;
-    const status = advertInfos.status;
-
-    if (!adverts[advertId]) continue;
-
-    if (![4, 9, 11].includes(status)) continue;
-
-    const budget = advertsBudgets[advertId];
-
-    let currentBid = undefined;
-    if (type == 8) {
-      currentBid = advertInfos.autoParams.cpm;
-    } else if (type == 6) {
-      const tempParams = advertInfos.params ? advertInfos.params[0] : undefined;
-      currentBid = tempParams ? tempParams.price : undefined;
-    }
-    const cpm = currentBid;
-
-    let nms = [];
-    if (type == 8) {
-      nms = advertInfos.autoParams.nms ?? [];
-    } else {
-      const temp = advertInfos.params ? advertInfos.params[0].nms : [];
-      for (let i = 0; i < temp.length; i++) {
-        nms.push(temp[i].nm);
-      }
-    }
-
-    for (let i = 0; i < nms.length; i++) {
-      const nmId = nms[i];
-      const artData = arts.byNmId[nmId];
-      if (!artData) continue;
-      const art = artData.art;
-      if (!art) continue;
-
-      if (!(art in artsWithAdverts)) artsWithAdverts[art] = {};
-      if (!(type in artsWithAdverts[art])) artsWithAdverts[art][type] = {};
-
-      const words = { excluded: [], clusters: [] };
-      const wordsForId = advertsWords[advertId]
-        ? type == 8
-          ? advertsWords[advertId]
-          : advertsWords[advertId].words
-        : undefined;
-      if (wordsForId) {
-        words.excluded = wordsForId.excluded;
-        if (type == 8) {
-          for (let j = 0; j < wordsForId.clusters.length; j++) {
-            const { cluster, count, keywords } = wordsForId.clusters[j];
-
-            const { stat } = advertsWords[advertId];
-
-            const clusterKeywordsTemp = new Array(keywords ?? []);
-            const clusterKeywords = clusterKeywordsTemp.filter(
-              (value, index) => {
-                return clusterKeywordsTemp.indexOf(value) === index;
-              }
-            );
-            if (!clusterKeywords.includes(cluster))
-              clusterKeywords.push(cluster);
-            const clusterStat = {
-              views: 0,
-              clicks: 0,
-              ctr: 0,
-              sum: 0,
-            };
-            for (let j = 0; j < clusterKeywords.length; j++) {
-              if (!stat[clusterKeywords[j]]) continue;
-              clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
-              clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
-              clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
-            }
-            clusterStat.ctr = getRoundValue(
-              clusterStat.clicks,
-              clusterStat.views,
-              true
-            );
-
-            words.clusters.push({
-              cluster: cluster,
-              count: count,
-              sum: clusterStat.sum,
-              ctr: clusterStat.ctr,
-              clicks: clusterStat.clicks,
-            });
-          }
-        } else if (type == 6) {
-          for (let j = 0; j < wordsForId.keywords.length; j++) {
-            const { keyword, count } = wordsForId.keywords[j];
-            const { stat } = advertsWords[advertId];
-            if (!stat[keyword]) continue;
-            const { sum, ctr, clicks } = stat[keyword];
-            words.clusters.push({
-              cluster: keyword,
-              count: count,
-              sum: sum,
-              ctr: ctr,
-              clicks: clicks,
-            });
-          }
-        }
-      }
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const startDate = new Date(advertInfos.createTime.slice(0, 10));
-      startDate.setHours(0, 0, 0, 0);
-      const daysInWork = (today.getTime() - startDate.getTime()) / 86400 / 1000;
-
-      artsWithAdverts[art][type][advertId] = {
-        updateTime: advertsStatsByDay[advertId]
-          ? advertsStatsByDay[advertId].updateTime
-          : "Ошибка.",
-        advertId: advertId,
-        type: type,
-        status: status,
-        budget: budget,
-        cpm: cpm,
-        words: words,
-        daysInWork: daysInWork,
-        bidLog: advertsBidsLog[advertId],
-      };
-    }
-  }
-
-  const dateFrom = new Date(dateRange.from);
-  dateFrom.setDate(dateFrom.getDate() - 30);
-  dateFrom.setHours(0, 0, 0, 0);
-  const dateTo = new Date(dateRange.to);
-  dateTo.setHours(0, 0, 0, 0);
-
-  const today = new Date();
-  const todayStr = today
-    .toLocaleDateString("ru-RU")
-    .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-    .slice(0, 10);
-
-  const jsonData = {};
-  for (const [nmId, artData] of Object.entries(arts.byNmId)) {
-    const art = artData.art;
-    if (!(art in jsonData)) jsonData[art] = {};
-
-    jsonData[art].art = art;
-    jsonData[art].object = artData.object;
-    jsonData[art].nmId = parseInt(nmId);
-    jsonData[art].title = artData.title;
-    jsonData[art].size = artData.size;
-    jsonData[art].adverts = artsWithAdverts[art];
-    jsonData[art].advertsStats = advertsStatsByArt[art];
-    jsonData[art].stocks = 0;
-    jsonData[art].brand = artData.brand;
-    jsonData[art].drrAI = advertsAutoBidsRules[art];
-    jsonData[art].budgetToKeep = advertsBudgetsToKeep[art];
-    jsonData[art].plusPhrasesTemplate = advertsPlusPhrasesTemplates[art];
-    jsonData[art].advertsStocksThreshold = advertsStocksThreshold[art];
-
-    const sizes = artData.sizes;
-    for (let i = 0; i < sizes.length; i++) {
-      const sku = sizes[i].skus[0];
-      const local_art = arts.bySku[sku].art;
-      jsonData[art].stocks += stocks[todayStr]
-        ? stocks[todayStr].all[local_art]
-          ? stocks[todayStr].all[local_art].quantity
-          : 0
-        : 0;
-    }
-  }
-
-  afs.writeFileSync(
-    path.join(__dirname, "marketMaster", uid, campaignName, "massAdverts.json"),
-    JSON.stringify(jsonData)
-  );
-
-  return jsonData;
-};
-
 const getPlacements = (uid, campaignName) => {
-  const advertsManagerRules = readIfExists(
-    path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsManagerRules.json"
-    )
-  );
-  const advertsWords = readIfExists(
-    path.join(__dirname, "marketMaster", uid, campaignName, "advertsWords.json")
-  );
+  try {
+    const advertsManagerRules = readIfExists(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsManagerRules.json"
+      )
+    );
 
-  const arts = readIfExists(
-    path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
-  );
-  arts.byBrandArt = {};
-  for (const [nmId, artData] of Object.entries(arts.byNmId)) {
-    artData.nmId = nmId;
-    arts.byBrandArt[artData.art] = artData;
-  }
+    const advertsSelectedPhrases = readIfExists(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsSelectedPhrases.json"
+      ))
 
-  const currentPlacements = readIfExists(
-    path.join(__dirname, "marketMaster", uid, campaignName, "placements.json")
-  );
 
-  const jsonData = {};
-  for (const [art, advertsTypes] of Object.entries(advertsManagerRules)) {
-    const topPhrase = { phrase: "", count: 0 };
+    const advertsWords = readIfExists(
+      path.join(__dirname, "marketMaster", uid, campaignName, "advertsWords.json")
+    );
 
-    if (!art || !advertsTypes) continue;
-    for (const [advertsType, rules] of Object.entries(advertsTypes)) {
-      if (!advertsType || !rules) continue;
-      const { advertId, mode } = rules;
-      if (!advertId || !mode) continue;
-      //   console.log(art, advertsType, rules);
+    const arts = readIfExists(
+      path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
+    );
+    arts.byBrandArt = {};
+    for (const [nmId, artData] of Object.entries(arts.byNmId)) {
+      artData.nmId = nmId;
+      arts.byBrandArt[artData.art] = artData;
+    }
 
-      const words = advertsWords[advertId];
-      if (!words) continue;
-      if (advertsType == "search") {
-        const { keywords, pluse } = words.words ?? {};
-        if (!keywords || !keywords.length) continue;
+    const jsonData = {};
+    for (const [art, advertsTypes] of Object.entries(advertsManagerRules)) {
+      const topPhrase = { phrase: "", count: 0 };
 
-        if (pluse) {
-          for (let j = 0; j < pluse.length; j++) {
-            const keyword = pluse[j];
-            const { stat } = advertsWords[advertId];
-            if (!stat[keyword]) continue;
-            const { views } = stat[keyword] ?? {};
-            // console.log(stat[keyword], keyword);
-            keywords.push({
-              keyword: keyword,
-              count: views,
-            });
+      if (advertsSelectedPhrases[art] && advertsSelectedPhrases[art].phrase) {
+        topPhrase.count = 10;
+        topPhrase.phrase = advertsSelectedPhrases[art].phrase;
+      }
+
+      else {
+
+        if (!art || !advertsTypes) continue;
+        for (const [advertsType, rules] of Object.entries(advertsTypes)) {
+          if (!advertsType || !rules) continue;
+          const { advertId, mode } = rules;
+          if (!advertId || !mode) continue;
+          //   console.log(art, advertsType, rules);
+
+          const words = advertsWords[advertId];
+          if (!words) continue;
+          if (advertsType == "search") {
+            const { keywords, pluse } = words.words ?? {};
+            if (!keywords || !keywords.length) continue;
+
+            if (pluse) {
+              for (let j = 0; j < pluse.length; j++) {
+                const keyword = pluse[j];
+                const { stat } = advertsWords[advertId];
+                if (!stat[keyword]) continue;
+                const { views } = stat[keyword] ?? {};
+                // console.log(stat[keyword], keyword);
+                keywords.push({
+                  keyword: keyword,
+                  count: views,
+                });
+              }
+            }
+
+            keywords.sort((a, b) => b.count - a.count);
+
+            const top = keywords[0];
+            // console.log(art, advertsType, top);
+
+            if (!topPhrase.count || topPhrase.count < top.count) {
+              topPhrase.phrase = top.keyword;
+              topPhrase.count = top.count;
+              //   console.log(art, advertsType, topPhrase);
+            }
+          } else {
+            const { clusters } = words ?? {};
+            if (!clusters || !clusters.length) continue;
+
+            const top = clusters[0];
+
+            if (!topPhrase.count || topPhrase.count < top.count) {
+              topPhrase.phrase = top.cluster;
+              topPhrase.count = top.count;
+              //   console.log(art, advertsType, topPhrase);
+            }
           }
         }
+      }
 
-        keywords.sort((a, b) => b.count - a.count);
+      const phrasePlacementsPath = path.join(
+        __dirname,
+        "placementsByPhrases",
+        `${topPhrase.phrase.replace(/\s/g, "_")}.json`
+      );
+      const phrasePlacements = readIfExists(phrasePlacementsPath);
+      const { updateTime, data, firstAdvertIndex } = phrasePlacements;
 
-        const top = keywords[0];
-        // console.log(art, advertsType, top);
+      const { nmId } = arts.byBrandArt[art] ?? {};
+      if (!nmId) continue;
 
-        if (!topPhrase.count || topPhrase.count < top.count) {
-          topPhrase.phrase = top.keyword;
-          topPhrase.count = top.count;
-          //   console.log(art, advertsType, topPhrase);
-        }
-      } else {
-        const { clusters } = words ?? {};
-        if (!clusters || !clusters.length) continue;
-
-        const top = clusters[0];
-
-        if (!topPhrase.count || topPhrase.count < top.count) {
-          topPhrase.phrase = top.cluster;
-          topPhrase.count = top.count;
-          //   console.log(art, advertsType, topPhrase);
-        }
+      const phrasePlacementsData = data ? data[nmId] : undefined;
+      if (!phrasePlacementsData)
+        jsonData[art] = { index: -1, updateTime, phrase: topPhrase.phrase, firstAdvertIndex };
+      else {
+        phrasePlacementsData.updateTime = updateTime;
+        phrasePlacementsData.firstAdvertIndex = firstAdvertIndex;
+        phrasePlacementsData.phrase = topPhrase.phrase;
+        jsonData[art] = phrasePlacementsData;
       }
     }
 
-    const phrasePlacementsPath = path.join(
-      __dirname,
-      "placementsByPhrases",
-      `${topPhrase.phrase.replace(/\s/g, "_")}.json`
+    afs.writeFileSync(
+      path.join(__dirname, "marketMaster", uid, campaignName, "placements.json"),
+      JSON.stringify(jsonData)
     );
-    const phrasePlacements = readIfExists(phrasePlacementsPath);
-    const { updateTime, data } = phrasePlacements;
-
-    const { nmId } = arts.byBrandArt[art] ?? {};
-    if (!nmId) continue;
-
-    const phrasePlacementsData = data ? data[nmId] : undefined;
-    if (!phrasePlacementsData)
-      jsonData[art] = { index: -1, updateTime, phrase: topPhrase.phrase };
-    else {
-      phrasePlacementsData.updateTime = updateTime;
-      phrasePlacementsData.phrase = topPhrase.phrase;
-      jsonData[art] = phrasePlacementsData;
-    }
+  } catch (e) {
+    console.log(e);
+    return;
   }
 
-  afs.writeFileSync(
-    path.join(__dirname, "marketMaster", uid, campaignName, "placements.json"),
-    JSON.stringify(jsonData)
-  );
+
 };
 
 const calcMassAdvertsNewAndWriteToJsonMM = (
@@ -8041,7 +7773,14 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
   const arts = readIfExists(
     path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
   );
-
+  const requests = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+      "requests.json"
+    )
+  );
   const adverts = readIfExists(
     path.join(__dirname, "marketMaster", uid, campaignName, "adverts.json")
   );
@@ -8054,6 +7793,15 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
       "advertsStocksThreshold.json"
     )
   );
+
+  const advertsSelectedPhrasesPath = path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "advertsSelectedPhrases.json"
+  );
+  const advertsSelectedPhrases = readIfExists(advertsSelectedPhrasesPath);
 
   const advertsBudgets = readIfExists(
     path.join(
@@ -8121,6 +7869,9 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
   const orders = readIfExists(
     path.join(__dirname, "marketMaster", uid, campaignName, "orders.json")
   );
+  const sales = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "sales.json")
+  );
   const placements = readIfExists(
     path.join(__dirname, "marketMaster", uid, campaignName, "placements.json")
   );
@@ -8151,32 +7902,49 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     for (const [date, dateData] of Object.entries(advertStats.days)) {
       if (!(date in advertsStatsByArt[art]))
         advertsStatsByArt[art][date] = {
-          search: {
-            orders: 0,
-            sum_orders: 0,
-            sum: 0,
-            views: 0,
-            clicks: 0,
-          },
-          booster: {
-            orders: 0,
-            sum_orders: 0,
-            sum: 0,
-            views: 0,
-            clicks: 0,
-          },
-          carousel: {
-            orders: 0,
-            sum_orders: 0,
-            sum: 0,
-            views: 0,
-            clicks: 0,
-          },
+          orders: 0,
+          sum_orders: 0,
+          sum: 0,
+          views: 0,
+          clicks: 0,
+          sales: 0,
+          sum_sales: 0,
+          // search: {
+          //   orders: 0,
+          //   sum_orders: 0,
+          //   sum: 0,
+          //   views: 0,
+          //   clicks: 0,
+          //   sales: 0,
+          //   sum_sales: 0,
+          // },
+          // booster: {
+          //   orders: 0,
+          //   sum_orders: 0,
+          //   sum: 0,
+          //   views: 0,
+          //   clicks: 0,
+          //   sales: 0,
+          //   sum_sales: 0,
+          // },
+          // carousel: {
+          //   orders: 0,
+          //   sum_orders: 0,
+          //   sum: 0,
+          //   views: 0,
+          //   clicks: 0,
+          //   sales: 0,
+          //   sum_sales: 0,
+          // },
         };
 
-      advertsStatsByArt[art][date][advertType].views += dateData.views ?? 0;
-      advertsStatsByArt[art][date][advertType].sum += dateData.sum ?? 0;
-      advertsStatsByArt[art][date][advertType].clicks += dateData.clicks ?? 0;
+      // advertsStatsByArt[art][date][advertType].views += dateData.views ?? 0;
+      // advertsStatsByArt[art][date][advertType].sum += dateData.sum ?? 0;
+      // advertsStatsByArt[art][date][advertType].clicks += dateData.clicks ?? 0;
+
+      advertsStatsByArt[art][date].views += dateData.views ?? 0;
+      advertsStatsByArt[art][date].sum += dateData.sum ?? 0;
+      advertsStatsByArt[art][date].clicks += dateData.clicks ?? 0;
     }
   }
 
@@ -8190,27 +7958,13 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
 
         if (!(date in advertsStatsByArt[art])) {
           advertsStatsByArt[art][date] = {
-            search: {
-              orders: 0,
-              sum_orders: 0,
-              sum: 0,
-              views: 0,
-              clicks: 0,
-            },
-            booster: {
-              orders: 0,
-              sum_orders: 0,
-              sum: 0,
-              views: 0,
-              clicks: 0,
-            },
-            carousel: {
-              orders: 0,
-              sum_orders: 0,
-              sum: 0,
-              views: 0,
-              clicks: 0,
-            },
+            orders: 0,
+            sum_orders: 0,
+            sum: 0,
+            views: 0,
+            clicks: 0,
+            sales: 0,
+            sum_sales: 0,
           };
         }
 
@@ -8251,6 +8005,86 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
       }
     }
   }
+
+  ///// sales
+  if (sales) {
+    for (const [local_art, artSalesData] of Object.entries(sales)) {
+      if (local_art == 'byObject') continue;
+      for (const [date, salesData] of Object.entries(artSalesData.all)) {
+        if (!(local_art in arts.byArt)) continue;
+        const art = arts.byArt[local_art].brand_art;
+        if (!(art in advertsStatsByArt)) advertsStatsByArt[art] = {};
+
+        if (!(date in advertsStatsByArt[art])) {
+          advertsStatsByArt[art][date] = {
+            search: {
+              orders: 0,
+              sum_orders: 0,
+              sum: 0,
+              views: 0,
+              clicks: 0,
+              sales: 0,
+              sum_sales: 0,
+            },
+            booster: {
+              orders: 0,
+              sum_orders: 0,
+              sum: 0,
+              views: 0,
+              clicks: 0,
+              sales: 0,
+              sum_sales: 0,
+            },
+            carousel: {
+              orders: 0,
+              sum_orders: 0,
+              sum: 0,
+              views: 0,
+              clicks: 0,
+              sales: 0,
+              sum_sales: 0,
+            },
+          };
+        }
+
+        const searchClicks = advertsStatsByArt[art][date]["search"]
+          ? advertsStatsByArt[art][date]["search"].clicks
+          : 0;
+        const boosterClicks = advertsStatsByArt[art][date]["booster"]
+          ? advertsStatsByArt[art][date]["booster"].clicks
+          : 0;
+        const carouselClicks = advertsStatsByArt[art][date]["carousel"]
+          ? advertsStatsByArt[art][date]["carousel"].clicks
+          : 0;
+        const sumClicks = searchClicks + boosterClicks + carouselClicks;
+        if (sumClicks) {
+          if (searchClicks) {
+            advertsStatsByArt[art][date]["search"].sales +=
+              salesData.count * (searchClicks / sumClicks);
+            advertsStatsByArt[art][date]["search"].sum_sales +=
+              salesData.sum * (searchClicks / sumClicks);
+          }
+          if (boosterClicks) {
+            advertsStatsByArt[art][date]["booster"].sales +=
+              salesData.count * (boosterClicks / sumClicks);
+            advertsStatsByArt[art][date]["booster"].sum_sales +=
+              salesData.sum * (boosterClicks / sumClicks);
+          }
+          if (carouselClicks) {
+            advertsStatsByArt[art][date]["carousel"].sales +=
+              salesData.count * (carouselClicks / sumClicks);
+            advertsStatsByArt[art][date]["carousel"].sum_sales +=
+              salesData.sum * (carouselClicks / sumClicks);
+          }
+        } else {
+          advertsStatsByArt[art][date]["booster"].sales += salesData.count;
+          advertsStatsByArt[art][date]["booster"].sum_sales +=
+            salesData.sum;
+        }
+      }
+    }
+  }
+
 
   // console.log(advertsStatsByArt);
 
@@ -8318,29 +8152,35 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
       if (wordsForId) {
         for (let j = 0; j < wordsForId.excluded.length; j++) {
           const keyword = wordsForId.excluded[j];
-          const { stat } = advertsWords[advertId];
+          const { stat, statOnMinus } = advertsWords[advertId];
           // if (!stat[keyword]) continue;
-          const { sum, ctr, clicks, views } = stat[keyword] ?? {};
+          const { sum, ctr, clicks, views } = statOnMinus[keyword] ?? {};
           // console.log(stat[keyword], keyword);
           words.excluded.push({
             cluster: keyword,
+            freq: requests[keyword],
             count: views,
             sum: sum,
             ctr: ctr,
             clicks: clicks,
+            cpc: getRoundValue(sum, clicks, false, undefined),
           });
         }
+        words.excluded.sort((a, b) => { return b.freq - a.freq });
+
         if (type == 8) {
           for (let j = 0; j < wordsForId.clusters.length; j++) {
             const { cluster, count, keywords } = wordsForId.clusters[j];
 
             const { stat } = advertsWords[advertId];
-            const clusterKeywordsTemp = new Array(keywords ?? []);
+            const clusterKeywordsTemp = Array.from(keywords ?? []);
             const clusterKeywords = clusterKeywordsTemp.filter(
               (value, index) => {
                 return clusterKeywordsTemp.indexOf(value) === index;
               }
             );
+            // if (advertId == "15641202")
+            //   console.log(clusterKeywords, keywords);
             if (!clusterKeywords.includes(cluster))
               clusterKeywords.push(cluster);
             const clusterStat = {
@@ -8348,8 +8188,12 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
               clicks: 0,
               ctr: 0,
               sum: 0,
+              freq: 0,
             };
             for (let j = 0; j < clusterKeywords.length; j++) {
+              // if (advertId == "15641202")
+              //   console.log(j, clusterKeywords[j], requests[clusterKeywords[j]]);
+              clusterStat.freq += requests[clusterKeywords[j]] ?? 0;
               if (!stat[clusterKeywords[j]]) continue;
               clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
               clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
@@ -8363,10 +8207,12 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
 
             words.clusters.push({
               cluster: cluster,
+              freq: clusterStat.freq,
               count: count,
               sum: clusterStat.sum,
               ctr: clusterStat.ctr,
               clicks: clusterStat.clicks,
+              cpc: getRoundValue(clusterStat.sum, clusterStat.clicks, false, undefined),
             });
           }
         } else if (type == 6) {
@@ -8387,10 +8233,11 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
           for (let j = 0; j < wordsForId.keywords.length; j++) {
             const { keyword, count } = wordsForId.keywords[j];
             const { stat } = advertsWords[advertId];
-            if (!stat[keyword]) continue;
-            const { sum, ctr, clicks } = stat[keyword];
+
+            const { sum, ctr, clicks } = stat ? stat[keyword] ?? {} : {}
             words.clusters.push({
               cluster: keyword,
+              freq: requests[keyword],
               count: count,
               sum: sum,
               ctr: ctr,
@@ -8407,6 +8254,7 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
               // console.log(stat[keyword], keyword);
               words.clusters.push({
                 cluster: keyword,
+                freq: requests[keyword],
                 count: views,
                 sum: sum,
                 ctr: ctr,
@@ -8415,15 +8263,14 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
             }
           }
 
-          words.clusters.sort((a, b) => b.count - a.count);
         }
+        words.clusters.sort((a, b) => { return b.freq - a.freq });
+
       }
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const startDate = new Date(advertInfos.createTime.slice(0, 10));
-      startDate.setHours(0, 0, 0, 0);
-      const daysInWork = (today.getTime() - startDate.getTime()) / 86400 / 1000;
+      const daysInWork = getDaysInWork(advertInfos.createTime);
 
       artsWithAdverts[art][advertType][advertId] = {
         updateTime: advertsStatsByDay[advertId]
@@ -8460,6 +8307,8 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
 
     jsonData[art].art = art;
     jsonData[art].object = artData.object;
+    jsonData[art].photos = artData.photos;
+    jsonData[art].imtId = artData.imtId;
     jsonData[art].nmId = parseInt(nmId);
     jsonData[art].title = artData.title;
     jsonData[art].size = artData.size;
@@ -8473,6 +8322,8 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     jsonData[art].advertsManagerRules = advertsManagerRules[art];
     jsonData[art].advertsStocksThreshold = advertsStocksThreshold[art];
     jsonData[art].placements = placements[art];
+    jsonData[art].advertsSelectedPhrases = advertsSelectedPhrases[art];
+
 
     const sizes = artData.sizes;
     for (let i = 0; i < sizes.length; i++) {
@@ -8530,6 +8381,44 @@ const updateAdvertsManagerRulesMM = (uid, campaignName, data) => {
     afs.writeFileSync(
       advertsManagerRulesPath,
       JSON.stringify(advertsManagerRules)
+    );
+
+    resolve();
+  });
+};
+
+const updateAdvertsSelectedPhrasesMM = (uid, campaignName, data) => {
+  return new Promise((resolve, reject) => {
+    const advertsSelectedPhrasesPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsSelectedPhrases.json"
+    );
+    const advertsSelectedPhrases = readIfExists(advertsSelectedPhrasesPath);
+
+    console.log(uid, campaignName, data);
+
+    const { mode } = data;
+
+    if (data.arts)
+      for (const [art, artData] of Object.entries(data.arts)) {
+        if (!art || !artData) continue;
+        if (mode == 'Установить') {
+          if (!advertsSelectedPhrases[art]) advertsSelectedPhrases[art] = {};
+          advertsSelectedPhrases[art] = artData;
+          advertsSelectedPhrases[art].updateTime =
+            new Date().toISOString();
+        }
+        else if (mode == 'Удалить') {
+          advertsSelectedPhrases[art] = undefined;
+        }
+      }
+
+    afs.writeFileSync(
+      advertsSelectedPhrasesPath,
+      JSON.stringify(advertsSelectedPhrases)
     );
 
     resolve();
@@ -8848,8 +8737,8 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
       if (type == 8) {
         nms = advertInfos.autoParams.nms ?? [];
       } else if (type == 9) {
-        nms = advertInfos.unitedParams ? advertInfos.unitedParams[0].nms : [];
-      } else {
+        nms = advertInfos.unitedParams ? advertInfos.unitedParams[0].nms ?? [] : [];
+      } else if (type == 6) {
         const temp = advertInfos.params ? advertInfos.params[0].nms : [];
         for (let i = 0; i < temp.length; i++) {
           nms.push(temp[i].nm);
@@ -8865,7 +8754,7 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
         if (!art) continue;
 
         if (nms.length == 1 && name != art) {
-          if (advertsManagerRules[art] && advertsManagerRules[advertsType] && advertsManagerRules[advertsType].mode) {
+          if (advertsManagerRules[art] && advertsManagerRules[art][advertsType] && advertsManagerRules[art][advertsType].mode) {
             await changeAdvertName(authToken, { advertId: advertInfos.advertId, name: art })
             console.log(uid, campaignName, 'Changed name of', advertId, 'from', name, 'to', art);
             await new Promise(resolve => setTimeout(resolve, 1000))
@@ -8964,11 +8853,16 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
                   artsWithAdverts[art][advertsType][
                   Object.keys(artsWithAdverts[art][advertsType])[0]
                   ];
-                if (!jsonData[art]) jsonData[art] = {};
-                if (!jsonData[art][advertsType])
-                  jsonData[art][advertsType] =
-                    advertsManagerRules[art][advertsType];
-                jsonData[art][advertsType].advertId = firstSuch.advertId;
+
+                if (advertId != firstSuch.advertId && advertsManagerRules[art][advertsType].advertId != firstSuch.advertId) {
+
+                  if (!jsonData[art]) jsonData[art] = {};
+                  if (!jsonData[art][advertsType])
+                    jsonData[art][advertsType] =
+                      advertsManagerRules[art][advertsType];
+                  jsonData[art][advertsType].advertId = firstSuch.advertId;
+
+                }
                 if (advertId != firstSuch.advertId) {
                   if (
                     new Date(
@@ -9576,8 +9470,8 @@ const calcAutoEnteredValuesAndWriteToJSON = () => {
           //   console.log(obor, art, parseInt(value), temp);
           if (temp === null) throw new Error(`roi couldnt be found for ${art}`);
 
-          // const res = artsData[art].prime_cost * (1 + temp / 100); // new Процент наценки к себестоимости
-          const res = temp; // old just value
+          const res = artsData[art].prime_cost * (1 + temp / 100); // new Процент наценки к себестоимости
+          // const res = temp; // old just value
           // console.log(art, res, temp);
           return { val: res, ob: temp };
         }
@@ -9652,9 +9546,9 @@ const calcAutoEnteredValuesAndWriteToJSON = () => {
             );
             // console.log(art, brand, val, ob);
             jsonData[brand_names[brand] ?? brand][art] = {
-              rentabelnost: val,
+              rentabelnost: undefined,
               roi: undefined,
-              roz_price: undefined,
+              roz_price: val,
               spp_price: undefined,
               obor: ob,
             };
@@ -9883,22 +9777,33 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
         const commission = roz_price * (commision_percent / 100);
         const delivery = arts_data[vendorCode].delivery;
         const tax = roz_price * (arts_data[vendorCode].tax / 100);
-        const expences = roz_price * (arts_data[vendorCode].expences / 100);
+        // const expences = roz_price * (arts_data[vendorCode].expences / 100);
+        const expences = campaign == "TKS" ? roz_price * 0.05 : arts_data[vendorCode].expences;
         const prime_cost = arts_data[vendorCode].prime_cost;
+
         const brand_art = arts.byArt[vendorCode].brand_art;
+        // const brand_art = arts.byArt[vendorCode].art;
+        const ad = advertsAvgStatsByArt[brand_art]
+          ? getRoundValue(
+            advertsAvgStatsByArt[brand_art].sum,
+            advertsAvgStatsByArt[brand_art].orders,
+            false,
+            advertsAvgStatsByArt[brand_art].sum
+          )
+          : 0;
         // const type = brand_art;
         // const type = mapp[campaign];
         // const ad = advertsAvgStatsByArt[type]
         //   ? getRoundValue(
-        //       advertsAvgStatsByArt[type].sum,
-        //       advertsAvgStatsByArt[type].orders
-        //     )
+        //     advertsAvgStatsByArt[type].sum,
+        //     advertsAvgStatsByArt[type].orders
+        //   )
         //   : 0;
-        // const drr = ad / roz_price;
-        const drr = advertsAvgStatsByArt[mapp[campaign]]
-          ? advertsAvgStatsByArt[mapp[campaign]].drr / 100
-          : 0;
-        const ad = roz_price * drr;
+        const drr = ad / roz_price;
+        // const drr = advertsAvgStatsByArt[mapp[campaign]]
+        //   ? advertsAvgStatsByArt[mapp[campaign]].drr / 100
+        //   : 0;
+        // const ad = roz_price * drr;
 
         const profit =
           -ad -
@@ -9947,7 +9852,7 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
 
       const diffs = [];
       const calculateds = {};
-      for (let i = 450; i < 4500; i++) {
+      for (let i = 300; i < 4500; i++) {
         const calculated = calc(i);
         let diff = undefined;
         if (entered_roi !== undefined && !isNaN(entered_roi)) {
@@ -10040,7 +9945,12 @@ const getGeneralMaskFromVendorCode = (vendorCode) => {
 
 const readIfExists = (filepath, _default = {}) => {
   let result = _default;
-  if (afs.existsSync(filepath)) result = JSON.parse(afs.readFileSync(filepath));
+  try {
+    if (afs.existsSync(filepath)) result = JSON.parse(afs.readFileSync(filepath));
+  } catch (e) {
+    console.log(filepath);
+    throw e
+  }
   return result;
 };
 module.exports = {
@@ -10099,7 +10009,6 @@ module.exports = {
   fetchStocksAndWriteToJsonMM,
   fetchOfficesAndWriteToJsonMM,
   calcDeliveryOrdersAndWriteToJsonMM,
-  calcMassAdvertsAndWriteToJsonMM,
   createMassAdvertsMM,
   getAdvertsStatsMM,
   getAuthTokenMM,
@@ -10124,6 +10033,7 @@ module.exports = {
   calcMassAdvertsNewAndWriteToJsonMM,
   autoAdvertsManagingMM,
   updateAdvertsManagerRulesMM,
+  updateAdvertsSelectedPhrasesMM,
   autoAdvertsStopMM,
   getPlacements,
   fetchBalanceWithRetry,

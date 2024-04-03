@@ -10,7 +10,7 @@ const autoBidder = async (uid, campaignName) => {
       console.log(uid, campaignName, "Adverts bids set.")
     )
 
-    await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1 * 60 * 1000));
   }
 };
 
