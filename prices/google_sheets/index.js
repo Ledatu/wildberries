@@ -298,6 +298,7 @@ async function writeDrrToDataSpreadsheet(auth) {
           Перинка: "Перинка",
           "Trinity Fashion": "Trinity Fashion",
         };
+        if (artsBarcodesFull[row[0]].brand == "Объединённая текстильная компания ЕН") continue;
         // console.log(row[0]);
         const type = brand_names[artsBarcodesFull[row[0]].brand];
         // const type = getMaskFromVendorCode(row[0]);
@@ -1012,6 +1013,8 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
     // console.log(data);
     const data = {};
     for (const [index, brand] of Object.entries(brands)) {
+      if (brand == 'ОТК ЕН') continue;
+
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
         range: `${brand}!A2:R`,

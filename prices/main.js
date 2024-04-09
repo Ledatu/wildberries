@@ -718,6 +718,21 @@ const getCardsMM = (authToken, params) => {
     .catch((error) => console.error(error));
 };
 
+const getGoodsMM = (authToken, params) => {
+  return axios
+    .get(
+      "https://discounts-prices-api.wb.ru/api/v2/list/goods/filter",
+      {
+        headers: {
+          Authorization: authToken,
+        },
+        params: params,
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
 const getNmDetailReport = (authToken, params) => {
   return axios
     .post(
@@ -820,14 +835,7 @@ const fetchOfficesAndWriteToJsonMM = (uid, campaignName) => {
 
 const buildXlsx = (campaign, rewriteProfit = false) =>
   new Promise((resolve, reject) => {
-    const artsBarcodesFull = JSON.parse(
-      afs.readFileSync(
-        path.join(__dirname, "files", campaign, "artsBarcodesFull.json")
-      )
-    );
-    const prices = JSON.parse(
-      afs.readFileSync(path.join(__dirname, "files", campaign, "prices.json"))
-    );
+
     const sppByArt = JSON.parse(
       afs.readFileSync(
         path.join(__dirname, "files", campaign, "spp by mask.json")
@@ -904,6 +912,12 @@ const buildXlsx = (campaign, rewriteProfit = false) =>
         `./marketMaster/4a1f2828-9a1e-4bbf-8e07-208ba676a806/${mapp[campaign]}/advertsStatsByArt.json`
       )
     );
+    const prices = readIfExists(
+      path.join(
+        __dirname,
+        `./marketMaster/4a1f2828-9a1e-4bbf-8e07-208ba676a806/${mapp[campaign]}/prices.json`
+      )
+    );
     const storage = readIfExists(
       path.join(
         __dirname,
@@ -914,8 +928,11 @@ const buildXlsx = (campaign, rewriteProfit = false) =>
       ? storage[mapp[campaign]].total.avgCost
       : 0;
 
-    const stocks = JSON.parse(
-      afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
+    const stocks = readIfExists(
+      path.join(
+        __dirname,
+        `./marketMaster/4a1f2828-9a1e-4bbf-8e07-208ba676a806/${mapp[campaign]}/stocks.json`
+      )
     );
     const arts_data = JSON.parse(
       afs.readFileSync(path.join(__dirname, "files/data.json"))
@@ -950,8 +967,9 @@ const buildXlsx = (campaign, rewriteProfit = false) =>
       "Trinity Fashion": "Trinity Fashion",
     };
     const brand_sheets = {};
-    for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+    for (const [art, art_data] of Object.entries(arts.byArt)) {
       const brand = brand_names[art_data.brand] ?? art_data.brand;
+      if (art_data.brand == "Объединённая текстильная компания ЕН") continue;
       // const fullBrand = brand + art.includes("_ЕН" ? " ЕН" : "");
       if (!(brand in brand_sheets)) brand_sheets[brand] = [[]];
       if (!(brand in stdProfitSumTKS)) stdProfitSumTKS[brand] = 0;
@@ -961,9 +979,9 @@ const buildXlsx = (campaign, rewriteProfit = false) =>
       // console.log(brand_sheets[brand]);
       let vendorCode = art;
       if (!vendorCode || !arts_data[vendorCode]) continue;
-      if (!prices[art_data.nmId])
-        console.log(sppByArt[art], sppByArt[art].price);
-      el = prices[art_data.nmId] ?? {
+      // if (!prices[art_data.nmId])
+      //   console.log(sppByArt[art], sppByArt[art].price);
+      el = prices[art_data.nmId] ? prices[art_data.nmId].sizes[art_data.size] : {
         price: sppByArt[art]
           ? sppByArt[art].price
             ? sppByArt[art].price * 2
@@ -971,12 +989,13 @@ const buildXlsx = (campaign, rewriteProfit = false) =>
           : 4000,
         discount: 50,
       };
+      el.discount = prices[art_data.nmId] ? prices[art_data.nmId].discount : 50;
       // console.log(vendorCode, el);
 
       vendorCode = String(vendorCode);
 
       const per_day = orders[vendorCode];
-      const stock = stocks["today"][vendorCode];
+      const stock = stocks[today_date_str] ? stocks[today_date_str].all[vendorCode] ? stocks[today_date_str].all[vendorCode].quantity ?? 0 : 0 : 0;
       let obor = stock / per_day;
       if (stock && per_day === 0) {
         obor = 999;
@@ -1309,6 +1328,38 @@ const writeVendorCodeToJson = (data, campaign) => {
     .catch((error) => console.error(error));
 };
 
+const writePricesToJsonMM = (data, uid, campaignName) => {
+  const jsonData = {}
+  for (let i = 0; i < data.length; i++) {
+    const good = data[i];
+    const { nmID, sizes } = good;
+    if (nmID === undefined || sizes === undefined) continue;
+    good.nmID = undefined;
+    good.nmId = nmID;
+
+    const my_sizes = {}
+    for (let j = 0; j < sizes.length; j++) {
+      const size = sizes[j];
+      const { techSizeName } = size;
+      my_sizes[techSizeName] = size;
+    }
+    good.sizes = my_sizes;
+
+    jsonData[nmID] = good;
+  }
+  fs.writeFile(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "prices.json"
+    ),
+    JSON.stringify(jsonData)
+    // xlsx.build([{ name: "a", data: sheet_data }])
+  )
+}
+
 const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
   const artsPath = path.join(
     __dirname,
@@ -1380,6 +1431,7 @@ const writeVendorCodesToJsonMM = (data, uid, campaignName) => {
       photos: item.photos,
       imtId: item.imtID,
       nmId: item.nmID,
+      editableSizePrice: item.editableSizePrice,
       title: item.title,
       // volume: volume,
     };
@@ -1543,12 +1595,12 @@ const writeStocksToJson = async (data, campaign, date) => {
     afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
   );
   let jsonData = {};
-  await fetchHandStocks(campaign).then((pr) => {
-    jsonData = pr;
-    // console.log(jsonData);
-  });
+  // await fetchHandStocks(campaign).then((pr) => {
+  //   jsonData = pr;
+  //   // console.log(jsonData);
+  // });
 
-  if (Object.keys(jsonData).length == 0) {
+  if (jsonData && Object.keys(jsonData).length == 0) {
     if (data && data.length) {
       data.forEach((item) => {
         const { warehouseName } = item;
@@ -1644,7 +1696,7 @@ const writeStocksToJsonMM = async (data, uid, campaignName) => {
   }
 
   return fs
-    .writeFile(stocksPath, JSON.stringify(stocks))
+    .writeFile(stocksPath, JSON.stringify(stocksCurrent))
     .then(() => console.log(uid, campaignName, "stocks.json created."))
     .catch((error) => console.error(error));
 };
@@ -3396,7 +3448,13 @@ const fetchPricesAndWriteToJSON = (campaign) =>
 
 const fetchDataAndWriteToXlsx = (campaign, rewriteProfit = false) => {
   return new Promise((resolve) => {
-    return fetchPricesAndWriteToJSON(campaign)
+    const mapp = {
+      mayusha: "ИП Валерий",
+      delicatus: "ИП Артем",
+      TKS: "Текстиль",
+      perinka: "ИП Оксана",
+    };
+    return fetchArtsPricesAndWriteToJsonMM('4a1f2828-9a1e-4bbf-8e07-208ba676a806', mapp[campaign])
       .then(async () => {
         await buildXlsx(campaign, rewriteProfit).then(() => resolve());
       })
@@ -3550,29 +3608,28 @@ const fetchAdvertsInfosAndWriteToJsonMM = async (uid, campaignName) => {
     campaignName,
     "advertsInfos.json"
   );
-  let jsonData = {};
-  if (afs.existsSync(filepath)) {
-    jsonData = JSON.parse(afs.readFileSync(filepath));
-  }
+  let jsonData = readIfExists(filepath)
   const params = [[]];
   let count = 0;
   for (const [advertId, advertData] of Object.entries(adverts)) {
-    // if (advertData.status == 7) continue;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endDate = new Date(advertData.changeTime);
-    endDate.setHours(0, 0, 0, 0);
-    const daysPassed = (today.getTime() - endDate.getTime()) / 86400 / 1000;
-    // console.log(new Date(advertData.endTime.slice(0, 10)), new Date(), dayyss);
-    if (daysPassed >= 30) {
-      continue;
+    if (jsonData[advertId] && jsonData[advertId].status == advertData.status) {
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const endDate = new Date(advertData.changeTime);
+      endDate.setHours(0, 0, 0, 0);
+      const daysPassed = (today.getTime() - endDate.getTime()) / 86400 / 1000;
+      // console.log(new Date(advertData.endTime.slice(0, 10)), new Date(), dayyss);
+      if (daysPassed >= 30) {
+        continue;
+      }
     }
 
     params[params.length - 1].push(advertData.advertId);
     count++;
     if (count % 50 == 0) params.push([]);
   }
-  // console.log(params);
+
   const typeJsonData = {};
   for (let i = 0; i < params.length; i++) {
     await getAdvertInfo(authToken, params[i]).then((pr) => {
@@ -3587,16 +3644,21 @@ const fetchAdvertsInfosAndWriteToJsonMM = async (uid, campaignName) => {
       "infos updated."
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await new Promise((resolve) => setTimeout(resolve, 3500));
   }
 
   for (const [type, stats] of Object.entries(typeJsonData)) {
     if (!stats.length) continue;
     for (let i = 0; i < stats.length; i++) {
       const advertId = stats[i].advertId;
-      if (advertId == "15432592") console.log(stats[i]);
       if (stats[i].type == 8) {
-        if (!stats[i].autoParams.nms) {
+        if (stats[i].status != 7 && !stats[i].autoParams.nms) {
+          console.log(stats[i]);
+          continue;
+        }
+      }
+      else if (stats[i].type == 9) {
+        if (stats[i].status != 7 && !stats[i].unitedParams[0].nms) {
           console.log(stats[i]);
           continue;
         }
@@ -4135,7 +4197,7 @@ const startAdvert = (authToken, params) => {
       params: params,
     })
     .then((response) => response.data)
-    .catch((error) => console.log(error.response.data));
+    .catch((error) => console.log(error.response.data, params));
 };
 
 const pauseAdvert = (authToken, params) => {
@@ -4162,7 +4224,7 @@ const stopAdvert = (authToken, params) => {
     .catch((error) => console.log(error.response.data));
 };
 
-const changeAdvertActivity = (authToken, mode, params) => {
+const changeAdvertActivity = (authToken, mode, params, throwError = false) => {
   return axios
     .get("https://advert-api.wb.ru/adv/v0/" + mode, {
       headers: {
@@ -4171,7 +4233,11 @@ const changeAdvertActivity = (authToken, mode, params) => {
       params: params,
     })
     .then((response) => response.data)
-    .catch((error) => console.log(error.response.data));
+    .catch((error) => {
+      console.log(error.response.data);
+      if (throwError)
+        throw error;
+    });
 };
 
 const changeAdvertName = (authToken, params) => {
@@ -4236,215 +4302,190 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
       "adverts.json"
     );
     const adverts = readIfExists(advertsPath);
-    const advertsManagerRulesPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsManagerRules.json"
-    );
-    const advertsManagerRules = readIfExists(advertsManagerRulesPath);
 
     const excludeMinusPhrases = async () => {
-      for (const [art, templateName] of Object.entries(
+      for (const [advertId, templateData] of Object.entries(
         advertsPlusPhrasesTemplates
       )) {
-        if (!art || !templateName) continue;
-        if (!advertsManagerRules[art]) continue
-        for (const [advertsType, advertsTypeData] of Object.entries(advertsManagerRules[art])) {
+        if (!advertId || !templateData) continue;
+        const { templateName } = templateData;
+        if (!templateName) continue;
 
-          if (!advertsType || !advertsTypeData) continue;
-          const { advertId, mode } = advertsTypeData;
-          if (!mode || !advertId) continue;
+        if (!adverts[advertId]) continue;
+        if (!advertsInfos[advertId]) continue;
 
-          if (!adverts[advertId]) continue;
-          if (!advertsInfos[advertId]) continue;
+        const { name, type, status, createTime } = advertsInfos[advertId]
+        if (![8, 6, 9].includes(type)) continue;
 
-          const { name, type, status, createTime } = advertsInfos[advertId]
-          if (name != art) continue;
-          if (![8, 6, 9].includes(type)) continue;
-          if (status != 9) continue;
+        if (!advertsWords[advertId]) continue;
 
-          if (!advertsWords[advertId]) continue;
+        const words =
+          type == 8
+            ? advertsWords[advertId]
+            : advertsWords[advertId].words;
 
-          const words =
-            type == 8
-              ? advertsWords[advertId]
-              : advertsWords[advertId].words;
+        if (!words) continue;
+        const stat = advertsWords[advertId].stat ?? {};
+        const statOnMinus = advertsWords[advertId].statOnMinus ?? {};
 
-          if (!words) continue;
-          const stat = advertsWords[advertId].stat ?? {};
-          const statOnMinus = advertsWords[advertId].statOnMinus ?? {};
+        const plusPhrasesTemplate = plusPhrasesTemplates[templateName];
+        if (!plusPhrasesTemplate) continue;
+        const autoPhrasesTemplate = plusPhrasesTemplate.autoPhrasesTemplate
 
-          const plusPhrasesTemplate = plusPhrasesTemplates[templateName];
-          if (!plusPhrasesTemplate) continue;
-          const autoPhrasesTemplate = plusPhrasesTemplate.autoPhrasesTemplate
+        const addOrNot = (phrase) => {
+          const { includes, notIncludes } = autoPhrasesTemplate;
 
-          const addOrNot = (phrase) => {
-            const { includes, notIncludes } = autoPhrasesTemplate;
+          let addFlagInc = 0;
+          for (let j = 0; j < includes.length; j++) {
+            const rule = includes[j];
 
-            let addFlagInc = 0;
-            for (let j = 0; j < includes.length; j++) {
-              const rule = includes[j];
+            if (!rule || rule == '') continue
 
-              if (!rule || rule == '') continue
+            const rulesForAnd = rule.split('+');
 
-              const rulesForAnd = rule.split('+');
-
-              let tempFlagInc = 0;
-              for (let k = 0; k < rulesForAnd.length; k++) {
-                const ruleForAdd = rulesForAnd[k];
-                if (phrase.includes(ruleForAdd)) {
-                  tempFlagInc++;
-                }
+            let tempFlagInc = 0;
+            for (let k = 0; k < rulesForAnd.length; k++) {
+              const ruleForAdd = rulesForAnd[k];
+              if (phrase.includes(ruleForAdd)) {
+                tempFlagInc++;
               }
-              addFlagInc += (tempFlagInc == rulesForAnd.length ? 1 : 0);
             }
-
-            let addFlagNotInc = 0;
-            for (let j = 0; j < notIncludes.length; j++) {
-              const rule = notIncludes[j];
-
-              if (!rule || rule == '') continue
-
-              const rulesForAnd = rule.split('+');
-
-              let tempFlagNotInc = 0;
-
-              for (let k = 0; k < rulesForAnd.length; k++) {
-                const ruleForAdd = rulesForAnd[k];
-                if (phrase.includes(ruleForAdd)) {
-                  tempFlagNotInc++;
-                }
-              }
-
-              addFlagNotInc += tempFlagNotInc;
-            }
-
-            // console.log((addFlagInc && !addFlagNotInc), addFlagInc, addFlagInc, phrase, plusPhrasesTemplate.autoPhrasesTemplate);
-            return addFlagInc && !addFlagNotInc
+            addFlagInc += (tempFlagInc == rulesForAnd.length ? 1 : 0);
           }
 
-          if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-            || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-            const newClusters = []
-            for (const phrase of plusPhrasesTemplate.clusters) {
+          let addFlagNotInc = 0;
+          for (let j = 0; j < notIncludes.length; j++) {
+            const rule = notIncludes[j];
+
+            if (!rule || rule == '') continue
+
+            const rulesForAnd = rule.split('+');
+
+            let tempFlagNotInc = 0;
+
+            for (let k = 0; k < rulesForAnd.length; k++) {
+              const ruleForAdd = rulesForAnd[k];
+              if (phrase.includes(ruleForAdd)) {
+                tempFlagNotInc++;
+              }
+            }
+
+            addFlagNotInc += tempFlagNotInc;
+          }
+
+          // console.log((addFlagInc && !addFlagNotInc), addFlagInc, addFlagInc, phrase, plusPhrasesTemplate.autoPhrasesTemplate);
+          return addFlagInc && !addFlagNotInc
+        }
+
+        if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+          || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+          const newClusters = []
+          for (const phrase of plusPhrasesTemplate.clusters) {
+            if (addOrNot(phrase)) {
+              if (!newClusters.includes(phrase)) {
+                newClusters.push(phrase)
+              }
+            }
+          }
+          plusPhrasesTemplate.clusters = newClusters
+        }
+
+
+        const isFixed = plusPhrasesTemplate.isFixed ?? false;
+
+        const { excluded, clusters, keywords } = words;
+        if (clusters) {
+          const toExclude = [];
+          for (let i = 0; i < excluded.length; i++) {
+            const phrase = excluded[i];
+            // console.log(plusPhrasesTemplate.clusters.includes(phrase), phrase)
+            const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
+            const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
+            if (
+              plusPhrasesTemplate.threshold &&
+              viewsExcluded < plusPhrasesTemplate.threshold
+            )
+              continue;
+            if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
+              plusPhrasesTemplate.ctrThreshold &&
+              ctrExcluded > plusPhrasesTemplate.ctrThreshold
+            )
+              continue;
+
+            if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+              || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
               if (addOrNot(phrase)) {
-                if (!newClusters.includes(phrase)) {
-                  newClusters.push(phrase)
+                if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                  plusPhrasesTemplate.clusters.push(phrase);
                 }
               }
             }
-            plusPhrasesTemplate.clusters = newClusters
+
+            if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
+            toExclude.push(phrase);
           }
 
+          let needsUpdate = toExclude.length != excluded.length;
+          for (let i = 0; i < clusters.length; i++) {
+            const { cluster, count, keywords } = clusters[i];
 
-          const isFixed = plusPhrasesTemplate.isFixed ?? false;
-
-          const { excluded, clusters, keywords } = words;
-          if (clusters) {
-            const toExclude = [];
-            for (let i = 0; i < excluded.length; i++) {
-              const phrase = excluded[i];
-              // console.log(plusPhrasesTemplate.clusters.includes(phrase), phrase)
-              const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
-              const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
-              if (
-                plusPhrasesTemplate.threshold &&
-                viewsExcluded < plusPhrasesTemplate.threshold
-              )
-                continue;
-              if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
-                plusPhrasesTemplate.ctrThreshold &&
-                ctrExcluded > plusPhrasesTemplate.ctrThreshold
-              )
-                continue;
-
-              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-                if (addOrNot(phrase)) {
-                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                    plusPhrasesTemplate.clusters.push(phrase);
-                  }
+            const phrase = cluster;
+            if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+              || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+              if (addOrNot(phrase)) {
+                if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                  plusPhrasesTemplate.clusters.push(phrase);
                 }
               }
-
-              if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
-              toExclude.push(phrase);
             }
 
-            let needsUpdate = toExclude.length != excluded.length;
-            for (let i = 0; i < clusters.length; i++) {
-              const { cluster, count, keywords } = clusters[i];
+            if (plusPhrasesTemplate.threshold > count) continue;
+            // console.log(advertId, cluster, count, plusPhrasesTemplate.clusters);
 
-              const phrase = cluster;
-              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-                if (addOrNot(phrase)) {
-                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                    plusPhrasesTemplate.clusters.push(phrase);
-                  }
-                }
+            const clusterKeywordsTemp = new Array(keywords ?? []);
+            const clusterKeywords = clusterKeywordsTemp.filter(
+              (value, index) => {
+                return clusterKeywordsTemp.indexOf(value) === index;
               }
+            );
+            if (!clusterKeywords.includes(cluster))
+              clusterKeywords.push(cluster);
+            const clusterStat = {
+              views: 0,
+              clicks: 0,
+              ctr: 0,
+              sum: 0,
+            };
+            for (let j = 0; j < clusterKeywords.length; j++) {
+              if (!stat[clusterKeywords[j]]) continue;
+              clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
+              clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
+              clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
+            }
+            clusterStat.ctr = getRoundValue(
+              clusterStat.clicks,
+              clusterStat.views,
+              true
+            );
 
-              if (plusPhrasesTemplate.threshold > count) continue;
-              // console.log(advertId, cluster, count, plusPhrasesTemplate.clusters);
+            if (plusPhrasesTemplate.ctrThreshold) {
 
-              const clusterKeywordsTemp = new Array(keywords ?? []);
-              const clusterKeywords = clusterKeywordsTemp.filter(
-                (value, index) => {
-                  return clusterKeywordsTemp.indexOf(value) === index;
-                }
-              );
-              if (!clusterKeywords.includes(cluster))
-                clusterKeywords.push(cluster);
-              const clusterStat = {
-                views: 0,
-                clicks: 0,
-                ctr: 0,
-                sum: 0,
+              if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(cluster) && !toExclude.includes(cluster)) {
+                needsUpdate = true;
+                toExclude.push(cluster);
+                statOnMinus[cluster] = clusterStat;
+                continue;
               };
-              for (let j = 0; j < clusterKeywords.length; j++) {
-                if (!stat[clusterKeywords[j]]) continue;
-                clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
-                clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
-                clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
-              }
-              clusterStat.ctr = getRoundValue(
-                clusterStat.clicks,
-                clusterStat.views,
-                true
-              );
 
-              if (plusPhrasesTemplate.ctrThreshold) {
+              if (
+                clusterStat.ctr >= plusPhrasesTemplate.ctrThreshold
+              )
+                continue;
 
-                if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(cluster) && !toExclude.includes(cluster)) {
-                  needsUpdate = true;
-                  toExclude.push(cluster);
-                  statOnMinus[cluster] = clusterStat;
-                  continue;
-                };
-
-                if (
-                  clusterStat.ctr >= plusPhrasesTemplate.ctrThreshold
-                )
-                  continue;
-
-                if (!toExclude.includes(cluster)) {
-                  needsUpdate = true;
-                  statOnMinus[cluster] = clusterStat;
-                  toExclude.push(cluster);
-                }
-              } else {
-                if (plusPhrasesTemplate.clusters.includes(cluster))
-                  continue;
-
-
-                if (!toExclude.includes(cluster)) {
-                  needsUpdate = true;
-                  statOnMinus[cluster] = clusterStat;
-                  toExclude.push(cluster);
-                }
+              if (!toExclude.includes(cluster)) {
+                needsUpdate = true;
+                statOnMinus[cluster] = clusterStat;
+                toExclude.push(cluster);
               }
 
               if (plusPhrasesTemplate.secondThreshold && plusPhrasesTemplate.secondThreshold > count) {
@@ -4458,121 +4499,130 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                 }
               }
 
-            }
-            // console.log(toExclude);
-            if (toExclude.length > 1000) {
-              console.log("more than a 1000");
-              continue;
-            }
-            if (needsUpdate) {
-              const params = {
-                excluded: toExclude,
-              };
-
-              await setExcludedPhrasesAdvert(
-                authToken,
-                advertId,
-                params,
-                type
-              );
-
-              console.log(
-                uid,
-                campaignName,
-                art,
-                advertId,
-                "установлены минус фразы",
-                templateName,
-                toExclude.length,
-              );
-
-              await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
             } else {
-              console.log(
-                uid,
-                campaignName,
-                art,
-                advertId,
-                "не требует изменения минус фраз"
-              );
-            }
-          } else if (keywords) {
-            if (!isFixed) {
-              const toExclude = [];
-              for (let i = 0; i < excluded.length; i++) {
-                const phrase = excluded[i];
+              if (plusPhrasesTemplate.clusters.includes(cluster))
+                continue;
 
-                if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-                  || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-                  if (addOrNot(phrase)) {
-                    if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                      plusPhrasesTemplate.clusters.push(phrase);
-                    }
+
+              if (!toExclude.includes(cluster)) {
+                needsUpdate = true;
+                statOnMinus[cluster] = clusterStat;
+                toExclude.push(cluster);
+              }
+            }
+
+          }
+          // console.log(toExclude);
+          if (toExclude.length > 1000) {
+            console.log("more than a 1000");
+            continue;
+          }
+          if (needsUpdate) {
+            const params = {
+              excluded: toExclude,
+            };
+
+            await setExcludedPhrasesAdvert(
+              authToken,
+              advertId,
+              params,
+              type
+            );
+
+            console.log(
+              uid,
+              campaignName,
+              name,
+              advertId,
+              "установлены минус фразы",
+              templateName,
+              toExclude.length,
+            );
+
+            await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
+          } else {
+            console.log(
+              uid,
+              campaignName,
+              name,
+              advertId,
+              "не требует изменения минус фраз"
+            );
+          }
+        } else if (keywords) {
+          if (!isFixed) {
+            const toExclude = [];
+            for (let i = 0; i < excluded.length; i++) {
+              const phrase = excluded[i];
+
+              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+                if (addOrNot(phrase)) {
+                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                    plusPhrasesTemplate.clusters.push(phrase);
                   }
                 }
-
-                const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
-                const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
-                if (
-                  plusPhrasesTemplate.threshold &&
-                  viewsExcluded < plusPhrasesTemplate.threshold
-                )
-                  continue;
-                if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
-                  plusPhrasesTemplate.ctrThreshold &&
-                  ctrExcluded > plusPhrasesTemplate.ctrThreshold
-                )
-                  continue;
-                if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
-                toExclude.push(phrase);
               }
 
-              let needsUpdate = toExclude.length != excluded.length;
-              for (let i = 0; i < keywords.length; i++) {
-                const { keyword, count } = keywords[i];
-                const phrase = keyword;
+              const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
+              const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
+              if (
+                plusPhrasesTemplate.threshold &&
+                viewsExcluded < plusPhrasesTemplate.threshold
+              ) {
+                if (plusPhrasesTemplate.secondThreshold) {
+                  if (viewsExcluded < plusPhrasesTemplate.secondThreshold) continue;
+                } else
+                  continue;
+              }
+              if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
+                plusPhrasesTemplate.ctrThreshold &&
+                ctrExcluded >= plusPhrasesTemplate.ctrThreshold
+              ) {
+                if (plusPhrasesTemplate.secondCtrThreshold) {
+                  if (ctrExcluded >= plusPhrasesTemplate.secondCtrThreshold) continue;
+                } else
+                  continue;
+              }
+              if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
+              toExclude.push(phrase);
+            }
 
-                if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-                  || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-                  if (addOrNot(phrase)) {
-                    if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                      plusPhrasesTemplate.clusters.push(phrase);
-                    }
+            let needsUpdate = toExclude.length != excluded.length;
+            for (let i = 0; i < keywords.length; i++) {
+              const { keyword, count } = keywords[i];
+              const phrase = keyword;
+
+              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+                if (addOrNot(phrase)) {
+                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                    plusPhrasesTemplate.clusters.push(phrase);
                   }
                 }
+              }
 
-                if (plusPhrasesTemplate.threshold > count) continue;
+              if (plusPhrasesTemplate.threshold > count) continue;
 
-                if (plusPhrasesTemplate.ctrThreshold) {
+              if (plusPhrasesTemplate.ctrThreshold) {
 
-                  if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(keyword) && !toExclude.includes(keyword)) {
-                    needsUpdate = true;
-                    toExclude.push(keyword);
-                    statOnMinus[keyword] = stat[keyword] ?? { views: count };
-                    continue;
-                  };
+                if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(keyword) && !toExclude.includes(keyword)) {
+                  needsUpdate = true;
+                  toExclude.push(keyword);
+                  statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                  continue;
+                };
 
-                  if (
-                    stat[keyword] &&
-                    stat[keyword].ctr >= plusPhrasesTemplate.ctrThreshold
-                  )
-                    continue;
+                if (
+                  stat[keyword] &&
+                  stat[keyword].ctr >= plusPhrasesTemplate.ctrThreshold
+                )
+                  continue;
 
-                  if (!toExclude.includes(keyword)) {
-                    needsUpdate = true;
-                    statOnMinus[keyword] = stat[keyword] ?? { views: count };
-                    toExclude.push(keyword);
-                  }
-                } else {
-                  if (plusPhrasesTemplate.clusters.includes(keyword))
-                    continue;
-
-
-                  if (!toExclude.includes(keyword)) {
-                    needsUpdate = true;
-                    statOnMinus[keyword] = stat[keyword] ?? { views: count };
-                    toExclude.push(keyword);
-                  }
+                if (!toExclude.includes(keyword)) {
+                  needsUpdate = true;
+                  statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                  toExclude.push(keyword);
                 }
 
                 if (plusPhrasesTemplate.secondThreshold && plusPhrasesTemplate.secondThreshold > count) {
@@ -4585,84 +4635,98 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
                     }
                   }
                 }
-                // console.log(advertId, cluster, count, keywords);
-              }
-              // console.log(toExclude);
-              if (toExclude.length > 1000) {
-                console.log("more than a 1000");
-                continue;
-              } else if (needsUpdate) {
-                const params = {
-                  excluded: toExclude,
-                };
 
-                await setExcludedPhrasesAdvert(
-                  authToken,
-                  advertId,
-                  params,
-                  type
-                );
-                await setPlusPhrasesAdvert(authToken, advertId, {
-                  pluse: [],
-                });
-
-                console.log(
-                  uid,
-                  campaignName,
-                  art,
-                  advertId,
-                  "установлены минус фразы",
-                  templateName,
-                  toExclude.length
-                );
-
-                await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
               } else {
-                console.log(
-                  uid,
-                  campaignName,
-                  art,
-                  advertId,
-                  "не требует изменения минус фраз"
-                );
-              }
-            } else {
-              const toPlus = plusPhrasesTemplate.clusters;
+                if (plusPhrasesTemplate.clusters.includes(keyword))
+                  continue;
 
-              if (toPlus.length > 100) {
-                console.log("more than a 100");
-                continue;
+
+                if (!toExclude.includes(keyword)) {
+                  needsUpdate = true;
+                  statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                  toExclude.push(keyword);
+                }
               }
+
+
+              // console.log(advertId, cluster, count, keywords);
+            }
+            // console.log(toExclude);
+            if (toExclude.length > 1000) {
+              console.log("more than a 1000");
+              continue;
+            } else if (needsUpdate) {
               const params = {
-                pluse: toPlus,
+                excluded: toExclude,
               };
 
-              await setPlusPhrasesAdvert(authToken, advertId, params);
-              await setPlusPhrasesActivityAdvert(authToken, {
-                id: advertId,
-                fixed: true,
+              await setExcludedPhrasesAdvert(
+                authToken,
+                advertId,
+                params,
+                type
+              );
+              await setPlusPhrasesAdvert(authToken, advertId, {
+                pluse: [],
               });
 
               console.log(
                 uid,
                 campaignName,
-                art,
+                name,
                 advertId,
-                "установлены плюс фразы",
+                "установлены минус фразы",
                 templateName,
-                toPlus
+                toExclude.length
               );
 
               await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
+            } else {
+              console.log(
+                uid,
+                campaignName,
+                name,
+                advertId,
+                "не требует изменения минус фраз"
+              );
             }
+          } else {
+            const toPlus = plusPhrasesTemplate.clusters;
+
+            if (toPlus.length > 100) {
+              console.log("more than a 100");
+              continue;
+            }
+            const params = {
+              pluse: toPlus,
+            };
+
+            await setPlusPhrasesAdvert(authToken, advertId, params);
+            await setPlusPhrasesActivityAdvert(authToken, {
+              id: advertId,
+              fixed: true,
+            });
+
+            console.log(
+              uid,
+              campaignName,
+              name,
+              advertId,
+              "установлены плюс фразы",
+              templateName,
+              toPlus
+            );
+
+            await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
           }
-
-          plusPhrasesTemplates[templateName] = plusPhrasesTemplate;
-
-          advertsWords[advertId].statOnMinus = statOnMinus;
-
         }
+
+        plusPhrasesTemplates[templateName] = plusPhrasesTemplate;
+
+        advertsWords[advertId].statOnMinus = statOnMinus;
+
       }
+
     };
 
     excludeMinusPhrases().then(() => {
@@ -4754,79 +4818,22 @@ const manageAdvertsActivityMM = async (uid, campaignName, data) => {
   return new Promise((resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
 
-    const advertsInfosPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsInfos.json"
-    );
-    const advertsInfos = readIfExists(advertsInfosPath);
-    const artsPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "arts.json"
-    );
-    const artsData = readIfExists(artsPath);
-    artsData.byBrandArt = {};
-    for (const [nmId, artData] of Object.entries(artsData.byNmId)) {
-      artData.nmId = nmId;
-      artsData.byBrandArt[artData.art] = artData;
-    }
-
-    const { mode, arts } = data;
+    const { mode, advertsIds } = data;
 
     const manageAdvertsActivity = async () => {
-      for (let i = 0; i < arts.length; i++) {
-        const art = arts[i];
+      for (const [id, advertData] of Object.entries(advertsIds)) {
+        if (!id || !advertData) continue;
+        const advertId = advertData.advertId;
 
-        if (!art) continue;
-
-        for (const [id, advertData] of Object.entries(advertsInfos)) {
-          if (!id || !advertData) continue;
-          const advertId = advertData.advertId;
-          if (
-            advertData.status != 9 &&
-            advertData.status != 11 &&
-            advertData.status != 4
-          )
-            continue;
-          // if (advertData.name != art) continue; /////////
-          // if (advertData.type != 8 && advertData.type != 6) continue;
-
-          let nms = [];
-          if (advertData.type == 8) {
-            nms = advertData.autoParams.nms ?? [];
-          } else if (advertData.type == 9) {
-            nms = advertData.unitedParams ? advertData.unitedParams[0].nms ?? [] : [];
-          } else if (advertData.type == 6) {
-            const temp = advertData.params ? advertData.params[0].nms : [];
-            for (let i = 0; i < temp.length; i++) {
-              nms.push(temp[i].nm);
-            }
-          }
-
-
-          const nmId = artsData.byBrandArt[art]
-            ? parseInt(artsData.byBrandArt[art].nmId)
-            : undefined;
-          if (!nms.includes(nmId)) {
-            // console.log(art, nmId, advertId, nms);
-            continue;
-          }
-
-          await changeAdvertActivity(authToken, mode, { id: advertId });
-          await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
-          console.log(uid, campaignName, art, advertId, mode);
-        }
+        await changeAdvertActivity(authToken, mode, { id: advertId }, true);
+        await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
+        console.log(uid, campaignName, advertId, mode);
       }
     };
 
     manageAdvertsActivity().then(() => {
-      resolve();
-    });
+      resolve({ status: 'ok' });
+    }).catch((e) => { resolve({ status: 'bad' }) });
   });
 };
 
@@ -4844,25 +4851,22 @@ const setAdvertsPlusPhrasesTemplatesMM = async (uid, campaignName, data) => {
     );
 
     const setAdvertsPlusPhrasesTemplates = async () => {
-      for (const [art, artData] of Object.entries(data.arts)) {
-        if (!art || !artData) continue;
+      for (const [advertId, advertData] of Object.entries(data.advertsIds)) {
+        if (!advertId || !advertData) continue;
 
-        const { mode, templateName } = artData;
+        const { mode, templateName } = advertData;
         if (!mode) continue;
 
-        console.log(uid, campaignName, art, mode, templateName);
+        console.log(uid, campaignName, advertId, mode, templateName);
 
         if (mode == "Установить") {
           if (!templateName) continue;
-          if (!advertsPlusPhrasesTemplates[art])
-            advertsPlusPhrasesTemplates[art] = {};
+          if (!advertsPlusPhrasesTemplates[advertId])
+            advertsPlusPhrasesTemplates[advertId] = {};
 
-          advertsPlusPhrasesTemplates[art] = templateName;
+          advertsPlusPhrasesTemplates[advertId].templateName = templateName;
         } else if (mode == "Удалить") {
-          if (!advertsPlusPhrasesTemplates[art])
-            advertsPlusPhrasesTemplates[art] = {};
-
-          advertsPlusPhrasesTemplates[art] = undefined;
+          advertsPlusPhrasesTemplates[advertId] = undefined;
         }
       }
 
@@ -4930,82 +4934,67 @@ const depositAdvertsBudgetsAndWriteToJsonMM = async (
 
     const balance = await fetchBalanceWithRetry(uid, campaignName);
 
-    const { advertsTypes } = data;
-
-    let modeWhole = undefined;
+    const { mode } = data;
+    let modeWhole = mode;
     const toRestart = [];
     const depositAdvertsBudgets = async () => {
-      for (const [art, artData] of Object.entries(data.arts)) {
-        if (!art || !artData) continue;
-
-        const { mode, budget } = artData;
-        if (!mode) continue;
-        modeWhole = mode;
-
+      for (const [id, advertDataRule] of Object.entries(data.advertsIds)) {
+        if (!id || !advertDataRule) continue;
+        let { advertId, budget } = advertDataRule;
         if (mode == "Пополнить") {
-          for (const [id, advertData] of Object.entries(advertsInfos)) {
-            if (!id || !advertData) continue;
-            const advertId = advertData.advertId;
+          budget = Math.round(budget / 50) * 50;
+          const advertData = advertsInfos[advertId];
+          if (!advertData) continue;
 
-            if (!adverts[advertId]) continue;
+          if (!adverts[advertId]) continue;
 
-            if (
-              advertData.status != 9 &&
-              advertData.status != 11 &&
-              advertData.status != 4
-            )
-              continue;
-            if (advertData.name != art) continue;
-            if (advertData.type != 8 && advertData.type != 6) continue;
+          if (
+            advertData.status != 9 &&
+            advertData.status != 11 &&
+            advertData.status != 4
+          )
+            continue;
 
-            const advertsType = getAdvertsType(advertId, advertsInfos);
-            if (!advertsTypes[advertsType]) continue;
+          if (advertData.type != 8 && advertData.type != 9 && advertData.type != 6) continue;
 
-            console.log(uid, campaignName, art, advertId, mode, budget);
+          console.log(uid, campaignName, advertData.name, advertId, mode, budget);
 
-            let payType = 0;
-            if (balance.net && balance.net >= budget) payType = 1;
-            if (balance.bonus && balance.bonus >= budget) payType = 3;
+          let payType = 0;
+          if (balance.net && balance.net >= budget) payType = 1;
+          if (balance.bonus && balance.bonus >= budget) payType = 3;
 
-            const depositParams = {
-              sum: budget,
-              type: payType,
-              return: true,
-            };
+          const depositParams = {
+            sum: budget,
+            type: payType,
+            return: true,
+          };
 
-            if (payType == 3) {
-              balance.bonus -= budget;
-            } else if (payType == 0) {
-              balance.balance -= budget;
-            } else {
-              balance.net -= budget;
-            }
-
-            const newBudget = await depositAdvertBudget(
-              authToken,
-              advertId,
-              depositParams
-            );
-            advertsBudgets[advertId] = newBudget
-              ? newBudget.total
-              : advertsBudgets[advertId];
-            toRestart.push(advertId);
-            await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
+          if (payType == 3) {
+            balance.bonus -= budget;
+          } else if (payType == 0) {
+            balance.balance -= budget;
+          } else {
+            balance.net -= budget;
           }
+
+          const newBudget = await depositAdvertBudget(
+            authToken,
+            advertId,
+            depositParams
+          );
+          advertsBudgets[advertId] = newBudget
+            ? newBudget.total
+            : advertsBudgets[advertId];
+          toRestart.push(advertId);
+          await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
+
         } else if (mode == "Установить лимит") {
-          for (const [advertsType, value] of Object.entries(advertsTypes)) {
-            if (!advertsType || !value) continue;
-            if (!advertsBudgetsToKeep[art]) advertsBudgetsToKeep[art] = {};
-            if (!advertsBudgetsToKeep[art][advertsType])
-              advertsBudgetsToKeep[art][advertsType] = undefined;
-            advertsBudgetsToKeep[art][advertsType] =
-              budget == 0 ? undefined : budget;
-          }
-          console.log(uid, campaignName, art, mode, advertsTypes, budget);
+          advertsBudgetsToKeep[advertId] = budget == 0 ? undefined : budget;
+          console.log(uid, campaignName, advertId, mode, budget);
         }
       }
       if (modeWhole == "Пополнить") {
-        await new Promise((resolve) => setTimeout(resolve, 3 * 60 * 1000));
+        await new Promise((resolve) => setTimeout(resolve, 5 * 60 * 1000));
         for (let i = 0; i < toRestart.length; i++) {
           const advertId = toRestart[i];
           if (!advertId) continue;
@@ -5063,99 +5052,84 @@ const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
       "adverts.json"
     );
     const adverts = readIfExists(advertsPath);
-    // const balancePath = path.join(
-    //   __dirname,
-    //   "marketMaster",
-    //   uid,
-    //   campaignName,
-    //   "balance.json"
-    // );
-    // const balance = readIfExists(balancePath);
     const balance = await fetchBalanceWithRetry(uid, campaignName);
 
     const toRestart = [];
     const depositAdvertsBudgets = async () => {
-      for (const [art, advertsTypes] of Object.entries(advertsBudgetsToKeep)) {
-        for (const [advertsType, budgetToKeep] of Object.entries(
-          advertsTypes
-        )) {
-          if (!art || !budgetToKeep) continue;
-          // if (advertId == 13963592) console.log(advertId, art, advertData.name);
-          for (const [id, advertData] of Object.entries(advertsInfos)) {
-            if (!id || !advertData) continue;
-            const advertId = advertData.advertId;
+      for (const [id, budgetToKeep] of Object.entries(advertsBudgetsToKeep)) {
+        if (!id || !budgetToKeep) continue;
 
-            if (!adverts[advertId]) continue;
-            if (advertsType != getAdvertsType(advertId, advertsInfos)) continue;
+        if (!adverts[id]) continue;
+        if (!advertsInfos[id]) continue;
 
-            if (toRestart.includes(advertId)) continue;
+        const advertData = advertsInfos[id];
+        const advertId = advertData.advertId;
 
-            if (advertData.status != 11 && advertData.status != 9) continue;
-            if (advertData.name != art) continue;
-            if (advertData.type != 8 && advertData.type != 6 && advertData.type != 9) continue;
+        if (toRestart.includes(advertId)) continue;
 
-            toRestart.push(advertId);
+        if (advertData.status != 11 && advertData.status != 9) continue;
+        if (advertData.type != 8 && advertData.type != 6 && advertData.type != 9) continue;
 
-            const currentBudget = advertsBudgets[advertId];
-            // if (currentBudget) continue;
-            if (currentBudget >= budgetToKeep) continue;
+        toRestart.push(advertId);
 
-            let budget = budgetToKeep - currentBudget;
-            // if (budget < 125) continue;
-            budget = Math.ceil(budget / 50) * 50;
-            if (budget < 500 || isNaN(budget)) budget = 500;
-            // if (buf)
+        const currentBudget = advertsBudgets[advertId];
+        // if (currentBudget) continue;
+        if (currentBudget >= budgetToKeep) continue;
 
-            let payType = 0;
-            if (balance.net && balance.net >= budget) payType = 1;
-            if (balance.bonus && balance.bonus >= budget) payType = 3;
+        let budget = budgetToKeep - currentBudget;
+        // if (budget < 125) continue;
+        budget = Math.ceil(budget / 50) * 50;
+        if (budget < 500 || isNaN(budget)) budget = 500;
+        // if (buf)
 
-            const depositParams = {
-              sum: budget,
-              type: payType,
-              return: true,
-            };
+        let payType = 0;
+        if (balance.net && balance.net >= budget) payType = 1;
+        if (balance.bonus && balance.bonus >= budget) payType = 3;
 
-            if (payType == 3) {
-              balance.bonus -= budget;
-            } else if (payType == 0) {
-              balance.balance -= budget;
-            } else {
-              balance.net -= budget;
-            }
-            console.log(
-              uid,
-              campaignName,
-              art,
-              advertId,
-              "баланс:",
-              currentBudget,
-              "будет пополнен на:",
-              budget
-            );
-            const newBudget = await depositAdvertBudget(
-              authToken,
-              advertId,
-              depositParams
-            );
-            if (newBudget) {
-              advertsBudgets[advertId] = newBudget.total;
+        const depositParams = {
+          sum: budget,
+          type: payType,
+          return: true,
+        };
 
-              console.log(
-                uid,
-                campaignName,
-                art,
-                advertId,
-                "баланс:",
-                currentBudget,
-                "пополнен на:",
-                budget
-              );
-            }
-
-            await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
-          }
+        if (payType == 3) {
+          balance.bonus -= budget;
+        } else if (payType == 0) {
+          balance.balance -= budget;
+        } else {
+          balance.net -= budget;
         }
+        console.log(
+          uid,
+          campaignName,
+          advertId,
+          "баланс:",
+          currentBudget,
+          "будет пополнен на:",
+          budget
+        );
+        const newBudget = await depositAdvertBudget(
+          authToken,
+          advertId,
+          depositParams
+        );
+        if (newBudget) {
+          advertsBudgets[advertId] = newBudget.total;
+
+          console.log(
+            uid,
+            campaignName,
+            advertId,
+            "пополнен на:",
+            budget,
+            "текущий баланс:",
+            advertsBudgets[advertId],
+          );
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
+
+
       }
       await new Promise((resolve) => setTimeout(resolve, 3 * 60 * 1000));
       for (let i = 0; i < toRestart.length; i++) {
@@ -5164,7 +5138,7 @@ const autoDepositAdvertsBudgetsAndWriteToJsonMM = async (uid, campaignName) => {
         await startAdvert(authToken, { id: advertId });
         await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
       }
-    };
+    }
 
     depositAdvertsBudgets().then(async () => {
       afs.writeFileSync(advertsBudgetsPath, JSON.stringify(advertsBudgets));
@@ -5225,98 +5199,92 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
       data;
 
     const setAdvertsCPMs = async () => {
-      for (const [art, artData] of Object.entries(data.arts)) {
-        if (!art || !artData) continue;
+      for (const [id, advertDataRules] of Object.entries(data.advertsIds)) {
+        if (!id || !advertDataRules) continue;
         if (mode === undefined) continue;
 
+
+        const { advertId } = advertDataRules;
+        if (!advertId) continue;
         if (mode == "Установить") {
-          let { bid } = artData;
+
+          if (!adverts[advertId]) continue;
+          if (!advertsInfos[advertId]) continue;
+
+          let { bid } = advertDataRules;
           if (bid === undefined) continue;
 
-          for (const [advertsType, advertsTypeData] of Object.entries(advertsManagerRules[art])) {
+          const { name, type, status } = advertsInfos[advertId]
+          if (![8, 6, 9].includes(type)) continue;
 
-            if (!advertsType || !advertsTypeData) continue;
-            const { advertId, mode } = advertsTypeData;
-            if (!mode || !advertId) continue;
+          console.log(uid, campaignName, name, advertId, mode, bid);
 
-            if (!adverts[advertId]) continue;
-            if (!advertsInfos[advertId]) continue;
+          let subjectId = undefined;
+          if (type == 6) {
+            const tempParams = advertsInfos[advertId].params[0];
+            subjectId = tempParams ? tempParams.subjectId : undefined;
+          }
+          else if (type == 9) {
+            const tempParams = advertsInfos[advertId].unitedParams[0];
+            subjectId = tempParams ? tempParams.subject ? tempParams.subject.id : undefined : undefined;
+          }
 
-            if (!advertsTypes[advertsType]) continue;
+          const minBid = type == 8 ? 125 : 150;
+          if (bid < minBid) bid = minBid;
 
-            const { name, type, status } = advertsInfos[advertId]
-            if (name != art) continue;
-            if (![8, 6, 9].includes(type)) continue;
-            if (status != 9) continue;
+          const params = {
+            advertId: advertsInfos[advertId].advertId,
+            type: advertsInfos[advertId].type,
+            cpm: bid,
+          };
 
-            console.log(uid, campaignName, art, advertId, mode, bid);
-
-            let subjectId = undefined;
-            if (type == 6) {
-              const tempParams = advertsInfos[advertId].params[0];
-              subjectId = tempParams ? tempParams.subjectId : undefined;
-            }
-            else if (type == 9) {
-              const tempParams = advertsInfos[advertId].unitedParams[0];
-              subjectId = tempParams ? tempParams.subject ? tempParams.subject.id : undefined : undefined;
-            }
-
-            const minBid = type == 8 ? 125 : 150;
-            if (bid < minBid) bid = minBid;
-
-            const params = {
-              advertId: advertsInfos[advertId].advertId,
-              type: advertsInfos[advertId].type,
-              cpm: bid,
-            };
-
-            if (subjectId) {
-              params["param"] = subjectId;
-            }
-            if (type == 9) {
-              params["instrument"] = 4
-              await setAdvertCPM(authToken, params);
-              await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
-
-              params["instrument"] = 6
-            }
-
+          if (subjectId) {
+            params["param"] = subjectId;
+          }
+          if (type == 9) {
+            params["instrument"] = 4
             await setAdvertCPM(authToken, params);
             await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
 
-            if (!(advertId in bidsLog))
-              bidsLog[advertId] = { bids: [] };
-
-            bidsLog[advertId].bids.push({
-              time: new Date().toISOString(),
-              val: bid,
-              index: -1,
-              prevIndex: -1,
-            });
+            params["instrument"] = 6
           }
+
+          await setAdvertCPM(authToken, params);
+          await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
+
+          if (!(advertId in bidsLog))
+            bidsLog[advertId] = { bids: [] };
+
+          bidsLog[advertId].bids.push({
+            time: new Date().toISOString(),
+            val: bid,
+            index: -1,
+            prevIndex: -1,
+          });
+
         } else if (mode == "Автоставки") {
-          const { desiredDRR } = artData;
+          const { desiredDRR } = advertDataRules;
           if (desiredDRR == undefined) continue;
-          console.log(uid, campaignName, art, mode, desiredDRR, maxBid, placementsRange);
+          console.log(uid, campaignName, advertId, mode, desiredDRR, maxBid, placementsRange);
 
-          if (!advertsAutoBidsRules[art]) advertsAutoBidsRules[art] = {};
+          if (!advertsAutoBidsRules[advertId]) advertsAutoBidsRules[advertId] = {};
 
-          advertsAutoBidsRules[art] = {
+          advertsAutoBidsRules[advertId] = {
             desiredDRR: desiredDRR,
             maxBid: maxBid,
             placementsRange: placementsRange,
           };
 
-          if (!advertsStocksThreshold[art]) advertsStocksThreshold[art] = {};
-          advertsStocksThreshold[art].stocksThreshold = stocksThreshold;
+          // if (!advertsStocksThreshold[art]) advertsStocksThreshold[art] = {};
+          // advertsStocksThreshold[art].stocksThreshold = stocksThreshold;
         } else if (mode == "Удалить правила") {
-          console.log(uid, campaignName, art, mode);
+          console.log(uid, campaignName, advertId, mode);
 
-          if (!advertsAutoBidsRules[art]) advertsAutoBidsRules[art] = {};
-          advertsAutoBidsRules[art] = undefined;
+          if (!advertsAutoBidsRules[advertId]) advertsAutoBidsRules[advertId] = {};
+          advertsAutoBidsRules[advertId] = undefined;
 
-          if (!advertsStocksThreshold[art]) advertsStocksThreshold[art] = {};
-          advertsStocksThreshold[art].stocksThreshold = undefined;
+          // if (!advertsStocksThreshold[advertId]) advertsStocksThreshold[advertId] = {};
+          // advertsStocksThreshold[advertId].stocksThreshold = undefined;
         }
       }
     };
@@ -5326,10 +5294,10 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
         advertsAutoBidsRulesPath,
         JSON.stringify(advertsAutoBidsRules)
       );
-      afs.writeFileSync(
-        advertsStocksThresholdPath,
-        JSON.stringify(advertsStocksThreshold)
-      );
+      // afs.writeFileSync(
+      //   advertsStocksThresholdPath,
+      //   JSON.stringify(advertsStocksThreshold)
+      // );
       if (mode == 'Установить') {
         const advertsBidsLogPath = path.join(
           __dirname,
@@ -5412,13 +5380,6 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
       campaignName,
       "orders.json"
     );
-    const artsPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "arts.json"
-    );
     const advertsBidsLogPath = path.join(
       __dirname,
       "marketMaster",
@@ -5427,24 +5388,17 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
       "advertsBidsLog.json"
     );
     const advertsBidsLog = readIfExists(advertsBidsLogPath);
-    const advertsInfos = readIfExists(advertsInfosPath);
-    const adverts = readIfExists(advertsPath);
-    const ordersData = readIfExists(ordersPath);
-
-    const arts = readIfExists(artsPath);
-    arts.byBrandArt = {};
-    for (const [nmId, artData] of Object.entries(arts.byNmId)) {
-      arts.byBrandArt[artData.art] = artData;
-    }
-
-    const advertsManagerRulesPath = path.join(
+    const artsPath = path.join(
       __dirname,
       "marketMaster",
       uid,
       campaignName,
-      "advertsManagerRules.json"
+      "arts.json"
     );
-    const advertsManagerRules = readIfExists(advertsManagerRulesPath);
+    const arts = readIfExists(artsPath);
+    const advertsInfos = readIfExists(advertsInfosPath);
+    const adverts = readIfExists(advertsPath);
+    const ordersData = readIfExists(ordersPath);
 
     let campaignMassAdvertsData = {}
     try {
@@ -5461,69 +5415,112 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
     }
 
     const setAdvertsCPMs = async () => {
-      for (const [art, bidsRules] of Object.entries(advertsAutoBidsRules)) {
-        if (!art || !bidsRules) continue;
-        if (!(art in arts.byBrandArt)) continue;
+      const artsByImntId = {}
+      for (const [art, artData] of Object.entries(arts.byArt)) {
+        if (art === undefined || artData === undefined) continue;
+        const { imtId } = artData;
+        if (imtId === undefined) continue;
 
-        if (!advertsManagerRules[art]) continue;
-        for (const [advertsType, advertsTypeData] of Object.entries(advertsManagerRules[art])) {
+        if (!artsByImntId[imtId]) artsByImntId[imtId] = []
+        if (!artsByImntId[imtId].includes(art)) artsByImntId[imtId].push(art)
 
-          if (!advertsType || !advertsTypeData) continue;
-          const { advertId, mode } = advertsTypeData;
-          if (!mode || !advertId) continue;
+      }
 
-          if (!adverts[advertId]) continue;
-          if (!advertsInfos[advertId]) continue;
+      const advertsArts = {}
+      for (const [advertId, advertInfos] of Object.entries(advertsInfos)) {
+        if (!advertId || !advertInfos || !advertsAutoBidsRules[advertId]) continue;
+        const type = advertInfos.type;
+        const status = advertInfos.status;
 
-          const { name, type, status, createTime } = advertsInfos[advertId]
-          if (name != art) continue;
-          if (![8, 6, 9].includes(type)) continue;
-          if (status != 9) continue;
 
-          const daysInWork = getDaysInWork(createTime);
+        if (!adverts[advertId]) continue;
 
-          const isByDrr = (placementsRange) => {
-            return (placementsRange && placementsRange.from == 0 && placementsRange.to == 0) || advertsType == "carousel"
+        if (![4, 9, 11].includes(status)) continue;
+
+        let nms = [];
+        if (type == 8) {
+          nms = advertInfos.autoParams.nms ?? [];
+        } else if (type == 9) {
+          nms = advertInfos.unitedParams ? advertInfos.unitedParams[0].nms ?? [] : [];
+        } else if (type == 6) {
+          const temp = advertInfos.params ? advertInfos.params[0].nms : [];
+          for (let i = 0; i < temp.length; i++) {
+            nms.push(temp[i].nm);
           }
+        }
 
-          const { desiredDRR, maxBid, placementsRange } =
-            bidsRules ?? {};
+        if (!advertsArts[advertId]) advertsArts[advertId] = { topArt: { art: '', index: -1 }, nms: [], imtIdNms: { included: [], nms: [] } };
+        advertsArts[advertId].nms = nms;
+        for (const nmId of nms) {
+          if (!arts.byNmId[nmId]) continue;
 
-          if (!desiredDRR || !maxBid || !placementsRange) continue;
+          const { imtId, art } = arts.byNmId[nmId]
 
-          // if (isByDrr(placementsRange) && daysInWork < 1) continue;
+          const { index } = campaignMassAdvertsData[art].placements;
+          if (advertsArts[advertId].topArt.art == '' || advertsArts[advertId].topArt.index == -1 || advertsArts[advertId].topArt.index > (index == -1 ? 10 * 1000 : index)) {
+            advertsArts[advertId].topArt.index = index;
+            advertsArts[advertId].topArt.art = art;
+          }
+          try {
+            const included = advertsArts[advertId].imtIdNms.included;
+            if (!included.includes(imtId)) advertsArts[advertId].imtIdNms.included.push(imtId)
+            else continue;
+            advertsArts[advertId].imtIdNms.nms = advertsArts[advertId].imtIdNms.nms.concat(artsByImntId[imtId] ?? []);
+          } catch (e) {
+            console.log(e, campaignName, "ASDASDASDASd");
+            console.log(advertsArts[advertId], advertsArts[advertId].imtIdNms, advertsArts[advertId].imtIdNms.included);
+          }
+        }
 
-          const min_recalc = (daysInWork) => {
-            const res = {
-              cpo: 0,
-              sum: 0,
-              orders: 0,
-              sum_orders: 0,
-              views: 0,
-              cpm: 0,
-              cr: 0,
-              drr: 0,
-              clicks: 0,
-            };
+      }
 
-            for (let i = 0; i <= daysInWork; i++) {
-              const date = new Date();
-              date.setDate(date.getDate() - i);
-              date.setHours(0, 0, 0, 0);
-              const strDate = date
-                .toLocaleDateString("ru-RU")
-                .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
-                .slice(0, 10);
+      for (const [id, bidsRules] of Object.entries(advertsAutoBidsRules)) {
+        if (!id || !bidsRules) continue;
 
-              const { sum, orders, clicks, views, sum_orders } =
-                campaignMassAdvertsData[art].advertsStats
-                  ? campaignMassAdvertsData[art].advertsStats[strDate]
-                    ? campaignMassAdvertsData[art].advertsStats[strDate][
-                      advertsType
-                    ]
-                      ? campaignMassAdvertsData[art].advertsStats[strDate][
-                      advertsType
-                      ]
+        if (!adverts[id]) continue;
+        if (!advertsInfos[id]) continue;
+
+        const { name, type, status, createTime, advertId } = advertsInfos[id]
+        if (![8, 6, 9].includes(type)) continue;
+        if (status != 9) continue;
+
+        const daysInWork = getDaysInWork(createTime);
+
+        const isByDrr = (placementsRange) => {
+          return (placementsRange && placementsRange.from == 0 && placementsRange.to == 0)
+        }
+
+        const { desiredDRR, maxBid, placementsRange } =
+          bidsRules ?? {};
+
+        if (desiredDRR === undefined || maxBid === undefined || placementsRange === undefined) continue;
+
+        // if (isByDrr(placementsRange) && daysInWork < 1) continue;
+
+        const min_recalc = (daysInWork) => {
+          const res = {
+            cpo: 0,
+            sum: 0,
+            orders: 0,
+            sum_orders: 0,
+            views: 0,
+            cpm: 0,
+            cr: 0,
+            drr: 0,
+            clicks: 0,
+          };
+          if (advertsArts[advertId]) {
+            const { nms, imtIdNms } = advertsArts[advertId];
+            for (const art of imtIdNms.nms) {
+              for (let i = 0; i <= daysInWork; i++) {
+                const strDate = getLocaleDateString(getDateNDaysAgo(i)).slice(0, 10);
+
+
+
+                const { sum, orders, clicks, views, sum_orders } =
+                  campaignMassAdvertsData[art].advertsStats
+                    ? campaignMassAdvertsData[art].advertsStats[strDate]
+                      ? campaignMassAdvertsData[art].advertsStats[strDate]
                       : {
                         sum: 0,
                         orders: 0,
@@ -5532,226 +5529,212 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
                         sum_orders: 0,
                       }
                     : { sum: 0, orders: 0, clicks: 0, views: 0, sum_orders: 0 }
-                  : { sum: 0, orders: 0, clicks: 0, views: 0, sum_orders: 0 };
 
-              // if (
-              //   campaignMassAdvertsData[art].advertsStats &&
-              //   !campaignMassAdvertsData[art].advertsStats[strDate]
-              // )
-              //   console.log(uid, campaignName, art, strDate);
 
-              res.orders += orders;
-              res.sum_orders += sum_orders;
-              res.sum += sum;
-              res.views += views;
-              res.clicks += clicks;
+                // if (
+                //   campaignMassAdvertsData[art].advertsStats &&
+                //   !campaignMassAdvertsData[art].advertsStats[strDate]
+                // )
+                //   console.log(uid, campaignName, art, strDate);
+
+                res.orders += orders;
+                res.sum_orders += sum_orders;
+                if (nms.includes(arts.byArt[art].nmId)) {
+                  res.sum += sum;
+                  res.views += views;
+                  res.clicks += clicks;
+                }
+              }
             }
+          }
 
-            res.orders = Math.round(res.orders * 100) / 100;
-            res.sum_orders = Math.round(res.sum_orders);
-            res.sum = Math.round(res.sum);
-            res.clicks = Math.round(res.clicks);
-            res.views = Math.round(res.views);
-            res.cpo = getRoundValue(res.sum, res.orders, false, res.sum);
-            res.cpm = getRoundValue(res.sum * 1000, res.views);
-            res.cr = getRoundValue(res.orders, res.views, true);
-            res.drr = getRoundValue(res.sum, res.sum_orders, true, 1);
+          res.orders = Math.round(res.orders * 100) / 100;
+          res.sum_orders = Math.round(res.sum_orders);
+          res.sum = Math.round(res.sum);
+          res.clicks = Math.round(res.clicks);
+          res.views = Math.round(res.views);
+          res.cpo = getRoundValue(res.sum, res.orders, false, res.sum);
+          res.cpm = getRoundValue(res.sum * 1000, res.views);
+          res.cr = getRoundValue(res.orders, res.views, true);
+          res.drr = getRoundValue(res.sum, res.sum_orders, true, 1);
 
-            // console.log(uid, campaignName, advertsType, res);
+          // console.log(uid, campaignName, advertsType, res);
 
-            return res;
-          };
+          return res;
+        };
 
-          const prevBids = advertsBidsLog[advertId]
-            ? advertsBidsLog[advertId].bids : undefined
+        const prevBids = advertsBidsLog[advertId]
+          ? advertsBidsLog[advertId].bids : undefined
+
+
+
+        let currentBid = undefined;
+        let subjectId = undefined;
+        if (type == 8) {
+          if (!advertsInfos[advertId].autoParams) continue;
+          currentBid = advertsInfos[advertId].autoParams.cpm;
+        } else if (type == 6) {
+          if (!advertsInfos[advertId].params) continue;
+          const tempParams = advertsInfos[advertId].params[0];
+          currentBid = tempParams ? tempParams.price : undefined;
+          subjectId = tempParams ? tempParams.subjectId : undefined;
+        }
+        else if (type == 9) {
+          if (!advertsInfos[advertId].unitedParams) continue;
+          const tempParams = advertsInfos[advertId].unitedParams[0];
+          currentBid = tempParams ? tempParams.searchCPM : undefined;
+          subjectId = tempParams ? tempParams.subject ? tempParams.subject.id : undefined : undefined;
+        }
+
+        const minBid = type == 8 ? 125 : 150;
+        let bid = currentBid;
+        let rollback = false;
+
+        if (!isByDrr(placementsRange)) {
+          const art = advertsArts[advertId].topArt.art;
 
           const { index, updateTime, prevIndex, phrase } =
             campaignMassAdvertsData[art].placements;
 
-          let currentBid = undefined;
-          let subjectId = undefined;
-          if (type == 8) {
-            if (!advertsInfos[advertId].autoParams) continue;
-            currentBid = advertsInfos[advertId].autoParams.cpm;
-          } else if (type == 6) {
-            if (!advertsInfos[advertId].params) continue;
-            const tempParams = advertsInfos[advertId].params[0];
-            currentBid = tempParams ? tempParams.price : undefined;
-            subjectId = tempParams ? tempParams.subjectId : undefined;
+          if (!updateTime) continue;
+          if (
+            (new Date().getTime() - new Date(updateTime).getTime()) /
+            1000 /
+            60 >
+            60
+          )
+            continue;
+          if (prevBids && prevBids.length > 0) {
+            if (new Date(updateTime).getTime() <=
+              new Date(
+                prevBids.slice(-1)[0].time
+              ).getTime()) continue;
+
+            bid = prevBids.slice(-1)[0].val ?? currentBid;
           }
-          else if (type == 9) {
-            if (!advertsInfos[advertId].unitedParams) continue;
-            const tempParams = advertsInfos[advertId].unitedParams[0];
-            currentBid = tempParams ? tempParams.searchCPM : undefined;
-            subjectId = tempParams ? tempParams.subject ? tempParams.subject.id : undefined : undefined;
+
+          // console.log(
+          //   art,
+          //   index,
+          //   new Date(updateTime).toLocaleString("ru-RU"),
+          //   maxBid,
+          //   placementsRange
+          // );
+
+
+          // if (prevBids && prevBids.length >= 3) {
+          //   const prevData = prevBids.slice(-3);
+          //   // console.log(prevData);
+          //   if (!prevData[2].rollback) {
+          //     if (prevData[0].index != -1 && prevData[1].index != -1 && prevData[2].index != -1) {
+          //       if (prevData[2].val > prevData[1].val && prevData[1].val > prevData[0].val && prevData[1].index <= prevData[2].index) {
+          //         bid = Math.round(bid - 10);
+          //         rollback = true;
+          //       }
+          //     }
+          //   } else {
+          //     if (prevData[2].index == index) {
+          //       bid = Math.round(bid - 10);
+          //       rollback = true;
+          //     }
+          //   }
+          // }
+
+          if (rollback) { }
+          else if (index > placementsRange.to || index == -1) {
+            bid = Math.round(bid + 10);
+          } else if (index < placementsRange.from) {
+            bid = Math.round(bid - 10);
           }
+          else if (campaignMassAdvertsData[art].placements) {
+            const { prevIndex, prevPrevIndex } = campaignMassAdvertsData[art].placements;
 
-          const ordersTemp = { orders: 0, sum_orders: 0 };
-          const minBid = type == 8 ? 125 : 150;
-          let bid = currentBid;
-          let rollback = false;
-
-          if (!isByDrr(placementsRange)) {
-            if (!updateTime) continue;
-            if (
-              (new Date().getTime() - new Date(updateTime).getTime()) /
-              1000 /
-              60 >
-              60
-            )
-              continue;
-            if (prevBids && prevBids.length > 0) {
-              if (new Date(updateTime).getTime() <=
-                new Date(
-                  prevBids.slice(-1)[0].time
-                ).getTime()) continue;
-
-              bid = prevBids.slice(-1)[0].val ?? currentBid;
+            if (!prevIndex || !prevPrevIndex || prevIndex == -1 || prevPrevIndex == -1) continue;
+            if (prevIndex <= placementsRange.to && prevIndex >= placementsRange.from && prevPrevIndex <= placementsRange.to && prevPrevIndex >= placementsRange.from) {
+              bid = Math.round(bid - 5);
+            } else {
+              if (placementsRange.from <= index && placementsRange.to >= index)
+                continue;
             }
 
-            // console.log(
-            //   art,
-            //   index,
-            //   new Date(updateTime).toLocaleString("ru-RU"),
-            //   maxBid,
-            //   placementsRange
-            // );
-
-
-            // if (prevBids && prevBids.length >= 3) {
-            //   const prevData = prevBids.slice(-3);
-            //   // console.log(prevData);
-            //   if (!prevData[2].rollback) {
-            //     if (prevData[0].index != -1 && prevData[1].index != -1 && prevData[2].index != -1) {
-            //       if (prevData[2].val > prevData[1].val && prevData[1].val > prevData[0].val && prevData[1].index <= prevData[2].index) {
-            //         bid = Math.round(bid - 10);
-            //         rollback = true;
-            //       }
-            //     }
-            //   } else {
-            //     if (prevData[2].index == index) {
-            //       bid = Math.round(bid - 10);
-            //       rollback = true;
-            //     }
-            //   }
-            // }
-
-            if (rollback) { }
-            else if (index > placementsRange.to || index == -1) {
-              bid = Math.round(bid + 10);
-            } else if (index < placementsRange.from) {
-              bid = Math.round(bid - 10);
-            }
-            else if (campaignMassAdvertsData[art].placements) {
-              const { prevIndex, prevPrevIndex } = campaignMassAdvertsData[art].placements;
-
-              if (!prevIndex || !prevPrevIndex || prevIndex == -1 || prevPrevIndex == -1) continue;
-              if (prevIndex <= placementsRange.to && prevIndex >= placementsRange.from && prevPrevIndex <= placementsRange.to && prevPrevIndex >= placementsRange.from) {
-                bid = Math.round(bid - 5);
-              } else {
-                if (placementsRange.from <= index && placementsRange.to >= index)
-                  continue;
-              }
-
-            }
           }
-          else {
-            const { cr } = min_recalc(daysInWork);
-
-            for (const [_day, strDate] of Object.entries({
-              today: getLocaleDateString(getDateNDaysAgo(0)).slice(0, 10),
-              yesterday: getLocaleDateString(getDateNDaysAgo(1)).slice(0, 10),
-            })) {
-              if (ordersData[strDate]) {
-                const sizes = arts.byBrandArt[art].sizes;
-                for (let j = 0; j < sizes.length; j++) {
-                  const sku = sizes[j].skus[0];
-                  const local_art = arts.bySku[sku].art;
-                  ordersTemp.orders += ordersData[strDate].all[local_art]
-                    ? ordersData[strDate].all[local_art].count
-                    : 0;
-
-                  ordersTemp.sum_orders += ordersData[strDate].all[local_art]
-                    ? ordersData[strDate].all[local_art].sum
-                    : 0;
-                }
-              }
-            }
-            ordersTemp.avgBill = getRoundValue(
-              ordersTemp.sum_orders,
-              ordersTemp.orders
-            );
-
-            const calculatedCPO = Math.round(
-              ordersTemp.avgBill * (desiredDRR / 100)
-            );
-            bid = Math.round(calculatedCPO * cr * 10);
-            if (ordersTemp.orders == 0) bid = minBid;
-
-
-
-            // console.log(art, `cr: ${cr} drr: ${drr} views: ${views} oreders last 2 days:`, ordersTemp, ` cpo: ${calculatedCPO}`);
+        }
+        else {
+          if (prevBids && prevBids.length > 0) {
+            if (new Date().getTime() <=
+              (new Date(
+                prevBids.slice(-1)[0].time
+              ).getTime() + 20 * 60 * 1000)) continue;
           }
 
-          // if (drr == desiredDRR) continue;
-          // else if (drr < desiredDRR) bid += bidStep;
-          // else if (drr > desiredDRR) bid -= bidStep;
-          // let bid = Math.round(cr * 10 * desiredCPO);
+          const { cr, sum_orders, orders } = min_recalc(daysInWork);
 
-          if (bid > maxBid) bid = maxBid;
-          if (bid < minBid) bid = minBid;
+          const avgBill = getRoundValue(
+            sum_orders,
+            orders
+          );
 
-          // else if (views < 1000 && bid > currentBid) break;
+          const calculatedCPO = Math.round(
+            avgBill * (desiredDRR / 100)
+          );
+          bid = Math.round(calculatedCPO * cr * 10);
+          if (orders == 0) bid = minBid;
 
-          const params = {
-            advertId: advertsInfos[advertId].advertId,
-            type: advertsInfos[advertId].type,
-            cpm: bid,
-          };
-          if (subjectId) {
-            params["param"] = subjectId;
-          }
-          if (type == 9) {
-            params["instrument"] = 4
-            await setAdvertCPM(authToken, params);
-            await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
+          // console.log(art, `cr: ${cr} drr: ${drr} views: ${views} oreders last 2 days:`, ordersTemp, ` cpo: ${calculatedCPO}`);
+        }
 
-            params["instrument"] = 6
-          }
+        // if (drr == desiredDRR) continue;
+        // else if (drr < desiredDRR) bid += bidStep;
+        // else if (drr > desiredDRR) bid -= bidStep;
+        // let bid = Math.round(cr * 10 * desiredCPO);
 
+        if (bid > maxBid) bid = maxBid;
+        if (bid < minBid) bid = minBid;
+
+        // else if (views < 1000 && bid > currentBid) break;
+
+        const params = {
+          advertId: advertsInfos[advertId].advertId,
+          type: advertsInfos[advertId].type,
+          cpm: bid,
+        };
+        if (subjectId) {
+          params["param"] = subjectId;
+        }
+        if (type == 9) {
+          params["instrument"] = 4
           await setAdvertCPM(authToken, params);
           await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
-          console.log(
-            uid,
-            campaignName,
-            art,
-            "index:",
-            index,
-            "для",
-            placementsRange,
-            advertId,
-            "установлена ставка",
-            bid,
-            new Date(updateTime).toLocaleString("ru-RU"),
-            maxBid,
 
-          );
-          if (!(advertId in advertsBidsLog))
-            advertsBidsLog[advertId] = { bids: [] };
-          const len = advertsBidsLog[advertId].bids.length;
-          if (len >= 7 * 24) {
-            advertsBidsLog[advertId].bids.shift();
-          }
-
-          advertsBidsLog[advertId].bids.push({
-            time: new Date().toISOString(),
-            val: bid,
-            index: index,
-            prevIndex: prevIndex,
-            phrase: phrase,
-            rollback: rollback,
-          });
+          params["instrument"] = 6
         }
+
+        await setAdvertCPM(authToken, params);
+        await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
+        console.log(
+          uid,
+          campaignName,
+          advertId,
+          "установлена ставка",
+          bid,
+
+        );
+        if (!(advertId in advertsBidsLog))
+          advertsBidsLog[advertId] = { bids: [] };
+        const len = advertsBidsLog[advertId].bids.length;
+        if (len >= 7 * 24) {
+          advertsBidsLog[advertId].bids.shift();
+        }
+
+        advertsBidsLog[advertId].bids.push({
+          time: new Date().toISOString(),
+          val: bid,
+          // index: index,
+          // prevIndex: prevIndex,
+          // phrase: phrase,
+          // rollback: rollback,
+        });
+
       }
     };
 
@@ -5835,7 +5818,7 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
     if (!advertId || !advertData) continue;
 
 
-    if (advertId != '15957333') continue;
+    // if (advertId != '15957333') continue;
     // if (!adverts[advertId]) {
     //   console.log("ola soy dora");
     //   continue;
@@ -5883,9 +5866,8 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
     startDate.setHours(0, 0, 0, 0);
     const daysBetween = (today.getTime() - startDate.getTime()) / 86400 / 1000;
 
-    for (let i = 0; i <= 0; i++) {
-      console.log(getDateNDaysAgo(i), getDateNDaysAgo(i).toISOString());
-      dates.push(getDateNDaysAgo(i).toISOString().slice(0, 10));
+    for (let i = 0; i <= daysBetween; i++) {
+      dates.push(getLocaleDateString(getDateNDaysAgo(i)).slice(0, 10));
     }
     // console.log(
     //   advertId,
@@ -5898,10 +5880,10 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
     // continue;
     params[numOfButches].push({
       id: advertData.advertId,
-      interval: {
-        begin: "2022-01-01",
-        end: today_str,
-      },
+      // interval: {
+      //   begin: "2022-01-01",
+      //   end: today_str,
+      // },
       // dates: dates,
     });
   }
@@ -5938,7 +5920,7 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
             console.log("Skipped:", params[i], pr[j]);
             continue;
           }
-          console.log(advertData, advertData.days);
+          // console.log(advertData, advertData.days);
           advertData.updateTime = new Date().toLocaleString("ru-RU");
           if (advertId in jsonData) {
             for (
@@ -6779,6 +6761,50 @@ const fetchArtsAndWriteToJsonMM = async (uid, campaignName) => {
   });
 };
 
+const fetchArtsPricesAndWriteToJsonMM = async (uid, campaignName) => {
+  const authToken = getAuthTokenMM(uid, campaignName);
+
+  const promises = [];
+  let goods = [];
+  const params = {
+    limit: 1000,
+    offset: 0,
+  };
+  for (let i = 1; i < 10; i++) {
+    let isNextPage = false;
+
+    promises.push(
+      await getGoodsMM(authToken, params)
+        .then(async (res) => {
+          if (!res) return;
+          if (!res.data) return;
+          if (!res.data.listGoods) return;
+          const tempGoods = res.data.listGoods;
+          goods = goods.concat(tempGoods);
+
+          console.log(uid, campaignName, i, tempGoods.length);
+
+          if (tempGoods.length == 1000) {
+            isNextPage = true;
+            await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
+            params.offset = params.offset + 1000
+          }
+        })
+        .catch((e) => {
+          console.log(e);
+        })
+    );
+
+    if (!isNextPage) {
+      break;
+    }
+  }
+  Promise.all(promises).then(() => {
+    if (!goods || goods.length == 0) return;
+    writePricesToJsonMM(goods, uid, campaignName);
+  });
+};
+
 const fetchNmDetailReportAndWriteToJsonMM = (uid, campaignName) => {
   return new Promise(async (resolve) => {
     const authToken = getAuthTokenMM(uid, campaignName);
@@ -7081,7 +7107,7 @@ const fetchOrdersAndWriteToJsonMM = (uid, campaignName, daysAgo = undefined) => 
   return new Promise((resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
     const dateFrom = new Date();
-    dateFrom.setDate(dateFrom.getDate() - (daysAgo ?? 30));
+    dateFrom.setDate(dateFrom.getDate() - (daysAgo ?? 7));
     const date = dateFrom.toISOString().slice(0, 10);
     console.log(date);
     const params = {
@@ -7110,11 +7136,11 @@ const fetchOrdersAndWriteToJsonMM = (uid, campaignName, daysAgo = undefined) => 
   });
 };
 
-const fetchSalesAndWriteToJsonMM = (uid, campaignName, daysAgo) => {
+const fetchSalesAndWriteToJsonMM = (uid, campaignName, daysAgo = undefined) => {
   return new Promise((resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
     const dateFrom = new Date();
-    dateFrom.setDate(dateFrom.getDate() - daysAgo ?? 35);
+    dateFrom.setDate(dateFrom.getDate() - (daysAgo ?? 35));
     const date = getLocaleDateString(dateFrom).slice(0, 10);
     console.log(date);
     const params = {
@@ -7622,11 +7648,12 @@ const calcDeliveryOrdersAndWriteToJsonMM = (uid, campaignName, dateRange) => {
 const getAdvertsType = (advertId, advertsInfos) => {
   let advertType = "none";
   if (advertsInfos[advertId].type == 8) {
-    const { carousel, recom, booster } =
-      advertsInfos[advertId].autoParams.active ?? {};
-    if (carousel + recom + booster > 1) return advertType;
-    if (booster) advertType = "booster";
-    else if (carousel) advertType = "carousel";
+    //   const { carousel, recom, booster } =
+    //     advertsInfos[advertId].autoParams.active ?? {};
+    //   if (carousel + recom + booster > 1) return advertType;
+    //   if (booster) advertType = "booster";
+    //   else if (carousel) advertType = "carousel";
+    advertType = "booster";
   } else if (advertsInfos[advertId].type == 6 || advertsInfos[advertId].type == 9) {
     advertType = "search";
   }
@@ -7635,13 +7662,23 @@ const getAdvertsType = (advertId, advertsInfos) => {
 
 const getPlacements = (uid, campaignName) => {
   try {
-    const advertsManagerRules = readIfExists(
+    const advertsInfos = readIfExists(
       path.join(
         __dirname,
         "marketMaster",
         uid,
         campaignName,
-        "advertsManagerRules.json"
+        "advertsInfos.json"
+      )
+    );
+
+    const adverts = readIfExists(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "adverts.json"
       )
     );
 
@@ -7669,64 +7706,102 @@ const getPlacements = (uid, campaignName) => {
     }
 
     const jsonData = {};
-    for (const [art, advertsTypes] of Object.entries(advertsManagerRules)) {
-      const topPhrase = { phrase: "", count: 0 };
+    const artsWithAdverts = {};
+    for (const [advertId, advertInfos] of Object.entries(advertsInfos)) {
+      if (!advertId || !advertInfos) continue;
+      const type = advertInfos.type;
+      const status = advertInfos.status;
 
-      if (advertsSelectedPhrases[art] && advertsSelectedPhrases[art].phrase) {
-        topPhrase.count = 10;
-        topPhrase.phrase = advertsSelectedPhrases[art].phrase;
+      if (!adverts[advertId]) continue;
+
+      if (![4, 9, 11].includes(status)) continue;
+
+      let nms = [];
+      let advertType = getAdvertsType(advertId, advertsInfos);
+      if (type == 8) {
+        nms = advertInfos.autoParams.nms ?? [];
+      } else if (type == 9) {
+        nms = advertInfos.unitedParams ? advertInfos.unitedParams[0].nms ?? [] : [];
+      } else if (type == 6) {
+        const temp = advertInfos.params ? advertInfos.params[0].nms : [];
+        for (let i = 0; i < temp.length; i++) {
+          nms.push(temp[i].nm);
+        }
       }
 
-      else {
+      for (let i = 0; i < nms.length; i++) {
+        const nmId = nms[i];
+        const artData = arts.byNmId[nmId];
+        if (!artData) continue;
+        const art = artData.art;
+        if (!art) continue;
 
-        if (!art || !advertsTypes) continue;
-        for (const [advertsType, rules] of Object.entries(advertsTypes)) {
-          if (!advertsType || !rules) continue;
-          const { advertId, mode } = rules;
-          if (!advertId || !mode) continue;
-          //   console.log(art, advertsType, rules);
+        if (!(art in artsWithAdverts)) artsWithAdverts[art] = {};
 
-          const words = advertsWords[advertId];
-          if (!words) continue;
-          if (advertsType == "search") {
-            const { keywords, pluse } = words.words ?? {};
-            if (!keywords || !keywords.length) continue;
+        artsWithAdverts[art][advertId] = {
+          advertId: advertId,
+          advertsType: advertType
+        };
+      }
+    }
 
-            if (pluse) {
-              for (let j = 0; j < pluse.length; j++) {
-                const keyword = pluse[j];
-                const { stat } = advertsWords[advertId];
-                if (!stat[keyword]) continue;
-                const { views } = stat[keyword] ?? {};
-                // console.log(stat[keyword], keyword);
-                keywords.push({
-                  keyword: keyword,
-                  count: views,
-                });
-              }
+    for (const [art, advertsDatas] of Object.entries(artsWithAdverts)) {
+      const topPhrase = { phrase: "", count: 0 };
+
+      if (!art || !advertsDatas) continue;
+      for (const [id, advertsDatasCur] of Object.entries(advertsDatas)) {
+        if (!id || !advertsDatasCur) continue;
+        const { advertId, advertsType } = advertsDatasCur;
+        if (!advertId) continue;
+
+        if (advertsSelectedPhrases[advertId] && advertsSelectedPhrases[advertId].phrase) {
+          topPhrase.count = 10;
+          topPhrase.phrase = advertsSelectedPhrases[advertId].phrase;
+          continue;
+        }
+        //   console.log(art, advertsType, rules);
+
+        const words = advertsWords[advertId];
+        if (!words) continue;
+        if (advertsType == "search") {
+          const { keywords, pluse } = words.words ?? {};
+          if (!keywords || !keywords.length) continue;
+
+          if (pluse) {
+            for (let j = 0; j < pluse.length; j++) {
+              const keyword = pluse[j];
+              const { stat } = advertsWords[advertId];
+              if (!stat[keyword]) continue;
+              const { views } = stat[keyword] ?? {};
+              // console.log(stat[keyword], keyword);
+              keywords.push({
+                keyword: keyword,
+                count: views,
+              });
             }
+          }
 
-            keywords.sort((a, b) => b.count - a.count);
+          keywords.sort((a, b) => b.count - a.count);
 
-            const top = keywords[0];
-            // console.log(art, advertsType, top);
+          const top = keywords[0];
+          // console.log(art, advertsType, top);
 
-            if (!topPhrase.count || topPhrase.count < top.count) {
-              topPhrase.phrase = top.keyword;
-              topPhrase.count = top.count;
-              //   console.log(art, advertsType, topPhrase);
-            }
-          } else {
-            const { clusters } = words ?? {};
-            if (!clusters || !clusters.length) continue;
+          if (!topPhrase.count || topPhrase.count < top.count) {
+            topPhrase.phrase = top.keyword;
+            topPhrase.count = top.count;
+            //   console.log(art, advertsType, topPhrase);
+          }
+        } else {
+          const { clusters } = words ?? {};
+          if (!clusters || !clusters.length) continue;
 
-            const top = clusters[0];
+          const top = clusters[0];
 
-            if (!topPhrase.count || topPhrase.count < top.count) {
-              topPhrase.phrase = top.cluster;
-              topPhrase.count = top.count;
-              //   console.log(art, advertsType, topPhrase);
-            }
+          if (!topPhrase.count || topPhrase.count < top.count) {
+            topPhrase.phrase = top.cluster;
+            topPhrase.count = top.count;
+            //   console.log(art, advertsType, topPhrase);
+
           }
         }
       }
@@ -7863,6 +7938,15 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
       "advertsStatsByDay.json"
     )
   );
+  const advertsStatsByArt = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "advertsStatsByArt.json"
+    )
+  );
   const stocks = readIfExists(
     path.join(__dirname, "marketMaster", uid, campaignName, "stocks.json")
   );
@@ -7888,63 +7972,13 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     arts.byBrandArt[artData.art] = artData;
   }
 
-  const advertsStatsByArt = {};
-  for (const [advertId, advertStats] of Object.entries(advertsStatsByDay)) {
-    if (!advertId || !advertStats) continue;
-    const art = advertsInfos[advertId].name;
-    const type = advertsInfos[advertId].type;
-    let advertType = getAdvertsType(advertId, advertsInfos);
-    if (advertType == "none") continue;
-
-    if (!(art in advertsStatsByArt)) advertsStatsByArt[art] = {};
-    // console.log(artsToSumOrders);
-
-    for (const [date, dateData] of Object.entries(advertStats.days)) {
-      if (!(date in advertsStatsByArt[art]))
-        advertsStatsByArt[art][date] = {
-          orders: 0,
-          sum_orders: 0,
-          sum: 0,
-          views: 0,
-          clicks: 0,
-          sales: 0,
-          sum_sales: 0,
-          // search: {
-          //   orders: 0,
-          //   sum_orders: 0,
-          //   sum: 0,
-          //   views: 0,
-          //   clicks: 0,
-          //   sales: 0,
-          //   sum_sales: 0,
-          // },
-          // booster: {
-          //   orders: 0,
-          //   sum_orders: 0,
-          //   sum: 0,
-          //   views: 0,
-          //   clicks: 0,
-          //   sales: 0,
-          //   sum_sales: 0,
-          // },
-          // carousel: {
-          //   orders: 0,
-          //   sum_orders: 0,
-          //   sum: 0,
-          //   views: 0,
-          //   clicks: 0,
-          //   sales: 0,
-          //   sum_sales: 0,
-          // },
-        };
-
-      // advertsStatsByArt[art][date][advertType].views += dateData.views ?? 0;
-      // advertsStatsByArt[art][date][advertType].sum += dateData.sum ?? 0;
-      // advertsStatsByArt[art][date][advertType].clicks += dateData.clicks ?? 0;
-
-      advertsStatsByArt[art][date].views += dateData.views ?? 0;
-      advertsStatsByArt[art][date].sum += dateData.sum ?? 0;
-      advertsStatsByArt[art][date].clicks += dateData.clicks ?? 0;
+  // const advertsStatsByArt = {};
+  for (const [art, datesData] of Object.entries(advertsStatsByArt)) {
+    for (const [date, stats] of Object.entries(datesData)) {
+      advertsStatsByArt[art][date].orders = 0;
+      advertsStatsByArt[art][date].sum_orders = 0;
+      advertsStatsByArt[art][date].sales = 0;
+      advertsStatsByArt[art][date].sum_sales = 0;
     }
   }
 
@@ -7968,40 +8002,9 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
           };
         }
 
-        const searchClicks = advertsStatsByArt[art][date]["search"]
-          ? advertsStatsByArt[art][date]["search"].clicks
-          : 0;
-        const boosterClicks = advertsStatsByArt[art][date]["booster"]
-          ? advertsStatsByArt[art][date]["booster"].clicks
-          : 0;
-        const carouselClicks = advertsStatsByArt[art][date]["carousel"]
-          ? advertsStatsByArt[art][date]["carousel"].clicks
-          : 0;
-        const sumClicks = searchClicks + boosterClicks + carouselClicks;
-        if (sumClicks) {
-          if (searchClicks) {
-            advertsStatsByArt[art][date]["search"].orders +=
-              artOrdersData.count * (searchClicks / sumClicks);
-            advertsStatsByArt[art][date]["search"].sum_orders +=
-              artOrdersData.sum * (searchClicks / sumClicks);
-          }
-          if (boosterClicks) {
-            advertsStatsByArt[art][date]["booster"].orders +=
-              artOrdersData.count * (boosterClicks / sumClicks);
-            advertsStatsByArt[art][date]["booster"].sum_orders +=
-              artOrdersData.sum * (boosterClicks / sumClicks);
-          }
-          if (carouselClicks) {
-            advertsStatsByArt[art][date]["carousel"].orders +=
-              artOrdersData.count * (carouselClicks / sumClicks);
-            advertsStatsByArt[art][date]["carousel"].sum_orders +=
-              artOrdersData.sum * (carouselClicks / sumClicks);
-          }
-        } else {
-          advertsStatsByArt[art][date]["booster"].orders += artOrdersData.count;
-          advertsStatsByArt[art][date]["booster"].sum_orders +=
-            artOrdersData.sum;
-        }
+        advertsStatsByArt[art][date].orders += artOrdersData.count;
+        advertsStatsByArt[art][date].sum_orders += artOrdersData.sum;
+
       }
     }
   }
@@ -8014,73 +8017,21 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
         if (!(local_art in arts.byArt)) continue;
         const art = arts.byArt[local_art].brand_art;
         if (!(art in advertsStatsByArt)) advertsStatsByArt[art] = {};
-
         if (!(date in advertsStatsByArt[art])) {
           advertsStatsByArt[art][date] = {
-            search: {
-              orders: 0,
-              sum_orders: 0,
-              sum: 0,
-              views: 0,
-              clicks: 0,
-              sales: 0,
-              sum_sales: 0,
-            },
-            booster: {
-              orders: 0,
-              sum_orders: 0,
-              sum: 0,
-              views: 0,
-              clicks: 0,
-              sales: 0,
-              sum_sales: 0,
-            },
-            carousel: {
-              orders: 0,
-              sum_orders: 0,
-              sum: 0,
-              views: 0,
-              clicks: 0,
-              sales: 0,
-              sum_sales: 0,
-            },
+            orders: 0,
+            sum_orders: 0,
+            sum: 0,
+            views: 0,
+            clicks: 0,
+            sales: 0,
+            sum_sales: 0,
           };
         }
 
-        const searchClicks = advertsStatsByArt[art][date]["search"]
-          ? advertsStatsByArt[art][date]["search"].clicks
-          : 0;
-        const boosterClicks = advertsStatsByArt[art][date]["booster"]
-          ? advertsStatsByArt[art][date]["booster"].clicks
-          : 0;
-        const carouselClicks = advertsStatsByArt[art][date]["carousel"]
-          ? advertsStatsByArt[art][date]["carousel"].clicks
-          : 0;
-        const sumClicks = searchClicks + boosterClicks + carouselClicks;
-        if (sumClicks) {
-          if (searchClicks) {
-            advertsStatsByArt[art][date]["search"].sales +=
-              salesData.count * (searchClicks / sumClicks);
-            advertsStatsByArt[art][date]["search"].sum_sales +=
-              salesData.sum * (searchClicks / sumClicks);
-          }
-          if (boosterClicks) {
-            advertsStatsByArt[art][date]["booster"].sales +=
-              salesData.count * (boosterClicks / sumClicks);
-            advertsStatsByArt[art][date]["booster"].sum_sales +=
-              salesData.sum * (boosterClicks / sumClicks);
-          }
-          if (carouselClicks) {
-            advertsStatsByArt[art][date]["carousel"].sales +=
-              salesData.count * (carouselClicks / sumClicks);
-            advertsStatsByArt[art][date]["carousel"].sum_sales +=
-              salesData.sum * (carouselClicks / sumClicks);
-          }
-        } else {
-          advertsStatsByArt[art][date]["booster"].sales += salesData.count;
-          advertsStatsByArt[art][date]["booster"].sum_sales +=
-            salesData.sum;
-        }
+        advertsStatsByArt[art][date].sales += salesData.count;
+        advertsStatsByArt[art][date].sum_sales += salesData.sum;
+
       }
     }
   }
@@ -8095,8 +8046,6 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     const status = advertInfos.status;
 
     if (!adverts[advertId]) continue;
-
-
 
     if (![4, 9, 11].includes(status)) continue;
 
@@ -8249,7 +8198,6 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
             for (let j = 0; j < pluse.length; j++) {
               const keyword = pluse[j];
               const { stat } = advertsWords[advertId];
-              if (!stat[keyword]) continue;
               const { sum, ctr, clicks, views } = stat[keyword] ?? {};
               // console.log(stat[keyword], keyword);
               words.clusters.push({
@@ -8318,7 +8266,6 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     jsonData[art].brand = artData.brand;
     jsonData[art].drrAI = advertsAutoBidsRules[art];
     jsonData[art].budgetToKeep = advertsBudgetsToKeep[art];
-    jsonData[art].plusPhrasesTemplate = advertsPlusPhrasesTemplates[art];
     jsonData[art].advertsManagerRules = advertsManagerRules[art];
     jsonData[art].advertsStocksThreshold = advertsStocksThreshold[art];
     jsonData[art].placements = placements[art];
@@ -8402,17 +8349,17 @@ const updateAdvertsSelectedPhrasesMM = (uid, campaignName, data) => {
 
     const { mode } = data;
 
-    if (data.arts)
-      for (const [art, artData] of Object.entries(data.arts)) {
-        if (!art || !artData) continue;
+    if (data.advertsIds)
+      for (const [advertId, advertData] of Object.entries(data.advertsIds)) {
+        if (!advertId || !advertData) continue;
         if (mode == 'Установить') {
-          if (!advertsSelectedPhrases[art]) advertsSelectedPhrases[art] = {};
-          advertsSelectedPhrases[art] = artData;
-          advertsSelectedPhrases[art].updateTime =
+          if (!advertsSelectedPhrases[advertId]) advertsSelectedPhrases[advertId] = {};
+          advertsSelectedPhrases[advertId] = advertData;
+          advertsSelectedPhrases[advertId].updateTime =
             new Date().toISOString();
         }
         else if (mode == 'Удалить') {
-          advertsSelectedPhrases[art] = undefined;
+          advertsSelectedPhrases[advertId] = undefined;
         }
       }
 
@@ -8593,6 +8540,75 @@ const autoAdvertsStopMM = (uid, campaignName) => {
   });
 };
 
+const depositAndStart = async (uid, campaignName, advertsIdsArray) => {
+  const balance = await fetchBalanceWithRetry(uid, campaignName);
+  const advertsBudgetsPath = path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "advertsBudgets.json"
+  );
+  const advertsBudgets = readIfExists(advertsBudgetsPath);
+  const authToken = getAuthTokenMM(uid, campaignName);
+
+  return new Promise(async (resolve) => {
+    if (!advertsIdsArray || advertsIdsArray.length == 0) {
+      resolve();
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 120 * 1000));
+    for (let i = 0; i < advertsIdsArray.length; i++) {
+      const advertId = parseInt(advertsIdsArray[i]);
+
+      const budget = 500;
+
+      let payType = 0;
+      if (balance.net && balance.net >= budget) payType = 1;
+      if (balance.bonus && balance.bonus >= budget) payType = 3;
+
+      const depositParams = {
+        sum: budget,
+        type: payType,
+        return: true,
+      };
+
+      console.log(uid, campaignName, advertId, depositParams);
+
+      if (payType == 3) {
+        balance.bonus -= budget;
+      } else if (payType == 0) {
+        balance.balance -= budget;
+      } else {
+        balance.net -= budget;
+      }
+
+      const newBudget = await depositAdvertBudget(
+        authToken,
+        advertId,
+        depositParams
+      );
+      if (newBudget) {
+        advertsBudgets[advertId] = newBudget.total ?? 0;
+        console.log(uid, campaignName, "deposit 500 to", advertId);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120 * 1000));
+    for (let i = 0; i < advertsIdsArray.length; i++) {
+      const advertId = parseInt(advertsIdsArray[i]);
+      await changeAdvertActivity(authToken, "start", { id: advertId });
+      console.log(uid, campaignName, "started", advertId);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    afs.writeFileSync(advertsBudgetsPath, JSON.stringify(advertsBudgets));
+
+    resolve();
+  });
+};
+
 const autoAdvertsManagingMM = (uid, campaignName) => {
   return new Promise(async (resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
@@ -8653,73 +8669,12 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
     //   campaignName,
     //   "balance.json"
     // );
-    const balance = await fetchBalanceWithRetry(uid, campaignName);
 
     arts.byBrandArt = {};
     for (const [nmId, artData] of Object.entries(arts.byNmId)) {
       artData.nmId = parseInt(nmId);
       arts.byBrandArt[artData.art] = artData;
     }
-
-    const depositAndStart = (advertsIdsArray) => {
-      return new Promise(async (resolve) => {
-        if (!advertsIdsArray || advertsIdsArray.length == 0) {
-          resolve();
-          return;
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 120 * 1000));
-        for (let i = 0; i < advertsIdsArray.length; i++) {
-          const advertId = parseInt(advertsIdsArray[i]);
-
-          if (advertsBudgets[advertId] > 100) {
-            continue;
-          }
-
-          const budget = 500;
-
-          let payType = 0;
-          if (balance.net && balance.net >= budget) payType = 1;
-          if (balance.bonus && balance.bonus >= budget) payType = 3;
-
-          const depositParams = {
-            sum: budget,
-            type: payType,
-            return: true,
-          };
-
-          console.log(uid, campaignName, advertId, depositParams);
-
-          if (payType == 3) {
-            balance.bonus -= budget;
-          } else if (payType == 0) {
-            balance.balance -= budget;
-          } else {
-            balance.net -= budget;
-          }
-
-          const newBudget = await depositAdvertBudget(
-            authToken,
-            advertId,
-            depositParams
-          );
-          if (newBudget) {
-            advertsBudgets[advertId] = newBudget.total ?? 0;
-            console.log(uid, campaignName, "deposit 500 to", advertId);
-          }
-          await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
-        }
-        await new Promise((resolve) => setTimeout(resolve, 120 * 1000));
-        for (let i = 0; i < advertsIdsArray.length; i++) {
-          const advertId = parseInt(advertsIdsArray[i]);
-          await changeAdvertActivity(authToken, "start", { id: advertId });
-          console.log(uid, campaignName, "started", advertId);
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-
-        resolve();
-      });
-    };
 
     const artsWithAdverts = {};
     for (const [advertId, advertInfos] of Object.entries(advertsInfos)) {
@@ -8958,7 +8913,7 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
       }
 
       if (advertsType == "search") {
-        await depositAndStart(createdAdvertsIdsArray);
+        await depositAndStart(uid, campaignName, createdAdvertsIdsArray);
         for (const [art, advertId] of Object.entries(createdAdvertsIds)) {
           await changeAdvertName(authToken, { advertId: advertId, name: art })
           console.log(uid, campaignName, 'Changed name of', advertId, 'to', art);
@@ -8966,7 +8921,7 @@ const autoAdvertsManagingMM = (uid, campaignName) => {
         }
       }
     }
-    await depositAndStart(toStartSearchData);
+    await depositAndStart(uid, campaignName, toStartSearchData);
     afs.writeFileSync(advertsBudgetsPath, JSON.stringify(advertsBudgets));
 
     const advertsManagerRulesCurrent = readIfExists(advertsManagerRulesPath);
@@ -9012,7 +8967,7 @@ const createMassAdvertsMM = (uid, campaignName, data) => {
           );
           return response.data;
         })
-        .catch((error) => console.error(error.response.data));
+        .catch((error) => console.error(uid, campaignName, getLocaleDateString(new Date()), error.response.data));
     };
 
     const createSearchRK = (params) => {
@@ -9032,7 +8987,7 @@ const createMassAdvertsMM = (uid, campaignName, data) => {
           );
           return response.data;
         })
-        .catch((error) => console.error(error.response.data));
+        .catch((error) => console.error(uid, campaignName, getLocaleDateString(new Date()), error.response.data));
     };
 
     const updatePlacementsInAutoRK = (advertId, params) => {
@@ -9061,104 +9016,116 @@ const createMassAdvertsMM = (uid, campaignName, data) => {
 
     // const searchCampaignsArtsDepositData = {};
     // const searchCampaignsArtsBiddedData = {};
+    const { type, bid, budget } = data;
     const createdAdvertsIds = {};
     const createCampaigns = async () => {
       const balance = await fetchBalanceWithRetry(uid, campaignName);
-      for (const [art, artData] of Object.entries(data)) {
-        if (!art || !artData) continue;
-        const type = artData.type;
-        if (!type) continue;
-        const nmId = artData.nmId;
-        if (!nmId) continue;
+      const batches = {};
+      for (const [art, artData] of Object.entries(data.arts)) {
+        const { nmId } = artData;
+        if (art === undefined || nmId === undefined) continue;
         const object = arts.byNmId[nmId].object;
         if (!object) continue;
         const objectId = arts.byNmId[nmId].objectId;
         if (!objectId) continue;
-        const budget = artData.budget;
-        if (!budget) continue;
-        const bid = artData.bid;
-        if (!bid) continue;
+
+        if (!batches[object]) batches[object] = { nms: [], object: object, objectId: objectId }
+        batches[object].nms.push(nmId)
         // console.log(type, nmId, object, objectId, budget, bid, art);
-
-        let payType = 0;
-        if (balance.net && balance.net >= budget) payType = 1;
-        if (balance.bonus && balance.bonus >= budget) payType = 3;
-
-        if (type == "Авто") {
-          const createParams = {
-            type: 8,
-            name: art,
-            subjectId: objectId,
-            sum: budget,
-            btype: payType,
-            on_pause: false,
-            nms: [nmId],
-            cpm: bid,
-          };
-
-          console.log(uid, campaignName, art, createParams, balance);
-
-          if (payType == 3) {
-            balance.bonus -= budget;
-          } else if (payType == 0) {
-            balance.balance -= budget;
-          } else {
-            balance.net -= budget;
-          }
-
-          // console.log(uid, campaignName, createParams);
-
-          const newCampaignId = parseInt(await createAutoRK(createParams));
-          if (!Number.isNaN(newCampaignId)) {
-            createdAdvertsIds[art] = newCampaignId;
-            await updatePlacementsInAutoRK(newCampaignId, artData.placements);
-          }
-          await new Promise((resolve) => setTimeout(resolve, 22 * 1000));
-        } else if (type == "Поиск") {
-          const createParams = {
-            campaignName: art,
-            nms: [nmId],
-          };
-
-          // searchCampaignsArtsDepositData[art] = {
-          //   mode: "Пополнить",
-          //   art: art,
-          //   budget: budget,
-          // };
-
-          // searchCampaignsArtsBiddedData[art] = {
-          //   mode: "Установить",
-          //   art: art,
-          //   bid: bid,
-          // };
-
-          const newCampaignId = parseInt(await createSearchRK(createParams));
-          createdAdvertsIds[art] = newCampaignId;
-
-          await new Promise((resolve) => setTimeout(resolve, 14 * 1000));
-        }
       }
 
+      for (const [object, batchData] of Object.entries(batches)) {
+        const { nms, objectId } = batchData;
+        const toCreateCount = Math.ceil(nms.length / (type == 'Авто' ? 100 : 50))
+        const rkNmsCount = Math.ceil(nms.length / toCreateCount)
+
+        const batchesArray = []
+        for (let i = 0; i < nms.length; i++) {
+          if (i % rkNmsCount == 0)
+            batchesArray.push([])
+
+          const nmId = nms[i]
+          batchesArray[batchesArray.length - 1].push(nmId)
+        }
+
+        for (let i = 0; i < batchesArray.length; i++) {
+          const batch = batchesArray[i];
+          const rkName = `Aurum ${object}`
+
+          let payType = 0;
+          if (balance.net && balance.net >= budget) payType = 1;
+          if (balance.bonus && balance.bonus >= budget) payType = 3;
+
+          if (type == "Авто") {
+            const createParams = {
+              type: 8,
+              name: rkName,
+              subjectId: objectId,
+              sum: budget,
+              btype: payType,
+              on_pause: false,
+              nms: batch,
+              cpm: bid,
+            };
+
+            // console.log(uid, campaignName, rkName, createParams, balance);
+
+            if (payType == 3) {
+              balance.bonus -= budget;
+            } else if (payType == 0) {
+              balance.balance -= budget;
+            } else {
+              balance.net -= budget;
+            }
+
+            // console.log(uid, campaignName, createParams);
+
+            const newCampaignId = parseInt(await createAutoRK(createParams));
+            if (!Number.isNaN(newCampaignId)) {
+              createdAdvertsIds[newCampaignId] = { nms: batch, type };
+              // await updatePlacementsInAutoRK(newCampaignId, artData.placements);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 22 * 1000));
+          } else if (type == "Поиск") {
+            const createParams = {
+              campaignName: rkName,
+              nms: batch,
+            };
+
+            const newCampaignId = parseInt(await createSearchRK(createParams));
+            if (!Number.isNaN(newCampaignId)) {
+              createdAdvertsIds[newCampaignId] = { nms: batch, type, advertId: newCampaignId, rkName: rkName };
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 14 * 1000));
+          }
+
+        }
+
+      }
       // return jsonData;
     };
 
     createCampaigns().then(async () => {
-      // if (Object.entries(searchCampaignsArtsDepositData)) {
-      //   await new Promise((resolve) => setTimeout(resolve, 62 * 1000));
-      //   await fetchAdvertsInfosAndWriteToJsonMM(uid, campaignName);
-      //   await new Promise((resolve) => setTimeout(resolve, 62 * 1000));
-      //   await depositAdvertsBudgetsAndWriteToJsonMM(
-      //     uid,
-      //     campaignName,
-      //     searchCampaignsArtsDepositData
-      //   );
-      //   await new Promise((resolve) => setTimeout(resolve, 62 * 1000));
-      //   await searchCampaignsArtsBiddedData(
-      //     uid,
-      //     campaignName,
-      //     searchCampaignsArtsDepositData
-      //   );
-      // }
+
+      const advertsToStart = []
+      for (const [id, advertData] of Object.entries(createdAdvertsIds)) {
+        const { type, advertId } = advertData;
+        if (type == 'Поиск') {
+          advertsToStart.push(advertId)
+        }
+      }
+      if (advertsToStart.length > 0) {
+        await depositAndStart(uid, campaignName, advertsToStart);
+        for (const advertId of Object.entries(advertsToStart)) {
+          const { rkName } = createdAdvertsIds[advertId];
+          await changeAdvertName(authToken, { advertId: advertId, name: rkName })
+          console.log(uid, campaignName, 'Changed name of', advertId, 'to', rkName);
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+
+      afs.writeFileSync(path.join(__dirname, "marketMaster", uid, campaignName, "createdAdvertsIds.json"), JSON.stringify(createdAdvertsIds))
       resolve(createdAdvertsIds);
     });
   });
@@ -9578,8 +9545,17 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
       path.join(__dirname, "files", campaign, "orders by day.json")
     )
   );
-  const stocks = JSON.parse(
-    afs.readFileSync(path.join(__dirname, "files", campaign, "stocks.json"))
+  const mapp = {
+    mayusha: "ИП Валерий",
+    delicatus: "ИП Артем",
+    TKS: "Текстиль",
+    perinka: "ИП Оксана",
+  };
+  const stocks = readIfExists(
+    path.join(
+      __dirname,
+      `./marketMaster/4a1f2828-9a1e-4bbf-8e07-208ba676a806/${mapp[campaign]}/stocks.json`
+    )
   );
 
   const today = new Date();
@@ -9600,6 +9576,7 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
       avg[art].avg = avg[art].orders / 7;
     }
   }
+  console.log(stocks);
   // console.log(avg);
   for (let i = 1; i < 8; i++) {
     const temp_date = new Date();
@@ -9612,23 +9589,21 @@ const calcAvgOrdersAndWriteToJSON = (campaign) => {
     if (!orders_by_day[str_date]) continue;
     for (const [art, count] of Object.entries(orders_by_day[str_date])) {
       if (!art) continue;
-      if (
-        (stocks[str_date]
-          ? stocks[str_date][art]
-            ? stocks[str_date][art]
-            : 0
-          : 0) < avg[art].avg
-      ) {
-        // console.log(art, stocks[str_date][art], avg[art].avg);
-        continue;
-      }
+      const stock = stocks[str_date] ? stocks[str_date].all[art] ? stocks[str_date].all[art].quantity ?? 0 : 0 : 0;
+      // console.log(art, str_date, stock, stocks[str_date], stocks[str_date] ? stocks[str_date].all[art] : undefined);
+      // if (
+      //   stock < avg[art].avg
+      // ) {
+      //   // console.log(art, stocks[str_date][art], avg[art].avg);
+      //   continue;
+      // }
       if (!(art in jsonData)) jsonData[art] = { orders: 0, count: 0, avg: 0 };
       jsonData[art].orders += count;
       jsonData[art].count++;
       jsonData[art].avg = jsonData[art].orders / jsonData[art].count;
     }
   }
-  // console.log(jsonData);
+  console.log(jsonData);
   const avgData = {};
   for (art in jsonData) {
     avgData[art] = jsonData[art].avg;
@@ -10023,6 +9998,7 @@ module.exports = {
   calcNomenclaturesAndWriteToJsonMM,
   setByWarehousesInfoMM,
   calcPricesTemplateAndWriteToXlsxMM,
+  depositAndStart,
   calcPricesJsonDataMM,
   manageAdvertsActivityMM,
   getPaidStorageCostMM,
@@ -10032,11 +10008,13 @@ module.exports = {
   calcSmartDetailedByPeriodAndWriteToJSON,
   calcMassAdvertsNewAndWriteToJsonMM,
   autoAdvertsManagingMM,
+  changeAdvertActivity,
   updateAdvertsManagerRulesMM,
   updateAdvertsSelectedPhrasesMM,
   autoAdvertsStopMM,
   getPlacements,
   fetchBalanceWithRetry,
   fetchAdvertWords,
+  fetchArtsPricesAndWriteToJsonMM,
   readIfExists,
 };

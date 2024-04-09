@@ -23,7 +23,8 @@ const {
 // autoGenerateNewTags('perinka', 'Перинка');
 // autoGenerateNewTags('mayusha', 'МАЮША');
 // autoGenerateNewTags('delicatus', 'DELICATUS');
-// autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
+autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
+// autoGenerateNewTags('SLUMBER+', 'SLUMBER+');
 // exportAll()
-generateTagsRaspredelenniy()
+// generateTagsRaspredelenniy()
 // fetchOTKArtMathcingAndWriteToJSON()

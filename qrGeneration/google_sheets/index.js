@@ -239,7 +239,7 @@ async function fetchOTKArtMathcingAndWriteToJSON(auth) {
     const sheets = google.sheets({ version: "v4", auth });
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
-      range: `Сопоставление артикулов с ОТК!A2:E`,
+      range: `Сопоставление артикулов с ОТК!A1:E`,
     });
     // Parse the values into a JSON object
     const rows = res.data.values;

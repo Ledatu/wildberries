@@ -94,6 +94,7 @@ const {
   autoSetMinusPhrasesMM,
   readIfExists,
   autoDepositAdvertsBudgetsAndWriteToJsonMM,
+  fetchArtsPricesAndWriteToJsonMM,
 } = require("./main");
 const {
   getPrices,
@@ -375,21 +376,21 @@ const path = require("path");
 //   )
 // );
 // fetchAdvertsWordsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Оксана")
-// autoAdvertsManagingMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифов А. М.")
+// autoAdvertsManagingMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
 // fetchAdvertsWordsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
-// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ТОРГМАКСИМУМ")
+// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
 // autoDepositAdvertsBudgetsAndWriteT oJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ТОРГМАКСИМУМ")
 // autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ТОРГМАКСИМУМ")
 // fetchOrdersAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
 // fetchSalesAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
 // fetchAutoPriceRulesAndWriteToJSON()
 // calcMassAdvertsNewAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифов М.С.")
-fetchAdvertsStatsAndWriteToJsonMM(
-  "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
-  "ИП Валерий",
-  100,
-  2
-);
+// fetchAdvertsStatsAndWriteToJsonMM(
+//   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//   "ИП Валерий",
+//   100,
+//   2
+// );
 // calcSmartDetailedByPeriodAndWriteToJSON("mayusha");
 // const afs = require("fs");
 // const path = require("path");
@@ -424,7 +425,10 @@ fetchAdvertsStatsAndWriteToJsonMM(
 // )[15646095].words.keywords)
 // calcMassAdvertsNewAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //   "Текстиль")
-
+// fetchArtsPricesAndWriteToJsonMM(
+//   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//   "ИП Валерий"
+// );
 // const reqs = readIfExists(
 //   path.join(
 //     __dirname,
@@ -506,13 +510,20 @@ fetchAdvertsStatsAndWriteToJsonMM(
 // getPrices()
 // fetchAutoPriceRulesAndWriteToJSON()
 // calcAutoPrices(false)
-
+// fetchAdvertsInfosAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//   "ИП Валерий")
+// calcAvgOrdersAndWriteToJSON('mayusha');
 // fetchAdvertsWordsAndWriteToJsonMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //   "ИП Иосифов А. М."
 // );
 
 // fetchAdvertsMM();
+
+autoSetAdvertsCPMsAndWriteToJsonMM(
+  "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+  "ИП Валерий"
+);
 
 // getTariffsBoxAndWriteToJsonMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",

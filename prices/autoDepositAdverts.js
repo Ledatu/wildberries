@@ -27,7 +27,7 @@ const autoDepositAdverts = async () => {
   });
 };
 scheduleJob("1 * * * *", () => {
-  if (new Date().getHours() != 1) { console.log('Too early.');; return; }
+  if (new Date().getHours() != 1) { console.log('Too early.'); return; }
   autoDepositAdverts();
 });
 // autoDepositAdverts();

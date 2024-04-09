@@ -323,9 +323,30 @@ async function autoGenerateNewTags(campaign, brand) {
       // path.join(__dirname, "files", "logos", `${brand}.jpg`)
     );
 
+    // const pivot = xlsx.parse(path.join(__dirname, 'slumber.xlsx'))[0][
+    //   "data"
+    // ];
+    // console.log(pivot);
+    // const xlsxss = {}
+    // for (let i = 0; i < pivot.length; i++) {
+    //   const row = pivot[i]
+    //   xlsxss[row[0]] = {
+    //     brand_art: row[0],
+    //     color: row[3],
+    //     object: row[2],
+    //     brand: row[4],
+    //     size: "0",
+    //     barcode: row[1],
+    //   }
+    // }
+    // return
+    // for (const [art, art_data] of Object.entries(xlsxss)) {
     for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
       // if (art_data.brand != brand) continue;
-      if (!art.includes("НАМАТРАСНИК")) continue;
+
+      if (!art.includes('ПРПЭ') || !art.includes('ТКС')) continue
+      // if (art_data.color.toUpperCase().includes('ЧЕРНЫЙ')) continue;
+      // art_data.color = 'Черный'
 
       const otkArt = art.split("_").slice(0, 3).concat(["ОТК"]).join("_");
       console.log(art, art_data, otkArt);
@@ -527,9 +548,25 @@ function generateTagsRaspredelenniy() {
           )
         )
       );
+      // const pivot = xlsx.parse(path.join(__dirname, 'slumber.xlsx'))[0][
+      //   "data"
+      // ];
+      // console.log(pivot);
+      // const artsBarcodesFull = {}
+      // for (let i = 0; i < pivot.length; i++) {
+      //   const row = pivot[i]
+      //   artsBarcodesFull[row[0]] = {
+      //     brand_art: row[0],
+      //     color: row[3],
+      //     object: row[2],
+      //     brand: row[4],
+      //     size: "0",
+      //     barcode: row[1],
+      //   }
+      // }
       for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
         const array = art.split("_");
-        if (!art.includes("НАМАТРАСНИК") || !art.includes("ТКС")) continue;
+        if (!art.includes("ФТБЛ_ЖЕН_ОВЕР_Ф-10_Черный_МАЮ")) continue;
         // if (art.includes("СЛВДР")) {
         //   if (parseInt(array[3]) < 3000) continue;
         // }

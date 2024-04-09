@@ -341,6 +341,10 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
   const massAdvertsAccount = {
     fetchedPlacements: {},
     plusPhrasesTemplates: {},
+    advertsSelectedPhrases: {},
+    advertsPlusPhrasesTemplates: {},
+    advertsAutoBidsRules: {},
+    advertsBudgetsToKeep: {},
     balances: {},
     campaigns: {},
   };
@@ -351,6 +355,14 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
       massAdvertsAccount.balances[campaignName] = {};
     if (!massAdvertsAccount.plusPhrasesTemplates[campaignName])
       massAdvertsAccount.plusPhrasesTemplates[campaignName] = {};
+    if (!massAdvertsAccount.advertsPlusPhrasesTemplates[campaignName])
+      massAdvertsAccount.advertsPlusPhrasesTemplates[campaignName] = {};
+    if (!massAdvertsAccount.advertsBudgetsToKeep[campaignName])
+      massAdvertsAccount.advertsBudgetsToKeep[campaignName] = {};
+    if (!massAdvertsAccount.advertsSelectedPhrases[campaignName])
+      massAdvertsAccount.advertsSelectedPhrases[campaignName] = {};
+    if (!massAdvertsAccount.advertsAutoBidsRules[campaignName])
+      massAdvertsAccount.advertsAutoBidsRules[campaignName] = {};
 
     if (campaignName != (genForCampaignName ?? "ИП Валерий")) continue;
 
@@ -382,6 +394,46 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
       )
     );
     massAdvertsAccount.plusPhrasesTemplates[campaignName] = plusPhrasesTemplates;
+    const advertsPlusPhrasesTemplates = readIfExists(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        campaignName,
+        "advertsPlusPhrasesTemplates.json"
+      )
+    );
+    massAdvertsAccount.advertsPlusPhrasesTemplates[campaignName] = advertsPlusPhrasesTemplates;
+    const advertsBudgetsToKeep = readIfExists(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        campaignName,
+        "advertsBudgetsToKeep.json"
+      )
+    );
+    massAdvertsAccount.advertsBudgetsToKeep[campaignName] = advertsBudgetsToKeep;
+    const advertsSelectedPhrases = readIfExists(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        campaignName,
+        "advertsSelectedPhrases.json"
+      )
+    );
+    massAdvertsAccount.advertsSelectedPhrases[campaignName] = advertsSelectedPhrases;
+    const advertsAutoBidsRules = readIfExists(
+      path.join(
+        __dirname,
+        "../prices/marketMaster",
+        accountUid,
+        campaignName,
+        "advertsAutoBidsRules.json"
+      )
+    );
+    massAdvertsAccount.advertsAutoBidsRules[campaignName] = advertsAutoBidsRules;
   }
   res.send(JSON.stringify(massAdvertsAccount));
 });
@@ -435,7 +487,7 @@ app.post("/api/getNomenclatures", authenticateToken, (req, res) => {
 app.post("/api/createMassAdverts", authenticateToken, async (req, res) => {
   const accountUid = req.body.uid;
   const campaignName = req.body.campaignName;
-  const data = req.body.arts;
+  const data = req.body.data;
   if (!accountUid || accountUid == "") return;
   if (!campaignName || campaignName == "") return;
   if (!data || data == "") return;

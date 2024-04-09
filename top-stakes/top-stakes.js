@@ -15,7 +15,7 @@ const { writeDetailedByPeriod } = require("../prices/google_sheets");
 startServer();
 scheduleJob("20 * * * *", () => writeSpp());
 scheduleJob("55 * * * *", () => fetchAdverts());
-scheduleJob("40 * * * *", () => fetchAdvertsMM());
+scheduleJob("*/15 * * * *", () => fetchAdvertsMM());
 scheduleJob("50 * * * *", () => {
   if ([3, 9, 15, 21].includes(new Date().getHours())) getPrices(true);
 });

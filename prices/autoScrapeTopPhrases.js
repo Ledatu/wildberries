@@ -7,16 +7,16 @@ const { scrapeWildberriesData } = require("./scraper");
 const getTopPhrases = async (uid, campaignName) => {
   const topPhrases = [];
 
-  let advertsManagerRules = undefined
+  let advertsInfos = undefined
   let advertsSelectedPhrases = undefined
   try {
-    advertsManagerRules = readIfExists(
+    advertsInfos = readIfExists(
       path.join(
         __dirname,
         "marketMaster",
         uid,
         campaignName,
-        "advertsManagerRules.json"
+        "advertsInfos.json"
       )
     );
     advertsSelectedPhrases = readIfExists(
@@ -46,73 +46,70 @@ const getTopPhrases = async (uid, campaignName) => {
   }
 
 
-  for (const [art, advertsTypes] of Object.entries(advertsManagerRules)) {
+  for (const [id, advertsInfo] of Object.entries(advertsInfos)) {
     const topPhrase = {};
 
-    if (advertsSelectedPhrases[art] && advertsSelectedPhrases[art].phrase) {
+    if (advertsSelectedPhrases[id] && advertsSelectedPhrases[id].phrase) {
       topPhrase.count = 10;
-      topPhrase.phrase = advertsSelectedPhrases[art].phrase;
+      topPhrase.phrase = advertsSelectedPhrases[id].phrase;
     }
     else {
 
-      if (!art || !advertsTypes) continue;
-      for (const [advertsType, rules] of Object.entries(advertsTypes)) {
-        if (!advertsType || !rules) continue;
-        const { advertId, mode } = rules;
-        if (!advertId || !mode) continue;
-        //   console.log(art, advertsType, rules);
+      const { type, status, advertId } = advertsInfo;
+      if (![9, 11].includes(status)) continue;
+      //   console.log(art, advertsType, rules);
 
-        const words = advertsWords[advertId];
-        if (!words) continue;
-        if (advertsType == "search") {
-          const { keywords, pluse } = words.words ?? {};
-          if (!keywords || !keywords.length) continue;
+      const words = advertsWords[advertId];
+      if (!words) continue;
+      if (type == 9 || type == 6) {
+        const { keywords, pluse } = words.words ?? {};
+        if (!keywords || !keywords.length) continue;
 
-          if (pluse) {
-            for (let j = 0; j < pluse.length; j++) {
-              const keyword = pluse[j];
-              const { stat } = advertsWords[advertId];
-              if (!stat[keyword]) continue;
-              const { views } = stat[keyword] ?? {};
-              // console.log(stat[keyword], keyword);
-              keywords.push({
-                keyword: keyword,
-                count: views,
-              });
-            }
-          }
-
-          keywords.sort((a, b) => b.count - a.count);
-
-          const top = keywords[0];
-          // for (const key of keywords) {
-          //   if (!topPhrases.includes(key.keyword))
-          //     topPhrases.push(key.keyword);
-          // }
-          // console.log(art, advertsType, top);
-
-          if (!topPhrase.count || topPhrase.count < top.count) {
-            topPhrase.phrase = top.keyword;
-            topPhrase.count = top.count;
-            //   console.log(art, advertsType, topPhrase);
-          }
-        } else {
-          const { clusters } = words ?? {};
-          if (!clusters || !clusters.length) continue;
-
-          const top = clusters[0];
-          // for (const key of clusters) {
-          //   if (!topPhrases.includes(key.cluster))
-          //     topPhrases.push(key.cluster);
-          // }
-
-          if (!topPhrase.count || topPhrase.count < top.count) {
-            topPhrase.phrase = top.cluster;
-            topPhrase.count = top.count;
-            //   console.log(art, advertsType, topPhrase);
+        if (pluse) {
+          for (let j = 0; j < pluse.length; j++) {
+            const keyword = pluse[j];
+            const { stat } = advertsWords[advertId];
+            if (!stat[keyword]) continue;
+            const { views } = stat[keyword] ?? {};
+            // console.log(stat[keyword], keyword);
+            keywords.push({
+              keyword: keyword,
+              count: views,
+            });
           }
         }
+
+        keywords.sort((a, b) => b.count - a.count);
+
+        const top = keywords[0];
+        // for (const key of keywords) {
+        //   if (!topPhrases.includes(key.keyword))
+        //     topPhrases.push(key.keyword);
+        // }
+        // console.log(art, advertsType, top);
+
+        if (!topPhrase.count || topPhrase.count < top.count) {
+          topPhrase.phrase = top.keyword;
+          topPhrase.count = top.count;
+          //   console.log(art, advertsType, topPhrase);
+        }
+      } else {
+        const { clusters } = words ?? {};
+        if (!clusters || !clusters.length) continue;
+
+        const top = clusters[0];
+        // for (const key of clusters) {
+        //   if (!topPhrases.includes(key.cluster))
+        //     topPhrases.push(key.cluster);
+        // }
+
+        if (!topPhrase.count || topPhrase.count < top.count) {
+          topPhrase.phrase = top.cluster;
+          topPhrase.count = top.count;
+          //   console.log(art, advertsType, topPhrase);
+        }
       }
+
     }
     if (topPhrase.count && !topPhrases.includes(topPhrase.phrase)) {
       //   if (topPhrase.phrase == "пастельная белье") console.log(art);

@@ -26,5 +26,5 @@ const autoFetchStorage = async () => {
   });
 };
 
-scheduleJob("10 2 * * *", () => autoFetchStorage());
-// autoFetchStorage();
+// scheduleJob("10 2 * * *", () => autoFetchStorage());
+autoFetchStorage();
