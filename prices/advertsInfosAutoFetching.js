@@ -12,7 +12,7 @@ const autoFetchAdvertsInfosMM = async (uid, campaignName) => {
   await fetchAdvertsAndWriteToJsonMM(uid, campaignName).then(
     async () =>
       await fetchAdvertsInfosAndWriteToJsonMM(uid, campaignName).then(() =>
-        console.log(uid, campaignName, "advertsInfos updated.")
+        console.log(new Date(), uid, campaignName, "advertsInfos updated.")
       )
   );
   // await new Promise((resolve) => setTimeout(resolve, 15 * 61 * 1000));
@@ -27,11 +27,11 @@ const start = async () => {
     const campaignsNames = customerData.campaignsNames;
     for (let i = 0; i < campaignsNames.length; i++) {
       const campaignName = campaignsNames[i];
-      console.log(uid, campaignName);
+      console.log(new Date(), uid, campaignName);
       autoFetchAdvertsInfosMM(uid, campaignName);
     }
   }
-  console.log("Started");
+  console.log(new Date(), "Started");
 };
 
 // start();

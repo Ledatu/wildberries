@@ -25,7 +25,7 @@ const autoLogistics = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
-        console.log(uid, campaignName);
+        console.log(new Date(), uid, campaignName);
         if (!mapp[campaignName]) continue;
         promises.push(await getTariffsBoxAndWriteToJsonMM(uid, campaignName));
         promises.push(
@@ -38,7 +38,7 @@ const autoLogistics = async () => {
     }
     await Promise.all(promises).then(async () => {
       await writeLogisticsToDataSpreadsheet();
-      console.log("Adverts logistics deposited.");
+      console.log(new Date(), "Adverts logistics deposited.");
       resolve();
     });
   });

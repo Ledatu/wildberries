@@ -20,12 +20,12 @@ module.exports = {
         const sheet = xlsx.parse(path.join(mainDlDir, file))[0];
         const data = sheet.data.slice(-1)[0];
 
-        console.log(adId, data);
+        console.log(new Date(), adId, data);
         
         if (data[0].length < 1) {
           return;
         }
-        //    console.log(file, data)
+        //    console.log(new Date(), file, data)
         const shows = data[2];
         const clicks = data[3];
         const rashod = data[11];
@@ -49,7 +49,7 @@ module.exports = {
         pivotSheet.push([row[0]].concat(stats));
       }
 
-      // console.log(pivotSheet);
+      // console.log(new Date(), pivotSheet);
       fs.writeFileSync(
         path.join(
           __dirname,

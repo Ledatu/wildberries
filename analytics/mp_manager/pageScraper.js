@@ -74,14 +74,14 @@ const scraperObject = {
         discount: prices[id] ? prices[id].discount : 50,
       };
     }
-    console.log(arts_to_check);
+    console.log(new Date(), arts_to_check);
 
     const getSpp = async (art, discount, prev) =>
       new Promise(async (resolve, reject) => {
         const page = await context.newPage();
         const url = `https://www.wildberries.ru/catalog/${art}/detail.aspx?targetUrl=SP`;
 
-        console.log(`Navigating to ${url}...`);
+        console.log(new Date(), `Navigating to ${url}...`);
         await page.goto(url);
         await page.waitForLoadState();
         await page.goto(url);
@@ -89,7 +89,7 @@ const scraperObject = {
         await page.waitForTimeout(getRandomArbitrary(2000, 3000));
 
         if ((await page.locator("span.sold-out-product__text").count()) > 0) {
-          console.log(art, "sold out");
+          console.log(new Date(), art, "sold out");
           page.close();
           resolve(prev);
           return;
@@ -119,7 +119,7 @@ const scraperObject = {
         const int_price_with_spp = parseInt(price_with_spp);
         const int_price_without_spp =
           parseInt(price_without_spp) * (1 - discount / 100);
-        console.log(
+        console.log(new Date(), 
           art,
           discount,
           price_without_spp,
@@ -138,18 +138,18 @@ const scraperObject = {
     for (const [mask, mask_data] of Object.entries(arts_to_check)) {
       // if (mask_data.stock > 1) continue;
       if (mask_data == "takeprev") {
-        console.log(mask, jsonData.prev);
+        console.log(new Date(), mask, jsonData.prev);
         jsonData[mask] = jsonData.prev;
         continue;
       }
       const spp = await getSpp(mask_data.id, mask_data.discount, jsonData.prev);
       if (!spp) {
-        console.log(mask, jsonData.prev);
+        console.log(new Date(), mask, jsonData.prev);
         jsonData[mask] = jsonData.prev;
         continue;
       }
 
-      // console.log(temp_value, price, intprice);
+      // console.log(new Date(), temp_value, price, intprice);
       jsonData[mask] = { spp: Math.round(spp.spp), price: spp.price };
 
       jsonData.prev = jsonData[mask]
@@ -162,7 +162,7 @@ const scraperObject = {
     for (const [mask, mask_data] of Object.entries(arts_to_check)) {
       // if (mask_data.stock > 1) continue;
       if (mask_data == "takeprev") {
-        console.log(mask, jsonData.prev);
+        console.log(new Date(), mask, jsonData.prev);
         jsonData[mask] = jsonData.prev;
         continue;
       }
@@ -177,7 +177,7 @@ const scraperObject = {
         }
       }
     }
-    // console.log(jsonData);
+    // console.log(new Date(), jsonData);
 
     fs.writeFileSync(
       path.join(__dirname, "../../prices/files", campaign, "spp by mask.json"),
@@ -214,7 +214,7 @@ const scraperObject = {
         const url = urls[rk_type] + rk_id;
         //		context.setDefaultTimeout(60000*3)
         // await page.setViewportSize({ width: 1600, height: 30000 });
-        console.log(`Navigating to ${url}...`);
+        console.log(new Date(), `Navigating to ${url}...`);
         // Navigate to the selected page
         await page.goto(url);
         await page.waitForLoadState();
@@ -244,7 +244,7 @@ const scraperObject = {
         const url = urls[rk_type];
         //		context.setDefaultTimeout(60000*3)
         // await page.setViewportSize({ width: 1600, height: 30000 });
-        console.log(`Navigating to ${url}...`);
+        console.log(new Date(), `Navigating to ${url}...`);
         // Navigate to the selected page
         await page.goto(url);
         await page.waitForLoadState();
@@ -318,9 +318,9 @@ const scraperObject = {
     const promises = [];
     for (let i = 0; i < RKsToCreate.length; i++) {
       const rk_data = RKsToCreate[i];
-      console.log(rk_data);
+      console.log(new Date(), rk_data);
       const campaign = reverse_seller_ids[artsData[rk_data.art].seller_id];
-      console.log(campaign);
+      console.log(new Date(), campaign);
 
       await context.addCookies(cookies[campaign]);
       promises.push(
@@ -345,7 +345,7 @@ const scraperObject = {
 
     urls = urls.filter((link) => link.includes("/campaign"));
     urls = urls.filter((link) => link.includes("app.mpmgr.ru"));
-    //		console.log(urls);
+    //		console.log(new Date(), urls);
 
     await page.close();
     await context.close();
@@ -353,7 +353,7 @@ const scraperObject = {
     const good_campaign_ids =
       urls.filter((link) => link.includes("/0/")).length == 0;
     if (good_campaign_ids) {
-      console.log(urls);
+      console.log(new Date(), urls);
 
       const ids = [];
       urls.forEach((link) => ids.push(`[${link.split("/")[7]}]`));
@@ -383,13 +383,13 @@ const scraperObject = {
         await newPage
           .waitForSelector(".MuiTypography-root.MuiTypography-h3.css-11j0d37")
           .catch((error) => {
-            console.log("Invisible");
+            console.log(new Date(), "Invisible");
             reject(dataObj);
           });
 
         //await newPage.$eval('.MuiBox-root.css-mxe89r > .MuiBox-root', async el => {
         //	if (getComputedStyle(el).color == 'rgba(255, 191, 76, 0.25)') {
-        //		console.log('Paused campaign, leaving.')
+        //		console.log(new Date(), 'Paused campaign, leaving.')
         //		await new_context.close()
         //		reject(dataObj)
         //		await newPage.close()
@@ -402,7 +402,7 @@ const scraperObject = {
           ".MuiBox-root.css-6n7j50 > a > h3",
           (text) => text.textContent
         );
-        //			console.log(dataObj.name)
+        //			console.log(new Date(), dataObj.name)
         //			dataObj['name'] = dataObj.name.split(' ').slice(1, dataObj.name.length).join(' ')
 
         await newPage.waitForSelector(
@@ -434,7 +434,7 @@ const scraperObject = {
           .evaluate((el) => el.click());
         const download = await downloadPromise;
         // Wait for the download process to complete
-        // console.log(await download.path());
+        // console.log(new Date(), await download.path());
         // Save downloaded file somewhere
 
         const path_to_file = `${__dirname}/../files/${campaign_id}/${dataObj["id"]}.xlsx`;
@@ -452,22 +452,22 @@ const scraperObject = {
 
         await newPage.close();
         await new_context.close();
-        console.log(`${index}/${totalLength} `);
-        console.log(dataObj);
+        console.log(new Date(), `${index}/${totalLength} `);
+        console.log(new Date(), dataObj);
         resolve(dataObj);
       }).catch((error) => {
-        console.log("Passing error");
+        console.log(new Date(), "Passing error");
         throw error;
       });
 
     // let currentPageData = await pagePromise(urls[0]);
-    // console.log(currentPageData)
+    // console.log(new Date(), currentPageData)
 
     let scrapedData = [];
     // for(link in urls){
     // 	let currentPageData = await pagePromise(urls[link]);
     // 	scrapedData.push(currentPageData);
-    // 	console.log(currentPageData);
+    // 	console.log(new Date(), currentPageData);
     // }
     let index = 0;
     const batch = 6;
@@ -484,16 +484,16 @@ const scraperObject = {
             await pagePromise(urls[link], index, urls.length)
               .then((pr) => all_page_promises.push(pr))
               .catch((error) => {
-                console.log("Caught");
+                console.log(new Date(), "Caught");
                 throw error;
               });
           } catch (error) {
-            //console.log(error)
-            console.log("Retrying...");
+            //console.log(new Date(), error)
+            console.log(new Date(), "Retrying...");
             await pagePromise(urls[link], index, urls.length)
               .then((pr) => all_page_promises.push(pr))
               .catch((error) => {
-                console.log("Caught");
+                console.log(new Date(), "Caught");
               });
           }
         }
@@ -501,7 +501,7 @@ const scraperObject = {
       await Promise.all(all_page_promises);
       for (pr in all_page_promises) {
         scrapedData.push(pr);
-        //			console.log(pr);
+        //			console.log(new Date(), pr);
       }
     }
   },

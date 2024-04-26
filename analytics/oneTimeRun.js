@@ -7,7 +7,7 @@ module.exports = {
 
     const flagFile = "analytics-flag.txt";
     function cleanup() {
-      console.log("Script exiting...");
+      console.log(new Date(), "Script exiting...");
       deleteFlagFile(flagFile).catch((err) => {
         console.error(`Error deleting flag file: ${err}`);
       });

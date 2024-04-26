@@ -15,7 +15,7 @@ const {
 // fetchQrCodesAndWriteToJSON()
 // tagsGeneration();
 // qrGeneration()
-// autofillCurrent().then(count => console.log(count))
+// autofillCurrent().then(count => console.log(new Date(), count))
 // exportTZToXlsx()
 // exportAll()
 // newTagsGeneration();
@@ -23,8 +23,8 @@ const {
 // autoGenerateNewTags('perinka', 'Перинка');
 // autoGenerateNewTags('mayusha', 'МАЮША');
 // autoGenerateNewTags('delicatus', 'DELICATUS');
-autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
-// autoGenerateNewTags('SLUMBER+', 'SLUMBER+');
+// autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
+// autoGenerateNewTags('ShirtLab', 'ShirtLab');
 // exportAll()
-// generateTagsRaspredelenniy()
+generateTagsRaspredelenniy()
 // fetchOTKArtMathcingAndWriteToJSON()

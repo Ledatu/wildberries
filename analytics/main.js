@@ -18,7 +18,7 @@ const fetchAnalytics = async () => {
     if (campaign != "mayusha") continue;
     await Promise.all([]) // await fetchAdsIdsAndWriteToJSON(campaign)
       .then(async () => {
-        console.log("All tasks completed successfully");
+        console.log(new Date(), "All tasks completed successfully");
         await getAll("mayusha");
       })
       .catch((error) => {
@@ -36,7 +36,7 @@ const fetchSpp = async () =>
     }
     Promise.all(promises)
       .then(() => {
-        console.log("All tasks completed successfully");
+        console.log(new Date(), "All tasks completed successfully");
         resolve();
         // await getSpp(campaign);
       })

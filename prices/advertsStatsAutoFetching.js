@@ -10,7 +10,7 @@ const autoFetchAdvertsMM = async (uid, campaignName, batchSize, daysCount) => {
       campaignName,
       batchSize,
       daysCount
-    ).then(() => console.log(uid, campaignName, "Adverts updated."));
+    ).then(() => console.log(new Date(), uid, campaignName, "Adverts updated."));
     await new Promise((resolve) => setTimeout(resolve, 10 * 61 * 1000));
   }
 };
@@ -24,11 +24,11 @@ const start = async () => {
     for (let i = 0; i < campaignsNames.length; i++) {
       const campaignName = campaignsNames[i];
       // if (campaignName != "Объединённая текстильная компания") continue;
-      console.log(uid, campaignName);
+      console.log(new Date(), uid, campaignName);
       autoFetchAdvertsMM(uid, campaignName, 100, 2);
     }
   }
-  console.log("Started");
+  console.log(new Date(), "Started");
 };
 
 start();

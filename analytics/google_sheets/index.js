@@ -27,10 +27,10 @@ async function loadSavedCredentialsIfExist() {
     // const content = await fs.readFile(TOKEN_PATH);
     // const credentials = JSON.parse(content);
     const credentials = require(TOKEN_PATH);
-    console.log("Token loaded");
+    console.log(new Date(), "Token loaded");
     return google.auth.fromJSON(credentials);
   } catch (err) {
-    console.log("Failed to load token");
+    console.log(new Date(), "Failed to load token");
     return null;
   }
 }
@@ -85,11 +85,11 @@ async function writeAnalitics(auth, campaign_id, sheet_name) {
     });
   };
 
-  console.log(`Started writing ${campaign_id} data to the google sheets`);
+  console.log(new Date(), `Started writing ${campaign_id} data to the google sheets`);
   const analytics = xlsx.parse(`${__dirname}/../files/${campaign_id}.xlsx`)[0][
     "data"
   ];
-  //console.log(analytics)
+  //console.log(new Date(), analytics)
   const sheets = google.sheets({ version: "v4", auth });
 
   analytics.sort((a, b) => {
@@ -133,7 +133,7 @@ function fetchAdsIdsAndWriteToJSON(auth, campaign) {
       })
       .then((res) => {
         const rows = res.data.sheets[0].data[0].rowData[0].values;
-        // console.log(rows);
+        // console.log(new Date(), rows);
         const data = [];
         rows.forEach((row) => {
           if (!Object.keys(row).length) return;
@@ -148,7 +148,7 @@ function fetchAdsIdsAndWriteToJSON(auth, campaign) {
         for (let i = 0; i < data.length; i++) {
           ads[data[i].title] = data[i].id;
         }
-        // console.log(data);
+        // console.log(new Date(), data);
         writeDataToFile(
           { campaign: campaign, data: data },
           path.join(__dirname, `../files/${campaign}/adsIds.json`)
@@ -160,7 +160,7 @@ function fetchAdsIdsAndWriteToJSON(auth, campaign) {
         });
       })
       .catch((err) => {
-        console.log(`The API returned an error: ${err}`);
+        console.log(new Date(), `The API returned an error: ${err}`);
         reject(err);
       });
   });
@@ -168,8 +168,8 @@ function fetchAdsIdsAndWriteToJSON(auth, campaign) {
 
 const writeDataToFile = (data, filename) => {
   return fs.writeFile(filename, JSON.stringify(data), (err) => {
-    if (err) return console.log(`Error writing file: ${err}`);
-    console.log(`Data written to ${filename}`);
+    if (err) return console.log(new Date(), `Error writing file: ${err}`);
+    console.log(new Date(), `Data written to ${filename}`);
   });
 };
 
@@ -179,9 +179,9 @@ module.exports = {
     await fetchAdsIdsAndWriteToJSON(auth, campaign);
   },
   writeAnalitics: async (campaign_id, sheet_name) => {
-    console.log("Trying to authenticate...");
+    console.log(new Date(), "Trying to authenticate...");
     const auth = await authorize();
-    console.log("Authentication successful!");
+    console.log(new Date(), "Authentication successful!");
     await writeAnalitics(auth, campaign_id, sheet_name).catch(console.error);
   },
 };

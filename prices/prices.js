@@ -97,8 +97,7 @@ const getPrices = async (rewriteProfit = false) => {
   campaigns.forEach(async (campaign) => {
     Promise.all([
       // await calcAdvertismentAndWriteToJSON(campaign),
-
-      await fetchCardsAndWriteToJSON(campaign),
+      // await fetchCardsAndWriteToJSON(campaign),
       await fetchOrdersAndWriteToJSON(campaign),
       await fetchSalesAndWriteToJSON(campaign),
       await fetchStocksAndWriteToJSON(campaign),
@@ -107,7 +106,7 @@ const getPrices = async (rewriteProfit = false) => {
       await fetchDataAndWriteToXlsx(campaign, rewriteProfit),
     ])
       .then(async () => {
-        console.log("All tasks completed successfully");
+        console.log(new Date(), "All tasks completed successfully");
         await writePrices(campaign);
       })
       .catch((error) => {
@@ -126,7 +125,7 @@ const updateAnalytics = async () => {
       await updateAnalyticsOrders(campaign),
     ])
       .then(async () => {
-        console.log("All tasks completed successfully");
+        console.log(new Date(), "All tasks completed successfully");
       })
       .catch((error) => {
         console.error("An error occurred:", error);
@@ -142,7 +141,7 @@ const answerAllFeedbacks = async () => {
       await answerFeedbacks(campaign),
     ])
       .then(async () => {
-        console.log("All tasks completed successfully");
+        console.log(new Date(), "All tasks completed successfully");
       })
       .catch((error) => {
         console.error("An error occurred:", error);
@@ -179,7 +178,7 @@ const calcNewValues = async () => {
       await calculateNewValuesAndWriteToXlsx(campaign),
     ])
       .then(async () => {
-        console.log("All tasks completed successfully");
+        console.log(new Date(), "All tasks completed successfully");
         await writePrices(campaign);
       })
       .catch((error) => {
@@ -190,7 +189,7 @@ const calcNewValues = async () => {
 
 const calcAndSendTrendsToTg = async (now) => {
   const hour_key = now.toLocaleTimeString("ru-RU").slice(0, 2);
-  console.log(hour_key, now.toLocaleTimeString("ru-RU"));
+  console.log(new Date(), hour_key, now.toLocaleTimeString("ru-RU"));
   if (!["05", "08", "11", "14", "17", "20", "23"].includes(hour_key)) return;
   const promises = [];
   campaigns.forEach(async (campaign) => {
@@ -212,14 +211,14 @@ const calcAutoPrices = (autoSend = true) => {
       fs.readFileSync(path.join(__dirname, `files/campaigns.json`))
     ).brands;
     const hour_key = now.toLocaleTimeString("ru-RU").slice(0, 2);
-    console.log(hour_key, now.toLocaleTimeString("ru-RU"));
+    console.log(new Date(), hour_key, now.toLocaleTimeString("ru-RU"));
     // if (!hours.includes(hour_key) && autoSend) return;
     await calcAutoEnteredValuesAndWriteToJSON();
     const promises = [];
     campaigns.forEach(async (campaign) => {
       // promises.push(await fetchDataAndWriteToXlsx(campaign));
       promises.push(await calculateNewValuesAndWriteToXlsx(campaign));
-      console.log('herere');
+      console.log(new Date(), 'herere');
       // promises.push(await calculateNewValuesAndWriteToXlsx(campaign));
       promises.push(await writePrices(campaign));
       if (autoSend) {
@@ -240,7 +239,7 @@ const writeSpp = async () => {
   // campaigns.forEach(async (campaign) => {
   //   Promise.all([await writeSppToDataSpreadsheet(campaign)])
   //     .then(async () => {
-  //       console.log("All tasks completed successfully");
+  //       console.log(new Date(), "All tasks completed successfully");
   //     })
   //     .catch((error) => {
   //       console.error("An error occurred:", error);
@@ -253,7 +252,7 @@ const RNPupdation = async () => {
   await calcRNPByDayMetricsAndWriteToJSON().then(
     updateRNP()
       .then(async () => {
-        console.log("All tasks completed successfully");
+        console.log(new Date(), "All tasks completed successfully");
       })
       .catch((error) => {
         console.error("An error occurred:", error);
@@ -293,7 +292,7 @@ const fetchAdverts = async () => {
 };
 // .then(async () => {
 //   await calcAndSendTrendsToTg(now).then(() => resolve("Updated."));
-//   console.log("All tasks completed successfully");
+//   console.log(new Date(), "All tasks completed successfully");
 // })
 
 const fetchAdvertsMM = async () => {
@@ -309,7 +308,7 @@ const fetchAdvertsMM = async () => {
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
         // if (campaignName != "ИП Валерий") continue;
-        console.log(uid, campaignName);
+        console.log(new Date(), uid, campaignName);
         promises.push(
           new Promise(async (resolve, reject) => {
             Promise.all([
@@ -318,7 +317,6 @@ const fetchAdvertsMM = async () => {
               await fetchOrdersAndWriteToJsonMM(uid, campaignName),
               await fetchSalesAndWriteToJsonMM(uid, campaignName),
               await fetchStocksAndWriteToJsonMM(uid, campaignName),
-              await fetchAdvertsBudgetsAndWriteToJsonMM(uid, campaignName),
             ]).then(() => resolve(uid, campaignName, "Adverts updated."));
           })
         );
@@ -327,7 +325,7 @@ const fetchAdvertsMM = async () => {
     Promise.all(promises).then(() => resolve());
     //   .then(async () => {
     //     await calcAndSendTrendsToTg(now).then(() => resolve("Updated."));
-    //     console.log("All tasks completed successfully");
+    //     console.log(new Date(), "All tasks completed successfully");
     //   })
     //   .catch((error) => {
     //     console.error("An error occurred:", error);
@@ -343,7 +341,7 @@ const fetchByNowStats = async () => {
       await updateFactStatsByRK(campaign),
     ])
       .then(async () => {
-        console.log("All tasks completed successfully");
+        console.log(new Date(), "All tasks completed successfully");
       })
       .catch((error) => {
         console.error("An error occurred:", error);
@@ -377,7 +375,7 @@ const updateAdvertActivity = async () => {
           `Неучтённые номенклатуры РК для ${campaign_names[campaign]}`,
           JSON.stringify(notIncludedNMs, null, 2)
         );
-        console.log("All tasks completed successfully");
+        console.log(new Date(), "All tasks completed successfully");
       })
       .catch((error) => {
         console.error("An error occurred:", error);

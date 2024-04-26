@@ -31,7 +31,7 @@ const autoFetch = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
-        console.log(uid, campaignName);
+        console.log(new Date(), uid, campaignName);
         promises.push(autoFetchDay(uid, campaignName));
       }
     }
@@ -41,6 +41,6 @@ const autoFetch = async () => {
 
 scheduleJob("26 6 * * *", () => {
   autoFetch()
-  // console.log('hel2');
+  // console.log(new Date(), 'hel2');
 });
 // autoFetch();

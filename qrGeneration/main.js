@@ -134,7 +134,7 @@ async function generateNewTags() {
 
       const filepath = path.join(__dirname, "files", "tags", `${art}.pdf`);
       const pdfBytes = await pdfDoc.save();
-      console.log(filepath);
+      console.log(new Date(), filepath);
       fs.writeFileSync(filepath, pdfBytes);
     };
 
@@ -153,7 +153,7 @@ async function generateNewTags() {
       const data = sheet.data;
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
-        // console.log(row);
+        // console.log(new Date(), row);
         if (!row.length) continue;
         await makePdf(
           sheet.name,
@@ -221,6 +221,7 @@ async function autoGenerateNewTags(campaign, brand) {
         "Trinity Fashion": pngImageEmbed.scale(0.06),
         "Creative Cotton": pngImageEmbed.scale(0.06),
         "SLUMBER+": pngImageEmbed.scale(0.06),
+        "ShirtLab": pngImageEmbed.scale(0.027),
       };
       const scalar = scalars[campaign];
       page.drawImage(pngImageEmbed, {
@@ -229,6 +230,7 @@ async function autoGenerateNewTags(campaign, brand) {
           113 -
           scalar.height +
           (campaign == "SLUMBER+" ? 42 : 0) +
+          (campaign == "ShirtLab" ? 9 : 0) +
           (campaign != "delicatus" && campaign != "Amaze wear" ? 4 : 0),
         width: scalar.width,
         height: scalar.height,
@@ -288,25 +290,26 @@ async function autoGenerateNewTags(campaign, brand) {
         font: openSans,
       });
 
-      const filepath = path.join(__dirname, "files", "tags", `${art}.pdf`);
+      const filepath = path.join(__dirname, "files", "tags_ozon", `${art}.pdf`);
+      // const filepath = path.join(__dirname, "files", "tags", `${art}.pdf`);
       const pdfBytes = await pdfDoc.save();
-      console.log(filepath);
+      console.log(new Date(), filepath);
       fs.writeFileSync(filepath, pdfBytes);
     };
 
     const openSansBytes = fs.readFileSync(
       path.join(__dirname, "files", "OpenSans_Condensed-Bold.ttf")
     );
-    const artsBarcodesFull = JSON.parse(
-      fs.readFileSync(
-        path.join(
-          __dirname,
-          "../prices/files",
-          campaign,
-          "artsBarcodesFull.json"
-        )
-      )
-    );
+    // const artsBarcodesFull = JSON.parse(
+    //   fs.readFileSync(
+    //     path.join(
+    //       __dirname,
+    //       "../prices/files",
+    //       campaign,
+    //       "artsBarcodesFull.json"
+    //     )
+    //   )
+    // );
     const artsBarcodesFullMayusha = JSON.parse(
       fs.readFileSync(
         path.join(
@@ -323,33 +326,36 @@ async function autoGenerateNewTags(campaign, brand) {
       // path.join(__dirname, "files", "logos", `${brand}.jpg`)
     );
 
-    // const pivot = xlsx.parse(path.join(__dirname, 'slumber.xlsx'))[0][
-    //   "data"
-    // ];
-    // console.log(pivot);
-    // const xlsxss = {}
-    // for (let i = 0; i < pivot.length; i++) {
-    //   const row = pivot[i]
-    //   xlsxss[row[0]] = {
-    //     brand_art: row[0],
-    //     color: row[3],
-    //     object: row[2],
-    //     brand: row[4],
-    //     size: "0",
-    //     barcode: row[1],
-    //   }
-    // }
+    const pivot = xlsx.parse(path.join(__dirname, `${brand}.xlsx`))[0][
+      "data"
+    ];
+    console.log(new Date(), pivot);
+    const xlsxss = {}
+    for (let i = 0; i < pivot.length; i++) {
+      const row = pivot[i]
+      let size = '0';
+      if (!row[0] || row[0] == '') continue;
+      if (row[0].includes('ФТБЛ')) size = row[0].split('_').slice(-1)[0]
+      xlsxss[row[0]] = {
+        brand_art: row[0],
+        color: row[3],
+        object: row[2],
+        brand: row[4],
+        size: size,
+        barcode: row[1],
+      }
+    }
     // return
-    // for (const [art, art_data] of Object.entries(xlsxss)) {
-    for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
+    for (const [art, art_data] of Object.entries(xlsxss)) {
+      // for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
       // if (art_data.brand != brand) continue;
 
-      if (!art.includes('ПРПЭ') || !art.includes('ТКС')) continue
+      // if (!art.includes('ПРПЭ') || !art.includes('ТКС')) continue
       // if (art_data.color.toUpperCase().includes('ЧЕРНЫЙ')) continue;
       // art_data.color = 'Черный'
 
       const otkArt = art.split("_").slice(0, 3).concat(["ОТК"]).join("_");
-      console.log(art, art_data, otkArt);
+      console.log(new Date(), art, art_data, otkArt);
       await makePdf(
         brand,
         art_data.brand_art.toUpperCase(),
@@ -432,7 +438,7 @@ function main() {
     for (let i = 1; i < current.length; i++) {
       qrcodes.push(current[i][5]);
     }
-    console.log(qrcodes);
+    console.log(new Date(), qrcodes);
 
     // // Remove existing files
     // const arch = path.join(__dirname, "files/Поставка/qrcodes.zip");
@@ -474,7 +480,7 @@ function main() {
           // Zip directory
           // zipDirectory(mainQrDir, arch)
           // .then(() => {
-          //   console.log("Zipping complete.");
+          //   console.log(new Date(), "Zipping complete.");
           // })
           // .catch((err) => reject(err));
           resolve();
@@ -501,7 +507,7 @@ function generateTags() {
     const tags = JSON.parse(
       fs.readFileSync(path.join(__dirname, "files/tags.json"))
     ).tags;
-    console.log(tags);
+    console.log(new Date(), tags);
 
     const promises = [];
     for (let i = 0; i < tags.length; i++) {
@@ -522,7 +528,7 @@ function generateTags() {
       //   "../qrGeneration/files/Поставка/tags.zip"
       // );
       // return zipDirectory(currentTagsDir, arch).then(() => {
-      //   console.log("Zipping complete.");
+      //   console.log(new Date(), "Zipping complete.");
       // });
       resolve();
     });
@@ -531,42 +537,44 @@ function generateTags() {
 
 function generateTagsRaspredelenniy() {
   return new Promise((resolve, reject) => {
-    const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
+    // const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
+    const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags_ozon");
     const brands = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../prices/files/campaigns.json"))
     ).brands;
     const promises = [];
 
     for (const [campaign, brand_data] of Object.entries(brands)) {
-      const artsBarcodesFull = JSON.parse(
-        fs.readFileSync(
-          path.join(
-            __dirname,
-            "../prices/files",
-            campaign,
-            "artsBarcodesFull.json"
-          )
-        )
-      );
-      // const pivot = xlsx.parse(path.join(__dirname, 'slumber.xlsx'))[0][
-      //   "data"
-      // ];
-      // console.log(pivot);
-      // const artsBarcodesFull = {}
-      // for (let i = 0; i < pivot.length; i++) {
-      //   const row = pivot[i]
-      //   artsBarcodesFull[row[0]] = {
-      //     brand_art: row[0],
-      //     color: row[3],
-      //     object: row[2],
-      //     brand: row[4],
-      //     size: "0",
-      //     barcode: row[1],
-      //   }
-      // }
+      // const artsBarcodesFull = JSON.parse(
+      //   fs.readFileSync(
+      //     path.join(
+      //       __dirname,
+      //       "../prices/files",
+      //       campaign,
+      //       "artsBarcodesFull.json"
+      //     )
+      //   )
+      // );
+      const pivot = xlsx.parse(path.join(__dirname, 'ShirtLab.xlsx'))[0][
+        "data"
+      ];
+      console.log(new Date(), pivot);
+      const artsBarcodesFull = {}
+      for (let i = 0; i < pivot.length; i++) {
+        const row = pivot[i]
+        if (!row[0] || row[0] == '') continue;
+        artsBarcodesFull[row[0]] = {
+          brand_art: row[0],
+          color: row[3],
+          object: row[2],
+          brand: row[4],
+          size: "0",
+          barcode: row[1],
+        }
+      }
       for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
         const array = art.split("_");
-        if (!art.includes("ФТБЛ_ЖЕН_ОВЕР_Ф-10_Черный_МАЮ")) continue;
+        // if (!art.includes("ФТБЛ_ЖЕН_ОВЕР_Ф-10_Черный_МАЮ")) continue;
         // if (art.includes("СЛВДР")) {
         //   if (parseInt(array[3]) < 3000) continue;
         // }
@@ -625,7 +633,7 @@ function generateTagsRaspredelenniy() {
           // });
           fs.mkdirSync(currentTagsDir);
         }
-        console.log(currentTagsDir);
+        console.log(new Date(), currentTagsDir);
 
         promises.push(
           fs.copyFile(
@@ -644,7 +652,7 @@ function generateTagsRaspredelenniy() {
         path.join(__dirname, "../qrGeneration/files/Распределенные Этикетки"),
         arch
       ).then(() => {
-        console.log("Zipping complete.");
+        console.log(new Date(), "Zipping complete.");
       });
       resolve();
     });
@@ -682,7 +690,7 @@ function autofillAndWriteToXlsx() {
     current_qr_index = 0;
     for (let i = 0; i < tags.length; i++) {
       const calcTag = (tag) => {
-        console.log(tag);
+        console.log(new Date(), tag);
         const box = [
           arts_data[tag.tag].barcode,
           arts_data[tag.tag].multiplicity,
@@ -716,7 +724,7 @@ function autofillAndWriteToXlsx() {
       // data.concat();
       calcTag(tags[i]);
     }
-    // console.log(data);
+    // console.log(new Date(), data);
 
     const buffer = xlsx.build([{ name: "Готовый", data: data }]);
     fs.writeFileSync(path.join(__dirname, "files", "current.xlsx"), buffer);

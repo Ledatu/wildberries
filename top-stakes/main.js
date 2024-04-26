@@ -18,7 +18,7 @@ module.exports = () => {
     checkFlagFilesExist([flagFile, "analytics-flag.txt"])
       .then(async (flagExists) => {
         if (!flagExists) {
-          console.log("Running operation...");
+          console.log(new Date(), "Running operation...");
 
           await createFlagFile(flagFile);
 
@@ -28,7 +28,7 @@ module.exports = () => {
 
           await deleteFlagFile(flagFile);
         } else {
-          console.log(`Flag file present. Skipping operation.`);
+          console.log(new Date(), `Flag file present. Skipping operation.`);
           resolve();
         }
       })

@@ -14,7 +14,7 @@ function createFlagFile(flagFile) {
       if (err) {
         reject(err);
       } else {
-        console.log(`Flag file '${flagFile}' created.`);
+        console.log(new Date(), `Flag file '${flagFile}' created.`);
         resolve();
       }
     });
@@ -32,7 +32,7 @@ function deleteFlagFile(flagFile) {
       if (err) {
         reject(err);
       } else {
-        console.log(`Flag file '${flagFile}' deleted.`);
+        console.log(new Date(), `Flag file '${flagFile}' deleted.`);
         resolve();
       }
     });

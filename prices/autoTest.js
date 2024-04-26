@@ -12,26 +12,33 @@ const autoTest = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
-        console.log(uid, campaignName);
-        // await fetchAdvertsAndWriteToJsonMM(uid, campaignName)
+        console.log(new Date(), uid, campaignName);
 
-        // const adverts = readIfExists(path.join(
+        const advertsAutoBidsRules = readIfExists(path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "advertsAutoBidsRules.json"
+        ));
+
+        for (const [advertId, advertData] of Object.entries(advertsAutoBidsRules)) {
+          const { placementsRange } = advertData;
+          const isByDrr = (placementsRange) => {
+            return (placementsRange && placementsRange.from == 0 && placementsRange.to == 0)
+          }
+          advertData.autoBidsMode = isByDrr(placementsRange) ? 'drr' : 'placements';
+        }
+
+        console.log(new Date(), advertsAutoBidsRules);
+
+        // fs.writeFileSync(path.join(
         //   __dirname,
         //   "marketMaster",
         //   uid,
         //   campaignName,
-        //   "adverts.json"
-        // ));
-
-        // tores = []
-        // for (const [advertId, advertData] of Object.entries(adverts)) {
-        //   const { status } = advertData;
-        //   const id = parseInt(advertId)
-        //   if (status == 4 && !tores.includes(id)) tores.push(id)
-        // }
-        // console.log(uid, campaignName, tores);
-        // await depositAndStart(uid, campaignName, tores)
-        await fetchAdvertsBudgetsAndWriteToJsonMM(uid, campaignName)
+        //   "advertsAutoBidsRules.json"
+        // ), JSON.stringify(advertsAutoBidsRules))
       }
     }
     await Promise.all(promises).then(() => resolve());

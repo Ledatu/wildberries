@@ -33,10 +33,10 @@ async function loadSavedCredentialsIfExist() {
     // const content = await fs.readFile(TOKEN_PATH);
     // const credentials = JSON.parse(content);
     const credentials = require(TOKEN_PATH);
-    console.log("Token loaded.");
+    console.log(new Date(), "Token loaded.");
     return google.auth.fromJSON(credentials);
   } catch (err) {
-    console.log("Failed to load token.");
+    console.log(new Date(), "Failed to load token.");
     return null;
   }
 }
@@ -103,23 +103,23 @@ async function writePrices(auth, campaign) {
     json_data[xlsx_data[i].name] = xlsx_data[i].data;
   }
   for (const [brand, sheet_data] of Object.entries(json_data)) {
-    // console.log(campaign, brand, sheet_data[0]);
+    // console.log(new Date(), campaign, brand, sheet_data[0]);
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
       range: `${brand}!1:1000`,
     });
-    // console.log(brand, sheet_data);
+    // console.log(new Date(), brand, sheet_data);
     await update_data(sheet_data, brand);
   }
-  // console.log(data);
+  // console.log(new Date(), data);
 
-  console.log(`Prices data written to the google sheets.`);
+  console.log(new Date(), `Prices data written to the google sheets.`);
 }
 
 async function writeDetailedByPeriod(auth, campaign) {
   const sheets = google.sheets({ version: "v4", auth });
   return new Promise(async (resolve, reject) => {
-    // console.log(campaign);
+    // console.log(new Date(), campaign);
 
     const seller_ids = (
       await JSON.parse(
@@ -148,7 +148,7 @@ async function writeDetailedByPeriod(auth, campaign) {
     );
     const useEnteredDeliveryPrice = Object.keys(delivery).length == 0;
     if (useEnteredDeliveryPrice) {
-      console.log("Fetching entered delivery for", campaign);
+      console.log(new Date(), "Fetching entered delivery for", campaign);
 
       const enteredDeliveryPriceRes = await sheets.spreadsheets.values.get({
         spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
@@ -170,7 +170,7 @@ async function writeDetailedByPeriod(auth, campaign) {
         path.join(__dirname, `../files/${campaign}/avgDrrByMask.json`)
       )
     );
-    // console.log(data);
+    // console.log(new Date(), data);
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
@@ -179,7 +179,7 @@ async function writeDetailedByPeriod(auth, campaign) {
 
     // Parse the values into a JSON object
     const rows = res.data.values;
-    // console.log(rows);
+    // console.log(new Date(), rows);
     const data = [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -197,14 +197,14 @@ async function writeDetailedByPeriod(auth, campaign) {
       } else {
         // type = getMaskFromVendorCode(art).slice(0, 2);
         type = art.split("_")[0];
-        // console.log(type, delivery[type]);
+        // console.log(new Date(), type, delivery[type]);
 
         // const type = getMaskFromVendorCode(art);
         if (art.includes("_ЕН")) {
           type += "_ЕН";
         }
       }
-      // console.log(
+      // console.log(new Date(), 
       //   art,
       //   type,
       //   `${
@@ -225,11 +225,11 @@ async function writeDetailedByPeriod(auth, campaign) {
       // }`.replace(".", ",");
       data[i][0] = `${delivery[type] ? delivery[type].avg : art.includes("_ЕН") ? "150" : "50"
         }`.replace(".", ",");
-      // console.log(campaign, type, data[i]);
+      // console.log(new Date(), campaign, type, data[i]);
     }
 
     await update_data(data).then((pr) => resolve());
-    console.log(`Delivery data written to the google sheets.`);
+    console.log(new Date(), `Delivery data written to the google sheets.`);
   });
 }
 
@@ -252,7 +252,7 @@ async function writeDrrToDataSpreadsheet(auth) {
       });
     };
 
-    // console.log(data);
+    // console.log(new Date(), data);
     const sheets = google.sheets({ version: "v4", auth });
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
@@ -266,7 +266,7 @@ async function writeDrrToDataSpreadsheet(auth) {
 
     // Parse the values into a JSON object
     const rows = res.data.values;
-    // console.log(rows);
+    // console.log(new Date(), rows);
     const data = [];
     for (let i = 0; i < rows.length; i++) {
       for (const [campaign, seller_id] of Object.entries(seller_ids)) {
@@ -299,18 +299,18 @@ async function writeDrrToDataSpreadsheet(auth) {
           "Trinity Fashion": "Trinity Fashion",
         };
         if (artsBarcodesFull[row[0]].brand == "Объединённая текстильная компания ЕН") continue;
-        // console.log(row[0]);
+        // console.log(new Date(), row[0]);
         const type = brand_names[artsBarcodesFull[row[0]].brand];
         // const type = getMaskFromVendorCode(row[0]);
         // const type = getMaskFromVendorCode(row[0]).slice(0, 2);
-        // console.log(type);
+        // console.log(new Date(), type);
         data[i][0] = drr[type] ? drr[type].drr ?? 0 : 0;
-        // console.log(campaign, type, data[i]);
+        // console.log(new Date(), campaign, type, data[i]);
       }
     }
 
     await update_data(data).then((pr) => resolve());
-    console.log(`Drr data written to the google sheets.`);
+    console.log(new Date(), `Drr data written to the google sheets.`);
   });
 }
 
@@ -340,7 +340,7 @@ async function writeLogisticsToDataSpreadsheet(auth) {
       });
     };
 
-    // console.log(data);
+    // console.log(new Date(), data);
     const sheets = google.sheets({ version: "v4", auth });
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
@@ -354,7 +354,7 @@ async function writeLogisticsToDataSpreadsheet(auth) {
 
     // Parse the values into a JSON object
     const rows = res.data.values;
-    // console.log(rows);
+    // console.log(new Date(), rows);
     const data = [];
     for (const [campaign, seller_id] of Object.entries(seller_ids)) {
       const logistics = readIfExists(
@@ -380,7 +380,7 @@ async function writeLogisticsToDataSpreadsheet(auth) {
         const res = { delivery: 0, orders: 0 };
 
         const sizes = arts.byNmId[arts.byArt[row[0]].nmId].sizes;
-        // console.log(sizes);
+        // console.log(new Date(), sizes);
         for (let i = 0; i < sizes.length; i++) {
           const sku = sizes[i].skus[0];
           const local_art = arts.bySku[sku].art;
@@ -390,15 +390,15 @@ async function writeLogisticsToDataSpreadsheet(auth) {
           res.orders += logistics[local_art]
             ? logistics[local_art].orders ?? 1
             : 1;
-          // console.log(logistics[local_art]);
+          // console.log(new Date(), logistics[local_art]);
         }
         // if (row[0] == 'КПБ_1.5_СЛВДР_2496_ОТК')
-        //   console.log(res, logistics[row[0]]);
+        //   console.log(new Date(), res, logistics[row[0]]);
 
-        // if (row[0] == "ПР_120_БЕЛЫЙ_ОТК") console.log(findLastSaleSpp(row[0]));
-        // console.log(type, spp[type]);
+        // if (row[0] == "ПР_120_БЕЛЫЙ_ОТК") console.log(new Date(), findLastSaleSpp(row[0]));
+        // console.log(new Date(), type, spp[type]);
         data[i][0] = getRoundValue(res.delivery, res.orders);
-        // console.log(
+        // console.log(new Date(), 
         //   campaign,
         //   type,
         //   data[i],
@@ -410,7 +410,7 @@ async function writeLogisticsToDataSpreadsheet(auth) {
     }
 
     await update_data(data).then((pr) => resolve());
-    console.log(`Logistics data written to the google sheets.`);
+    console.log(new Date(), `Logistics data written to the google sheets.`);
   });
 }
 
@@ -440,7 +440,7 @@ async function writeSppToDataSpreadsheet(auth) {
       });
     };
 
-    // console.log(data);
+    // console.log(new Date(), data);
     const sheets = google.sheets({ version: "v4", auth });
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
@@ -454,7 +454,7 @@ async function writeSppToDataSpreadsheet(auth) {
 
     // Parse the values into a JSON object
     const rows = res.data.values;
-    // console.log(rows);
+    // console.log(new Date(), rows);
     const data = [];
     for (const [campaign, seller_id] of Object.entries(seller_ids)) {
       // const sales = JSON.parse(
@@ -489,7 +489,7 @@ async function writeSppToDataSpreadsheet(auth) {
           : undefined;
         if (!res) {
           const byObj = sales.byObject[arts.byArt[art].object];
-          // console.log(arts.byArt[art].object, byObj);
+          // console.log(new Date(), arts.byArt[art].object, byObj);
           res = byObj ? byObj.avg.spp : undefined;
         }
         return res;
@@ -503,13 +503,13 @@ async function writeSppToDataSpreadsheet(auth) {
         if (row[4] != seller_ids[campaign]) continue;
         if (!arts.byArt[row[0]]) continue;
 
-        // if (row[0] == "ПР_120_БЕЛЫЙ_ОТК") console.log(findLastSaleSpp(row[0]));
-        // console.log(type, spp[type]);
+        // if (row[0] == "ПР_120_БЕЛЫЙ_ОТК") console.log(new Date(), findLastSaleSpp(row[0]));
+        // console.log(new Date(), type, spp[type]);
         // data[i][0] = findLastSaleSpp(row[0]);
         data[i][0] = sppData[arts.byArt[row[0]].brand_art]
           ? sppData[arts.byArt[row[0]].brand_art].spp ?? 0
           : 0;
-        // console.log(
+        // console.log(new Date(), 
         //   campaign,
         //   type,
         //   data[i],
@@ -521,7 +521,7 @@ async function writeSppToDataSpreadsheet(auth) {
     }
 
     await update_data(data).then((pr) => resolve());
-    console.log(`Spp data written to the google sheets.`);
+    console.log(new Date(), `Spp data written to the google sheets.`);
   });
 }
 
@@ -556,7 +556,7 @@ async function calcAndWriteMinZakazToDataSpreadsheet(auth) {
       });
     };
 
-    // console.log(data);
+    // console.log(new Date(), data);
     const sheets = google.sheets({ version: "v4", auth });
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1U8q5ukJ7WHCM9kNRRPlKRr3Cb3cb8At-bTjZuBOpqRs",
@@ -574,7 +574,7 @@ async function calcAndWriteMinZakazToDataSpreadsheet(auth) {
         for (const [date, date_data] of Object.entries(orders[seller_id])) {
           max_zakaz = Math.max(max_zakaz, date_data[art]);
         }
-      console.log(art, max_zakaz);
+      console.log(new Date(), art, max_zakaz);
       if (!max_zakaz) return art.includes("ФТБЛ") ? 1 : 1;
       return Math.ceil(
         (Math.ceil(max_zakaz / 2) * arts_data[art].pref_obor) /
@@ -584,7 +584,7 @@ async function calcAndWriteMinZakazToDataSpreadsheet(auth) {
 
     // Parse the values into a JSON object
     const rows = res.data.values;
-    // console.log(rows);
+    // console.log(new Date(), rows);
     const data = [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -595,13 +595,13 @@ async function calcAndWriteMinZakazToDataSpreadsheet(auth) {
     }
 
     await update_data(data).then((pr) => resolve());
-    console.log(`Min zakaz data written to the google sheets.`);
+    console.log(new Date(), `Min zakaz data written to the google sheets.`);
   });
 }
 
 async function pivotOrders(auth, campaign) {
   return new Promise(async (resolve, reject) => {
-    // console.log(campaign);
+    // console.log(new Date(), campaign);
 
     const update_data = async (data) => {
       await sheets.spreadsheets.values.update({
@@ -706,14 +706,14 @@ async function fetchNewPricesAndWriteToJSON(auth, brand) {
       );
       // if (roi < -30) return;
       if (discounted_price < artsData[row[0]].prime_cost) return;
-      // console.log(row[0], artsBarcodesFull[row[0]]);
+      // console.log(new Date(), row[0], artsBarcodesFull[row[0]]);
       jsonData[artsBarcodesFull[row[0]].nmId] = new_price;
     });
-    const data = [];
+    const data = { data: [] }
     for (const [nmId, new_price] of Object.entries(jsonData)) {
-      data.push({ nmId: parseInt(nmId), price: new_price });
+      data.data.push({ nmId: parseInt(nmId), price: new_price, discount: 50 });
     }
-    console.log(data);
+    console.log(new Date(), data);
 
     writeDataToFile(
       data,
@@ -755,10 +755,10 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
       const art = row[art_index];
       if (!(art in temp_jsonData[brand])) temp_jsonData[brand][art] = {};
 
-      // console.log(row, art, brand);
+      // console.log(new Date(), row, art, brand);
       for (let j = brand_index + 1; j < brand_index + 9; j++) {
         const turn = temp_jsonData.turn[j - 2];
-        // console.log(turn, jsonData[brand][art], jsonData[brand][art][turn]);
+        // console.log(new Date(), turn, jsonData[brand][art], jsonData[brand][art][turn]);
         temp_jsonData[brand][art][turn] = row[j]
           ? parseFloat(
             row[j].replace("%", "").replace(",", ".").replace(/\s/g, "")
@@ -786,7 +786,7 @@ async function fetchAutoPriceRulesAndWriteToJSON(auth) {
         if (!jsonData[brand][art]) jsonData[brand][art] = {};
       }
     }
-    // console.log(jsonData);
+    // console.log(new Date(), jsonData);
     const sheetData = [];
     for (const [brand, brandData] of Object.entries(jsonData)) {
       if (brand == "turn" || brand == "hours") continue;
@@ -952,7 +952,7 @@ async function fetchDataAndWriteToJSON(auth) {
 
     writeDataToFile(data, path.join(__dirname, "../files/data.json"));
   } catch (err) {
-    console.log(`The API returned an error: ${err}`);
+    console.log(new Date(), `The API returned an error: ${err}`);
     return null;
   }
 }
@@ -960,7 +960,7 @@ async function fetchDataAndWriteToJSON(auth) {
 async function fetchHandStocks(auth, campaign) {
   try {
     const sheets = google.sheets({ version: "v4", auth });
-    console.log("Hand stocks taken into account");
+    console.log(new Date(), "Hand stocks taken into account");
     // Retrieve the values from the specified range
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1i8E2dvzA3KKw6eDIec9zDg2idvF6oov4LH7sEdK1zf8",
@@ -995,10 +995,10 @@ async function fetchHandStocks(auth, campaign) {
         continue;
       jsonData[supplierArticle] = parseInt(row[1]);
     }
-    // console.log(jsonData);
+    // console.log(new Date(), jsonData);
     return jsonData;
   } catch (err) {
-    console.log(`The API returned an error: ${err}`);
+    console.log(new Date(), `The API returned an error: ${err}`);
     return null;
   }
 }
@@ -1010,7 +1010,7 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
       await fs.readFile(path.join(__dirname, `../files/campaigns.json`))
     ).brands[campaign];
 
-    // console.log(data);
+    // console.log(new Date(), data);
     const data = {};
     for (const [index, brand] of Object.entries(brands)) {
       if (brand == 'ОТК ЕН') continue;
@@ -1025,7 +1025,7 @@ function fetchEnteredValuesAndWriteToJSON(auth, campaign) {
       if (!(brand in data)) data[brand] = {};
 
       rows.forEach((row) => {
-        // console.log(row);
+        // console.log(new Date(), row);
         if (!row.slice(14).length) return;
         data[brand][row[0]] = {
           rentabelnost: row[14]
@@ -1076,7 +1076,7 @@ function fetchAvgRatingsAndWriteToJSON(auth) {
         const rows = res.data.values;
         for (const campaign of campaigns) {
           data = {};
-          // console.log(rows);
+          // console.log(new Date(), rows);
           for (const row of rows) {
             const mask = row[0];
             if (!mask) continue;
@@ -1096,17 +1096,17 @@ function fetchAvgRatingsAndWriteToJSON(auth) {
 
             data[mask] = parseFloat(row[2] ? row[2].replace(",", ".") : "0");
           }
-          // console.log(data);
+          // console.log(new Date(), data);
           await writeDataToFile(
             data,
             path.join(__dirname, `../files/${campaign}/avgRatings.json`)
           );
-          console.log(`${campaign} avgRatings.json created`);
+          console.log(new Date(), `${campaign} avgRatings.json created`);
         }
         resolve();
       });
   }).catch((err) => {
-    console.log(`The API returned an error: ${err}`);
+    console.log(new Date(), `The API returned an error: ${err}`);
     reject(err);
   });
 }
@@ -1130,11 +1130,11 @@ function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
       })
       .then((res) => {
         const rows = res.data.values;
-        // console.log(rows);
+        // console.log(new Date(), rows);
         for (row of rows) {
           const mask = row[0].split(" ")[1];
           // if (mask == "НАМАТРАСНИК_120") {
-          //   console.log(row, mask);
+          //   console.log(new Date(), row, mask);
           // }
           if (!mask) return;
           const days = 8;
@@ -1160,7 +1160,7 @@ function fetchAnalyticsLastWeekValuesAndWriteToJSON(auth, campaign) {
         ).then((pr) => resolve());
       });
   }).catch((err) => {
-    console.log(`The API returned an error: ${err}`);
+    console.log(new Date(), `The API returned an error: ${err}`);
     reject(err);
   });
 }
@@ -1197,7 +1197,7 @@ function updateRNP(auth) {
       Показы: { name: "views", formula: "sum" },
       SKU: { name: "sku", formula: "avg" },
     };
-    console.log(unique_params);
+    console.log(new Date(), unique_params);
 
     const brand_plan_res = await sheets.spreadsheets.values.get({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
@@ -1224,7 +1224,7 @@ function updateRNP(auth) {
           : value;
       }
     }
-    console.log(brand_plan);
+    console.log(new Date(), brand_plan);
 
     const jsonData = {}; //brand->metric->date,plan
     for (const [campaign, brands_data] of Object.entries(brands)) {
@@ -1251,7 +1251,7 @@ function updateRNP(auth) {
         for (const [index, param] of Object.entries(unique_params)) {
           const metric = param_map[param].name;
           const metric_formula = param_map[param].formula;
-          // console.log(brand_plan[brand], brand);
+          // console.log(new Date(), brand_plan[brand], brand);
           if (!(metric in jsonData[brand]))
             jsonData[brand][metric] = {
               month: {
@@ -1291,7 +1291,7 @@ function updateRNP(auth) {
           for (let i = 0; i < cur_date; i++) {
             const date = new Date(now);
             date.setDate(date.getDate() - i);
-            // console.log(campaign, brand, date);
+            // console.log(new Date(), campaign, brand, date);
             const str_date = date
               .toLocaleDateString("ru-RU")
               .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
@@ -1344,7 +1344,7 @@ function updateRNP(auth) {
       for (let i = 0; i < unique_params.length; i++) {
         // brand_sheet_data[2 + i * 32][0] = unique_params[i];
         const metric = param_map[unique_params[i]].name;
-        // console.log(metric, metrics[metric], metrics[metric].month);
+        // console.log(new Date(), metric, metrics[metric], metrics[metric].month);
         brand_sheet_data.push(
           [unique_params[i]].concat(Object.values(metrics[metric].month))
         );
@@ -1375,7 +1375,7 @@ function updateRNP(auth) {
       }
     }
 
-    // console.log(sheet_data);
+    // console.log(new Date(), sheet_data);
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
       range: `РНП 2.0!11:1000`,
@@ -1463,7 +1463,7 @@ function updatePlanFact(auth, campaign) {
       return mask_splitted.join("_");
     };
 
-    // console.log(byNow);
+    // console.log(new Date(), byNow);
     // const fact_res = await sheets.spreadsheets.values.get({
     // spreadsheetId: spIds[campaign],
     // range: "Факт!A3:A",
@@ -1539,7 +1539,7 @@ function updatePlanFact(auth, campaign) {
       all_masks.sort();
       all_masks.unshift(brand);
       // if (all_masks[0] == "НАМАТРАСНИК") all_masks.push(all_masks.shift());
-      console.log(all_masks);
+      console.log(new Date(), all_masks);
       for (let i = 0; i < all_masks.length; i++) {
         sheet_data[1] = sheet_data[1].concat(unique_params);
         //// formulas
@@ -1573,7 +1573,7 @@ function updatePlanFact(auth, campaign) {
               .toLocaleDateString("ru-RU")
               .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
               .slice(0, 10);
-            // console.log(str_date);
+            // console.log(new Date(), str_date);
             if (!(str_date in dates_datas)) dates_datas[str_date] = {};
             dates_datas[str_date][mask] = Array(unique_params.length);
 
@@ -1609,7 +1609,7 @@ function updatePlanFact(auth, campaign) {
           dateData.sum_orders = 0;
           dateData.orders = 0;
           dateData.stocks = 0;
-          // console.log(date, mask, dateData);
+          // console.log(new Date(), date, mask, dateData);
 
           for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
             if (!art.includes(get_proper_mask(mask))) continue;
@@ -1633,7 +1633,7 @@ function updatePlanFact(auth, campaign) {
 
           if (!sum_orders[date]) {
             // dates_datas[date] = {};
-            // console.log('here');
+            // console.log(new Date(), 'here');
             continue;
           }
 
@@ -1641,12 +1641,12 @@ function updatePlanFact(auth, campaign) {
 
           for (const [art, sum] of Object.entries(sum_orders[date])) {
             if (!art.includes(get_proper_mask(mask))) continue;
-            // console.log(art, mask, sum);
+            // console.log(new Date(), art, mask, sum);
             dateData.sum_orders += sum;
           }
           for (const [art, count] of Object.entries(orders[date])) {
             if (!art.includes(get_proper_mask(mask))) continue;
-            // console.log(art, mask, count);
+            // console.log(new Date(), art, mask, count);
             dateData.orders += count;
           }
 
@@ -1658,12 +1658,12 @@ function updatePlanFact(auth, campaign) {
           for (let j = 0; j < unique_params.length; j++) {
             to_push[j] = dateData[param_map[unique_params[j]].name];
           }
-          // if (mask == "КПБ_2_СТРАЙП") console.log(mask, to_push);
+          // if (mask == "КПБ_2_СТРАЙП") console.log(new Date(), mask, to_push);
           dates_datas[date][mask] = to_push;
-          // console.log(mask, fact[i], to_push);
+          // console.log(new Date(), mask, fact[i], to_push);
         }
       }
-      // console.log(dates_datas);
+      // console.log(new Date(), dates_datas);
 
       const cur_date = new Date();
       cur_date.setDate(cur_date.getDate() + 1);
@@ -1673,7 +1673,7 @@ function updatePlanFact(auth, campaign) {
           .toLocaleDateString("ru-RU")
           .replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1")
           .slice(0, 10);
-        // console.log(str_date);
+        // console.log(new Date(), str_date);
 
         sheet_data.push([str_date]);
         for (let j = 0; j < all_masks.length; j++) {
@@ -1691,7 +1691,7 @@ function updatePlanFact(auth, campaign) {
           if (1 <= i && i < 30) {
             // Указывыет за сколько дней считается дрр для рассчета цен
             // if (generalMaskForDrr == "ПРПЭ_120_DELICATUS")
-            //   console.log(str_date, dates_datas[str_date][generalMaskForDrr]);
+            //   console.log(new Date(), str_date, dates_datas[str_date][generalMaskForDrr]);
             if (dates_datas[str_date][all_masks[j]]) {
               const date_sum_orders =
                 dates_datas[str_date][all_masks[j]][
@@ -1710,7 +1710,7 @@ function updatePlanFact(auth, campaign) {
                 ? date_sum_orders
                 : 0;
               // if (generalMaskForDrr.slice(0, 2) == "КП")
-              //   console.log(
+              //   console.log(new Date(), 
               //     Math.round(avg_drr_by_mask[generalMaskForDrr].sum_orders),
               //     str_date,
               //     Math.round(date_sum_orders)
@@ -1751,10 +1751,10 @@ function updatePlanFact(auth, campaign) {
         jsonDataDrr[mask] = mask_data;
       }
 
-      console.log(jsonDataDrr);
+      console.log(new Date(), jsonDataDrr);
       const campaign_summary = [[]];
       if (brand in advertStatsByMaskByDay) {
-        console.log(brand, advertStatsByMaskByDay[brand]);
+        console.log(new Date(), brand, advertStatsByMaskByDay[brand]);
 
         for (let i = 3; i < sheet_data.length; i++) {
           if (!sheet_data[i]) continue;
@@ -2018,14 +2018,14 @@ function updateFactStatsByRK(auth, campaign) {
           .replace(/\s/, "")
           .split("/")[0];
         if (generalMasks.includes(generalMaskOfRK)) {
-          // if (generalMaskOfRK == 'ПРПЭ_200') console.log(date_range);
-          // console.log(advertNames[advertId], generalMaskOfRK, nms_to_sum_orders, generalMasks.includes(generalMaskOfRK));
+          // if (generalMaskOfRK == 'ПРПЭ_200') console.log(new Date(), date_range);
+          // console.log(new Date(), advertNames[advertId], generalMaskOfRK, nms_to_sum_orders, generalMasks.includes(generalMaskOfRK));
           // const mask = advertNames[advertId].split("/")[0];
           for (const [art, art_data] of Object.entries(artsData)) {
             const generalMask = getGeneralMaskFromVendorCode(art);
             if (generalMask != generalMaskOfRK) continue;
             if (!(art in artsBarcodesFull)) continue;
-            // console.log(generalMask, generalMaskOfRK);
+            // console.log(new Date(), generalMask, generalMaskOfRK);
             if (!nms_to_sum_orders.includes(art)) nms_to_sum_orders.push(art);
           }
         } else if (!artsData[advertNames[advertId]]) {
@@ -2035,7 +2035,7 @@ function updateFactStatsByRK(auth, campaign) {
             if (!vendorCode) continue;
             const stat_date = artData.createdAt.slice(0, 10);
             if (stat_date != str_date) continue;
-            // console.log(vendorCode, artData.vendorCode);
+            // console.log(new Date(), vendorCode, artData.vendorCode);
             if (!nms_to_sum_orders.includes(vendorCode))
               nms_to_sum_orders.push(vendorCode);
           }
@@ -2057,12 +2057,12 @@ function updateFactStatsByRK(auth, campaign) {
           return { rk_data: result, brand: undefined };
 
         nms_to_sum_orders = Array.from(new Set(nms_to_sum_orders));
-        // if (campaign == "TKS") console.log(nms_to_sum_orders);
+        // if (campaign == "TKS") console.log(new Date(), nms_to_sum_orders);
 
-        // console.log(advertNames[advertId], nms_to_sum_orders, generalMasks, advertNames[advertId].split("/")[0], generalMasks.includes(advertNames[advertId].split("/")[0]));
+        // console.log(new Date(), advertNames[advertId], nms_to_sum_orders, generalMasks, advertNames[advertId].split("/")[0], generalMasks.includes(advertNames[advertId].split("/")[0]));
         if (!orders[str_date]) continue;
         if (!stocksRatio.byDate[str_date]) continue;
-        // console.log(str_date);
+        // console.log(new Date(), str_date);
         for (const [art, value] of Object.entries(orders[str_date])) {
           if (!nms_to_sum_orders.includes(art)) continue;
           result.orders += value;
@@ -2081,9 +2081,9 @@ function updateFactStatsByRK(auth, campaign) {
               : false)
           )
             continue;
-          // console.log(art, mask, sum);
+          // console.log(new Date(), art, mask, sum);
           // if (getMaskFromVendorCode(nms_to_sum_orders[0]) == "КПБ_2+ЕВРО_МОНТЕ_ТКС")
-          //   console.log(nms_to_sum_orders, mask, count, str_date);
+          //   console.log(new Date(), nms_to_sum_orders, mask, count, str_date);
           result.stocks += count;
         }
 
@@ -2092,14 +2092,14 @@ function updateFactStatsByRK(auth, campaign) {
         // if (
         //   getMaskFromVendorCode(nms_to_sum_orders[0]) == "КПБ_2+ЕВРО_МОНТЕ_ТКС"
         // )
-        // console.log(result.stocks, date_range, str_date);
+        // console.log(new Date(), result.stocks, date_range, str_date);
         result.views += rkData[str_date].views ?? 0;
         result.clicks += rkData[str_date].clicks ?? 0;
         result.sum += rkData[str_date].sum ?? 0;
         if (result.views) result.ctr = result.clicks / result.views;
         if (result.views) result.cpm = result.sum / (result.views / 1000);
         if (result.clicks) result.cpc = result.sum / result.clicks;
-        // console.log(result);
+        // console.log(new Date(), result);
       }
 
       result.stocks = `${parseInt(
@@ -2115,7 +2115,7 @@ function updateFactStatsByRK(auth, campaign) {
       result.drr = result.sum / result.sum_orders;
       result.avg_bill = result.sum_orders / result.orders;
       // result.drr = result.sum_orders ? result.sum / result.sum_orders : 0;
-      // console.log(artsBarcodesFull[nms_to_sum_orders[0]], nms_to_sum_orders[0], nms_to_sum_orders, advertId);
+      // console.log(new Date(), artsBarcodesFull[nms_to_sum_orders[0]], nms_to_sum_orders[0], nms_to_sum_orders, advertId);
 
       return {
         rk_data: result,
@@ -2152,9 +2152,9 @@ function updateFactStatsByRK(auth, campaign) {
         for (let j = 0; j < to_push.length; j++) {
           to_push[j] = rkRangeDateData[param_map[unique_params[j]].name];
         }
-        // if (mask == "КПБ_2_СТРАЙП") console.log(mask, to_push);
+        // if (mask == "КПБ_2_СТРАЙП") console.log(new Date(), mask, to_push);
         rkStatInRanges = rkStatInRanges.concat(to_push);
-        // console.log(mask, fact[i], to_push);
+        // console.log(new Date(), mask, fact[i], to_push);
       }
       const rk_type_map = { 6: "Поиск", 8: "Авто" };
       const rk_status_map = {
@@ -2166,7 +2166,7 @@ function updateFactStatsByRK(auth, campaign) {
       };
       if (include_this_rk && [9, 11].includes(rkData.status)) {
         // if (!advertBudgets[rkData.advertId]) continue;
-        // console.log(rkData.advertId);
+        // console.log(new Date(), rkData.advertId);
         rkData.type = rk_type_map[rkData.type];
         rkData.status = rk_status_map[rkData.status];
         sheet_data_temp[brand].push(
@@ -2199,7 +2199,7 @@ function updateFactStatsByRK(auth, campaign) {
           sheet_data.push(_sheet[i]);
           inputed_rks.push(_sheet[i][0]);
         }
-        // console.log(brand, _sheet[i][0]);
+        // console.log(new Date(), brand, _sheet[i][0]);
       }
       for (let i = 0; i < stat_date_ranges.length; i++) {
         sheet_data[1] = sheet_data[1].concat(unique_params);
@@ -2274,7 +2274,7 @@ function fetchNewRKsToCreate(auth) {
           );
       }
     }
-    // console.log(new_rks_data);
+    // console.log(new Date(), new_rks_data);
     await sheets.spreadsheets.values.clear({
       spreadsheetId: "1I-hG_-dVdKusrSVXQYZrYjLWDEGLOg6ustch-AvlWHg",
       range: `Запуск РК!2:1000`,
@@ -2332,7 +2332,7 @@ function fetchFeedbackAnswerTemplatesAndWriteToJSON(auth) {
 
       // check if templates were modified
       const needRewrite = () => {
-        // console.log(previouslyFetchedTemplates);
+        // console.log(new Date(), previouslyFetchedTemplates);
         let rewrite_flag = true;
         if (Object.entries(previouslyFetchedTemplates).length) {
           rewrite_flag = false;
@@ -2348,7 +2348,7 @@ function fetchFeedbackAnswerTemplatesAndWriteToJSON(auth) {
       };
 
       if (!needRewrite()) {
-        console.log("No need to rewrite", campaign, "feedback templates");
+        console.log(new Date(), "No need to rewrite", campaign, "feedback templates");
         continue;
       }
       promises.push(
@@ -2424,7 +2424,7 @@ function genAllEqualTemplatesSheet(auth) {
         if (!masks.includes(mask)) masks.push(mask);
       }
       masks.sort();
-      console.log(masks);
+      console.log(new Date(), masks);
 
       const sheet_data = [masks];
       const camp_templates = templates[campaign];
@@ -2493,10 +2493,10 @@ function updateAnalyticsOrders(auth, campaign) {
           if (!(rows[1][i] in columns)) columns[rows[1][i]] = [];
           columns[rows[1][i]].push(i);
         }
-        // console.log(masks, columns);
+        // console.log(new Date(), masks, columns);
 
         for (const mask in masks) {
-          // console.log(mask);
+          // console.log(new Date(), mask);
           data[masks[mask]] = {};
           for (const day in orders) {
             data[masks[mask]][day] = {
@@ -2512,24 +2512,24 @@ function updateAnalyticsOrders(auth, campaign) {
             };
             for (const art in orders[day]) {
               if (art.includes(masks[mask])) {
-                // console.log(masks[mask], day, art, orders[day][art]);
+                // console.log(new Date(), masks[mask], day, art, orders[day][art]);
                 data[masks[mask]][day].orders += orders[day][art];
                 data[masks[mask]][day].sum_orders += sum_orders[day][art];
               }
             }
           }
         }
-        // console.log(data);
+        // console.log(new Date(), data);
         const days = Object.keys(orders).reverse();
-        // console.log(days);
+        // console.log(new Date(), days);
         const temp = {};
         const pivot = {};
         const sheet_data = rows.slice(2);
-        // console.log(sheet_data);
+        // console.log(new Date(), sheet_data);
         for (const st in orders) {
           let maskValuesStrartIndex = 0;
           for (const mask in data) {
-            // console.log(mask);
+            // console.log(new Date(), mask);
             const mainDlDir = path.join(
               __dirname,
               "../../analytics/files",
@@ -2537,17 +2537,17 @@ function updateAnalyticsOrders(auth, campaign) {
               mask
             );
 
-            // console.log(i, sheet_data.length, mainDlDir);
+            // console.log(new Date(), i, sheet_data.length, mainDlDir);
 
             if (!st || !advertsCreateDate[mask]) {
-              // console.log(st, "con");
+              // console.log(new Date(), st, "con");
               continue;
             }
-            // console.log(st);
+            // console.log(new Date(), st);
             const date = st.replace(/(\d{4})\-(\d{2})\-(\d{2})/, "$3.$2.$1");
 
             // if ()) {
-            //   // console.log(
+            //   // console.log(new Date(), 
             //   //   campaign,
             //   //   st,
             //   //   advertsCreateDate[mask],
@@ -2555,7 +2555,7 @@ function updateAnalyticsOrders(auth, campaign) {
             //   // );
             //   continue;
             // }
-            // console.log(date, st);
+            // console.log(new Date(), date, st);
 
             const analytics_data =
               new Date(st) >= new Date(advertsCreateDate[mask].createTime) &&
@@ -2565,7 +2565,7 @@ function updateAnalyticsOrders(auth, campaign) {
                   .data.slice(-1)[0]
                 : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-            // console.log(mainDlDir, analytics_data);
+            // console.log(new Date(), mainDlDir, analytics_data);
             const maskStat = {
               shows: parseInt(String(analytics_data[2]).replace(/\s/g, "")),
               clicks: parseInt(String(analytics_data[3]).replace(/\s/g, "")),
@@ -2583,7 +2583,7 @@ function updateAnalyticsOrders(auth, campaign) {
               sum_orders: 0,
               drr: 0,
             };
-            // console.log(st, mask, maskStat);
+            // console.log(new Date(), st, mask, maskStat);
             if (!(mask in temp)) temp[mask] = {};
             temp[mask][st] = maskStat;
             maskValuesStrartIndex += 1;
@@ -2599,8 +2599,8 @@ function updateAnalyticsOrders(auth, campaign) {
               temp[mask][st].rashod / (temp[mask][st].shows / 1000);
             temp[mask][st].drr =
               temp[mask][st].rashod / temp[mask][st].sum_orders;
-            // console.log(campaign, mask, st, temp[mask][st]);
-            // console.log(st, mask, temp[mask][st]);
+            // console.log(new Date(), campaign, mask, st, temp[mask][st]);
+            // console.log(new Date(), st, mask, temp[mask][st]);
             if (!(st in pivot))
               pivot[st] = {
                 day: new Date(st).toLocaleString("ru-RU", { weekday: "short" }),
@@ -2615,7 +2615,7 @@ function updateAnalyticsOrders(auth, campaign) {
             pivot[st].drr = pivot[st].rashod / pivot[st].sum_orders;
           }
         }
-        // console.log(temp);
+        // console.log(new Date(), temp);
         // return;
         for (let i = 0; i < days.length; i++) {
           for (const j in masks) {
@@ -2630,13 +2630,13 @@ function updateAnalyticsOrders(auth, campaign) {
             }
             // st = st.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1");
             sheet_data[i][0] = st;
-            // console.log(st);
+            // console.log(new Date(), st);
             maskValuesStrartIndex = 0;
-            // console.log(st, temp[masks[j]][st]);
+            // console.log(new Date(), st, temp[masks[j]][st]);
             if (temp[masks[j]] && temp[masks[j]][st]) {
               for (const [key, value] of Object.entries(temp[masks[j]][st])) {
-                // console.log(Object.entries(temp[masks[j]][st]));
-                // console.log(masks[j], j, [
+                // console.log(new Date(), Object.entries(temp[masks[j]][st]));
+                // console.log(new Date(), masks[j], j, [
                 //   1 +
                 //     j * Object.keys(temp[masks[j]][st]).length +
                 //     maskValuesStrartIndex
@@ -2649,27 +2649,27 @@ function updateAnalyticsOrders(auth, campaign) {
                 maskValuesStrartIndex += 1;
               }
             } else {
-              // console.log(st, masks[j]);
+              // console.log(new Date(), st, masks[j]);
               // sheet_data[i] = Array(sheet_data[0].length);
               // sheet_data[i][0] = st;
               // for (const column in columns["Заказы"]) {
-              //   // console.log(i, [columns["Заказы"][column]]);
+              //   // console.log(new Date(), i, [columns["Заказы"][column]]);
               //   sheet_data[i][columns["Заказы"][column]] =
               //     data[masks[j]][st].orders;
               // }
               // for (const column in columns["Сумма"]) {
-              //   // console.log(i, [columns["Заказы"][column]]);
+              //   // console.log(new Date(), i, [columns["Заказы"][column]]);
               //   sheet_data[i][columns["Сумма"][column]] =
               //     data[masks[j]][st].sum_orders;
               // }
               // maskValuesStrartIndex += 9;
-              // console.log(st, sheet_data[i])
+              // console.log(new Date(), st, sheet_data[i])
             }
-            // console.log(sheet_data[i]);
+            // console.log(new Date(), sheet_data[i]);
           }
         }
         if (!sheet_data.slice(-1)[0][0]) sheet_data.pop();
-        // console.log(sheet_data.slice(-1)[0][0]);
+        // console.log(new Date(), sheet_data.slice(-1)[0][0]);
         // return;
         sheets.spreadsheets.values
           .clear({
@@ -2703,10 +2703,10 @@ function updateAnalyticsOrders(auth, campaign) {
                   row.push(pivot[st].sum_orders);
                   row.push(pivot[st].drr);
 
-                  // console.log(row);
+                  // console.log(new Date(), row);
                   pivot_sheet.push(row);
                 }
-                // console.log(pivot_sheet);
+                // console.log(new Date(), pivot_sheet);
                 pivot_sheet.reverse();
                 sheets.spreadsheets.values
                   .clear({
@@ -2733,7 +2733,7 @@ function updateAnalyticsOrders(auth, campaign) {
           );
       })
       .catch((err) => {
-        console.log(`The API returned an error: ${err}`);
+        console.log(new Date(), `The API returned an error: ${err}`);
         reject(err);
       });
   });
@@ -2793,7 +2793,7 @@ function updateLowRatingStocksSheet(auth) {
         // else code.splice(2);
         // let remask = code.join("_");
         // if (mask.match("_2$")) remask += "*2";
-        // console.log(remask);
+        // console.log(new Date(), remask);
         const code = key.split("_");
         if (
           code[0].match("ПР") &&
@@ -2826,10 +2826,10 @@ function updateLowRatingStocksSheet(auth) {
         return 0;
       });
       for (let i = 0; i < temp.length; i++) sheet_data.push(temp[i]);
-      // console.log(temp, sheet_data);
+      // console.log(new Date(), temp, sheet_data);
     }
 
-    // console.log(sheet_data);
+    // console.log(new Date(), sheet_data);
     const update_data = async (data) => {
       await sheets.spreadsheets.values.update({
         spreadsheetId: "1iEaUSYe4BejADWpS9LgKGADknFwnvrF3Gc3PRS9ibME",
@@ -2848,8 +2848,8 @@ function updateLowRatingStocksSheet(auth) {
 // Define the function to write data to a JSON file
 const writeDataToFile = (data, filename) => {
   return fs.writeFile(filename, JSON.stringify(data), (err) => {
-    if (err) return console.log(`Error writing file: ${err}`);
-    console.log(`Data written to ${filename}`);
+    if (err) return console.log(new Date(), `Error writing file: ${err}`);
+    console.log(new Date(), `Data written to ${filename}`);
   });
 };
 
@@ -2883,7 +2883,7 @@ async function generateAdvertSpreadsheet(auth) {
       prices[row[0]] = Number(row[2]);
     });
 
-    // console.log(prices);
+    // console.log(new Date(), prices);
 
     const data_rows = (
       await sheets.spreadsheets.values.get({
@@ -2905,7 +2905,7 @@ async function generateAdvertSpreadsheet(auth) {
       if (row[0].includes("ТКС")) {
         regex += "_ТКС";
       }
-      // console.log(regex, prices[regex]);
+      // console.log(new Date(), regex, prices[regex]);
       data.push([prices[regex]]);
     });
 
@@ -2933,7 +2933,7 @@ async function copyPricesToDataSpreadsheet(auth) {
       });
     };
 
-    // console.log(prices);
+    // console.log(new Date(), prices);
 
     const data_rows = (
       await sheets.spreadsheets.values.get({
@@ -2946,7 +2946,7 @@ async function copyPricesToDataSpreadsheet(auth) {
     data_rows.forEach((row) => {
       const mask = getGeneralMaskFromVendorCode(row[0]);
       if (row[0] == "") return;
-      // console.log(mask, row[0]);
+      // console.log(new Date(), mask, row[0]);
       data.push([artPrices[mask] ? artPrices[mask].rc : 0]);
     });
     await sheets.spreadsheets.values.clear({
@@ -3025,14 +3025,14 @@ async function copyZakazToOtherSpreadsheet(auth) {
       if (title == "Остатки руч.") continue;
       if (title == "РОБОТ ЦЕН 2.0") continue;
       const sheet_data = await get_data(title);
-      console.log(title, sheet_data);
+      console.log(new Date(), title, sheet_data);
 
       const masks = [];
       for (let i = 0; i < sheet_data.length; i++) {
         const row = sheet_data[i];
         if (!row[0]) continue;
         let mask = getMaskFromVendorCode(row[0]);
-        console.log(title, mask);
+        console.log(new Date(), title, mask);
         mask = mask.split("_");
         if (!mask.includes("КПБ")) {
           mask = mask.slice(0, 1);
@@ -3052,10 +3052,10 @@ async function copyZakazToOtherSpreadsheet(auth) {
           continue;
         if (!masks.includes(mask)) masks.push(mask);
       }
-      console.log(masks);
+      console.log(new Date(), masks);
       for (let i = 0; i < masks.length; i++) {
         const mask_title = title + " " + masks[i];
-        // console.log(mask_title);
+        // console.log(new Date(), mask_title);
         const oldSheet = destinationSheets.data.sheets.find(
           (sheet) => sheet.properties.title === mask_title
         );
@@ -3075,7 +3075,7 @@ async function copyZakazToOtherSpreadsheet(auth) {
 
           mask_sheet_data.push(sheet_data[j]);
         }
-        // console.log(mask_sheet_data);
+        // console.log(new Date(), mask_sheet_data);
         // continue;
         if (oldSheet) {
           const oldSheetId = oldSheet.properties.sheetId;
@@ -3135,7 +3135,7 @@ async function sendEmail(auth, to, subject, body) {
         raw: Buffer.from(message.raw).toString("base64"),
       },
     });
-    console.log(`Email sent successfully: ${response.data}`);
+    console.log(new Date(), `Email sent successfully: ${response.data}`);
   } catch (error) {
     console.error(`Error sending email: ${error}`);
   }

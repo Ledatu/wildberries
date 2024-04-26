@@ -7,7 +7,7 @@ const autoAdvertsManaging = async (uid, campaignName) => {
   while (true) {
     try {
       await autoAdvertsManagingMM(uid, campaignName).then(() =>
-        console.log(uid, campaignName, "adverts managed.")
+        console.log(new Date(), uid, campaignName, "adverts managed.")
       );
       await new Promise((resolve) => setTimeout(resolve, 14 * 61 * 1000));
     } catch (e) {
@@ -15,7 +15,7 @@ const autoAdvertsManaging = async (uid, campaignName) => {
       resolve();
     }
     // await autoAdvertsStopMM(uid, campaignName).then(() =>
-    //   console.log(uid, campaignName, "stop advertsManagingRules updated.")
+    //   console.log(new Date(), uid, campaignName, "stop advertsManagingRules updated.")
     // );
 
     await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
@@ -30,11 +30,11 @@ const start = async () => {
     const campaignsNames = customerData.campaignsNames;
     for (let i = 0; i < campaignsNames.length; i++) {
       const campaignName = campaignsNames[i];
-      console.log(uid, campaignName);
+      console.log(new Date(), uid, campaignName);
       autoAdvertsManaging(uid, campaignName);
     }
   }
-  console.log("Started");
+  console.log(new Date(), "Started");
 };
 
 start();

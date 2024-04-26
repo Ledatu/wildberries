@@ -95,6 +95,10 @@ const {
   readIfExists,
   autoDepositAdvertsBudgetsAndWriteToJsonMM,
   fetchArtsPricesAndWriteToJsonMM,
+  autoManageAdvertsSchedule,
+  fetchAdvertsAndWriteToJsonMM,
+  calcPricesJsonDataMM,
+  fetchPaymentsHistoryMM,
 } = require("./main");
 const {
   getPrices,
@@ -118,7 +122,7 @@ const {
 const path = require("path");
 // copyZakazToOtherSpreadsheet()
 // fetchDetailedByPeriodAndWriteToJSON('mayusha')
-// getDelivery().then((pr) => console.log(pr));
+// getDelivery().then((pr) => console.log(new Date(), pr));
 // fetchDataAndWriteToJSON()
 //  getPrices();
 // fetchPricesAndWriteToJSON('delicatus');
@@ -134,7 +138,7 @@ const path = require("path");
 // fetchArtMaskPricesAndWriteToJSON()
 // copyPricesToDataSpreadsheet()
 // fetchNewPricesAndWriteToJSON("mayusha").then((pr) => {
-//   console.log("Prices fetched.");
+//   console.log(new Date(), "Prices fetched.");
 //   updatePrices("mayusha");
 // });
 // fetchStocksAndWriteToJSON("mayusha")
@@ -246,7 +250,7 @@ const path = require("path");
 // writePrices('delicatus')
 // writeSppToDataSpreadsheet()
 // const d = new Date('2023-12-22T11:57:00.000Z')
-// console.log(d);
+// console.log(new Date(), d);
 // calcAndSendTrendsToTg(d)
 // calcStatsTrendsAndWtriteToJSON('mayusha', d)
 // fetchAdverts()
@@ -351,14 +355,14 @@ const path = require("path");
 // fetchArtsAndWriteToJsonMM('4a1f2828-9a1e-4bbf-8e07-208ba676a806', 'МАЮША')
 // fetchArtsAndWriteToJsonMM('4a1f2828-9a1e-4bbf-8e07-208ba676a806', 'DELICATUS')
 // fetchOfficesAndWriteToJsonMM('4a1f2828-9a1e-4bbf-8e07-208ba676a806', 'МАЮША')
-// console.log(
+// console.log(new Date(), 
 //   calcDeliveryOrdersAndWriteToJsonMM(
 //     "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //     "Объединённая текстильная компания",
 //     { from: "2024-01-10", to: "2024-01-11" }
 //   )
 // );
-// console.log(
+// console.log(new Date(), 
 // calcMassAdvertsNewAndWriteToJsonMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //   "ИП Валерий",
@@ -368,7 +372,7 @@ const path = require("path");
 
 // autoSetAdvertsCPMsAndWriteToJsonMM('4a1f2828-9a1e-4bbf-8e07-208ba676a806', 'ИП Галилова');
 
-// console.log(
+// console.log(new Date(), 
 //   fetchAdvertWords(
 //     getAuthTokenMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий"),
 //     "14957084",
@@ -378,7 +382,7 @@ const path = require("path");
 // fetchAdvertsWordsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Оксана")
 // autoAdvertsManagingMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
 // fetchAdvertsWordsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
-// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
+// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
 // autoDepositAdvertsBudgetsAndWriteT oJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ТОРГМАКСИМУМ")
 // autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ТОРГМАКСИМУМ")
 // fetchOrdersAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
@@ -392,7 +396,7 @@ const path = require("path");
 //   2
 // );
 // calcSmartDetailedByPeriodAndWriteToJSON("mayusha");
-// const afs = require("fs");
+const afs = require("fs");
 // const path = require("path");
 // const authToken = getAuthTokenMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
@@ -416,7 +420,7 @@ const path = require("path");
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //   "ИП Валерий"
 // );
-// console.log(readIfExists(path.join(
+// console.log(new Date(), readIfExists(path.join(
 //   __dirname, 'marketMaster',
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //   "Текстиль",
@@ -429,6 +433,16 @@ const path = require("path");
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //   "ИП Валерий"
 // );
+// fetchBalanceMM(
+//   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//   "ИП Валерий"
+// );
+
+// fetchAdvertsBudgetsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
+// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
+// fetchAdvertsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
+autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
+// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифова Р. И.")
 // const reqs = readIfExists(
 //   path.join(
 //     __dirname,
@@ -437,12 +451,18 @@ const path = require("path");
 //     "requests.json"
 //   )
 // );
-// console.log(reqs);
+// // console.log(new Date(), reqs);
 // const nws = {};
-// for (const [key, val] of Object.entries(reqs)) {
+// for (let i = 1; i < reqs.length; i++) {
+//   const obj = reqs[i];
+//   const key = obj['кроссовки женские']
+//   const val = obj['5533015']
+//   // console.log(obj);
 //   nws[key] = parseInt(val);
+//   // console.log(key, nws[key]);
 // }
-// // console.log(nws);
+// nws['кроссовки женские'] = 5533015
+// // console.log(new Date(), nws);
 // afs.writeFileSync(
 //   path.join(
 //     __dirname,
@@ -520,10 +540,12 @@ const path = require("path");
 
 // fetchAdvertsMM();
 
-autoSetAdvertsCPMsAndWriteToJsonMM(
-  "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
-  "ИП Валерий"
-);
+// autoSetAdvertsCPMsAndWriteToJsonMM(
+//   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//   "Текстиль"
+// );
+// autoManageAdvertsSchedule("4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//   "ИП Валерий")
 
 // getTariffsBoxAndWriteToJsonMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
@@ -559,8 +581,9 @@ autoSetAdvertsCPMsAndWriteToJsonMM(
 // fetchAdverts()
 // getPrices()
 // fetchAdvertsWordsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
-// autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифов А. М.")
-// fetchAdvertsStatsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "Клининг Сервис", 100, 2)
+// calcPricesJsonDataMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
+// autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
+// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Галилова")
 // writeSpp
 
 // fetchAdvertsMM()

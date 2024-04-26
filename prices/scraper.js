@@ -24,9 +24,8 @@ async function scrapeWildberriesData(searchPhrases) {
       fs.mkdirSync(directory);
     }
 
-    const allCardDataList = { updateTime: undefined };
+    const allCardDataList = { updateTime: undefined, cpms: { search: [], auto: [] }, firstAdvertIndex: {} };
 
-    let firstAdvertIndexFlag = 0;
     let retryCount = 0;
     for (let page = 1; page <= 3; page++) {
       // retryCount = 0;
@@ -65,39 +64,65 @@ async function scrapeWildberriesData(searchPhrases) {
 
         if (data && data.data && data.data.products && data.data.products.length == 100) {
           const myData = {}
+          const cpms = {}
           for (let i = 0; i < data.data.products.length; i++) {
 
             const cur = data.data.products[i];
             cur.index = i + 1 + ((page - 1) * 100);
-            const { id, log } = cur;
-            if (page == 1) {
-              if (log && log.cpm && !firstAdvertIndexFlag) { firstAdvertIndexFlag = 1; allCardDataList.firstAdvertIndex = cur.index; }
+            const { id, log, name, brand, supplier } = cur;
+
+            const { tp } = log ?? {};
+            if (tp) {
+              const advertsType = tp == 'b' ? 'auto' : tp == 'c' ? 'search' : 'none';
+              log.advertsType = advertsType;
+              log.name = name;
+              log.brand = brand;
+              log.supplier = supplier;
+
+              if (!cpms[advertsType]) cpms[advertsType] = [];
+              cpms[advertsType].push(log)
+              cur.cpmIndex = allCardDataList.cpms[advertsType].length + cpms[advertsType].length;
+              if (page == 1) {
+                if (log.cpm && !allCardDataList.firstAdvertIndex[advertsType]) {
+                  allCardDataList.firstAdvertIndex[advertsType] = cur.index;
+                }
+              }
             }
             cur.prevIndex = old ? old.data ? old.data[id] ? old.data[id].index : undefined : undefined : undefined;
             cur.prevPrevIndex = old ? old.data ? old.data[id] ? old.data[id].prevIndex : undefined : undefined : undefined;
+
+            cur.cpmIndex = cur.cpmIndex ?? -1;
+            cur.cpmPrevIndex = old ? old.data ? old.data[id] ? old.data[id].cpmIndex : undefined : undefined : undefined;
+            cur.cpmPrevPrevIndex = old ? old.data ? old.data[id] ? old.data[id].cpmPrevIndex : undefined : undefined : undefined;
             myData[id] = cur;
           }
 
           if (!allCardDataList.data) allCardDataList.data = {}
           Object.assign(allCardDataList.data, myData);
 
+          if (!allCardDataList.cpms) allCardDataList.cpms = {}
+          for (const [advertsType, logs] of Object.entries(cpms)) {
+            if (!allCardDataList.cpms[advertsType]) allCardDataList.cpms[advertsType] = []
+            allCardDataList.cpms[advertsType] = allCardDataList.cpms[advertsType].concat(logs);
+          }
+
           await new Promise(resolve => setTimeout(resolve, 100))
         } else {
           page--;
           retryCount++;
           if (retryCount % 100 == 0) {
-            console.log(searchPhrase, retryCount);
+            console.log(new Date(), searchPhrase, retryCount);
             await new Promise(resolve => setTimeout(resolve, 100))
           }
           if (retryCount == 200) {
             retryCount = 0;
             break;
           }
-          // console.log(`Not enough data for search phrase: ${searchPhrase} on page ${page} only ${data.data.products.length} retrying`);
+          // console.log(new Date(), `Not enough data for search phrase: ${searchPhrase} on page ${page} only ${data.data.products.length} retrying`);
 
         }
 
-        // console.log(`Data saved for search phrase: ${searchPhrase}, page: ${page}`);
+        // console.log(new Date(), `Data saved for search phrase: ${searchPhrase}, page: ${page}`);
       } catch (error) {
         console.error(`Error fetching data for search phrase: ${searchPhrase}, page: ${page}`, error);
       }
@@ -112,10 +137,10 @@ async function scrapeWildberriesData(searchPhrases) {
 
       scrapedData[searchPhrase] = allCardDataList;
 
-      console.log(`All data saved for search phrase: ${searchPhrase}`);
+      console.log(new Date(), `All data saved for search phrase: ${searchPhrase}`);
     } else {
 
-      // console.log(`Not enough data for search phrase: ${searchPhrase} only ${Object.keys(allCardDataList.data).length}`);
+      // console.log(new Date(), `Not enough data for search phrase: ${searchPhrase} only ${Object.keys(allCardDataList.data).length}`);
     }
   }
 

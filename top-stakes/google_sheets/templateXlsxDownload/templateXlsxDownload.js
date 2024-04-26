@@ -30,10 +30,10 @@ async function loadSavedCredentialsIfExist() {
     // const content = await fs.readFile(TOKEN_PATH);
     // const credentials = JSON.parse(content);
     const credentials = require(TOKEN_PATH);
-    //console.log('Token loaded')
+    //console.log(new Date(), 'Token loaded')
     return google.auth.fromJSON(credentials);
   } catch (err) {
-    console.log("Failed to load token");
+    console.log(new Date(), "Failed to load token");
     return null;
   }
 }

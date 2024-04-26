@@ -22,7 +22,7 @@ const scraperObject = {
     context.addCookies(cookies);
     const page = await context.newPage();
     // await page.setViewportSize({ width: 1600, height: 30000 });
-    console.log(`Navigating to ${url}...`);
+    console.log(new Date(), `Navigating to ${url}...`);
     await page.goto(url);
     await page.waitForLoadState();
     await page.waitForSelector("div > input");
@@ -32,7 +32,7 @@ const scraperObject = {
     const stakes = xlsx.parse(
       path.join(__dirname, "files", "current_google_sheets_data.xlsx")
     )[0]["data"];
-    console.log(stakes);
+    console.log(new Date(), stakes);
     /**
 		This is a Promise that fills in a search input field with data from an array, clicks a search button, waits for a download button to appear, clicks the download button, saves the downloaded file, extracts data from the downloaded file, and stores the extracted data in an array.
 			@async
@@ -50,7 +50,7 @@ const scraperObject = {
 
         let data_presence = true;
         const downloadPromise = page.waitForEvent("download").catch((e) => {
-          console.log(`No data for ${stake}`);
+          console.log(new Date(), `No data for ${stake}`);
           data_presence = false;
         });
         await page
@@ -58,7 +58,7 @@ const scraperObject = {
           .first()
           .evaluate((el) => el.click())
           .catch((e) => {
-            console.log(`No data for ${stake}`);
+            console.log(new Date(), `No data for ${stake}`);
             data_presence = false;
           });
         if (!data_presence) {
@@ -79,11 +79,11 @@ const scraperObject = {
         // fs.writeFileSync(path_to_file, xlsx.build([{name: 'Sheet', data: data}]))
 
         const row = parseStakeSheet(path_to_file);
-        console.log(row);
+        console.log(new Date(), row);
         await updateRow(row);
         resolve();
       }).catch((error) => {
-        console.log("Passing error");
+        console.log(new Date(), "Passing error");
         throw error;
       });
 
@@ -94,7 +94,7 @@ const scraperObject = {
       await pagePromise(stakes[stake][0], index)
         .then((pr) => all_page_promises.push(pr))
         .catch((error) => {
-          console.log("Caught");
+          console.log(new Date(), "Caught");
           throw error;
         });
     }
@@ -104,14 +104,14 @@ const scraperObject = {
     // for (let i = 1; i < scrapedData.length; i++) {
     // 	const cur = scrapedData[i].slice(1, 5)
     // 	const prev = scrapedData[i - 1].slice(1, 5)
-    // 	console.log(cur)
-    // 	console.log(prev)
+    // 	console.log(new Date(), cur)
+    // 	console.log(new Date(), prev)
     // 	if (cur.join() == prev.join()) {
     // 		scrapedData[i] = [scrapedData[i][0]].concat(['', '', '', '', ''])
-    // 		console.log('Man its identical!')
-    // 		console.log(scrapedData[i])
+    // 		console.log(new Date(), 'Man its identical!')
+    // 		console.log(new Date(), scrapedData[i])
     // 	}
-    // 	console.log('-------')
+    // 	console.log(new Date(), '-------')
     // }
 
     // fs.writeFileSync(path.join(__dirname, 'files', 'gathered_stakes.xlsx'), xlsx.build([{ name: 'Terms', data: scrapedData }]))

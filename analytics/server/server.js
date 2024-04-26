@@ -20,7 +20,7 @@ fs.readFile(__dirname + "/index.html")
   .then((contents) => {
     indexFile = contents;
     server.listen(port, host, () => {
-      console.log(`Server is running on http://${host}:${port}`);
+      console.log(new Date(), `Server is running on http://${host}:${port}`);
     });
   })
   .catch((err) => {

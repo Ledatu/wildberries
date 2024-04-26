@@ -28,10 +28,10 @@ async function loadSavedCredentialsIfExist() {
     // const content = await fs.readFile(TOKEN_PATH);
     // const credentials = JSON.parse(content);
     const credentials = require(TOKEN_PATH);
-    console.log("Token loaded.");
+    console.log(new Date(), "Token loaded.");
     return google.auth.fromJSON(credentials);
   } catch (err) {
-    console.log("Failed to load token.");
+    console.log(new Date(), "Failed to load token.");
     return null;
   }
 }
@@ -89,7 +89,7 @@ async function writeCurrent(auth, campaign) {
   const data = xlsx.parse(path.join(__dirname, `../files/current.xlsx`))[0][
     "data"
   ];
-  // console.log(data);
+  // console.log(new Date(), data);
   const sheets = google.sheets({ version: "v4", auth });
 
   await sheets.spreadsheets.values.clear({
@@ -98,7 +98,7 @@ async function writeCurrent(auth, campaign) {
   });
 
   await update_data(data);
-  console.log(`Current autofill data written to the google sheets.`);
+  console.log(new Date(), `Current autofill data written to the google sheets.`);
 }
 
 async function fetchQrCodesAndWriteToJSON(auth) {
@@ -192,7 +192,7 @@ async function fetchNewTagsAndWriteToXLSX(auth) {
 
     const buffer = xlsx.build(xlsxSheets);
     afs.writeFileSync(path.join(__dirname, "../files", "newTags.xlsx"), buffer);
-    // console.log(xlsxSheets);
+    // console.log(new Date(), xlsxSheets);
     resolve();
   });
 }
@@ -229,7 +229,7 @@ async function fetchCurrentZakazAndWriteToXLSX(auth, sheet_name) {
       path.join(__dirname, "../files/supply.json"),
       JSON.stringify({ name: sheet_name })
     );
-    // console.log(xlsxSheets);
+    // console.log(new Date(), xlsxSheets);
     resolve();
   });
 }
@@ -243,11 +243,11 @@ async function fetchOTKArtMathcingAndWriteToJSON(auth) {
     });
     // Parse the values into a JSON object
     const rows = res.data.values;
-    // console.log(rows);
+    // console.log(new Date(), rows);
     const jsonData = {};
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      // console.log(row);
+      // console.log(new Date(), row);
       if (!row || !row[0] || row[0] == "") continue;
       for (let j = 1; j < row.length; j++) {
         const art = row[j];
@@ -267,8 +267,8 @@ async function fetchOTKArtMathcingAndWriteToJSON(auth) {
 // Define the function to write data to a JSON file
 const writeDataToFile = (data, filename) => {
   return fs.writeFile(filename, JSON.stringify(data), (err) => {
-    if (err) return console.log(`Error writing file: ${err}`);
-    console.log(`Data written to ${filename}`);
+    if (err) return console.log(new Date(), `Error writing file: ${err}`);
+    console.log(new Date(), `Data written to ${filename}`);
   });
 };
 
@@ -289,7 +289,7 @@ async function exportTZToXlsx(auth) {
       response.pipe(file);
     }
   );
-  console.log(`Exported ${filename} to files.`);
+  console.log(new Date(), `Exported ${filename} to files.`);
 }
 
 module.exports = {

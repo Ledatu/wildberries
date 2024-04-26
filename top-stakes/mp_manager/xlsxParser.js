@@ -41,7 +41,7 @@ const parseXlsxFiles = function () {
       files.forEach((filename) => {
         const extname = path.extname(filename);
         if (extname !== ".xlsx") {
-          console.log(
+          console.log(new Date(), 
             `Skipping file ${filename} because it is not an xlsx file.`
           );
           return;

@@ -67,7 +67,7 @@ const exportAll = () => {
       arch,
       path.join(__dirname, `../qrGeneration/files/Поставки/${name}.zip`)
     ).then(() => {
-      console.log("Zipping complete.");
+      console.log(new Date(), "Zipping complete.");
       resolve();
     });
   });

@@ -3,7 +3,7 @@ const playwright = require("playwright");
 async function startBrowser() {
   let browser;
   try {
-    console.log("Opening the browser......");
+    console.log(new Date(), "Opening the browser......");
     browser = await playwright.chromium.launch({
       // headless: true,
       //	        headless: false,
@@ -11,7 +11,7 @@ async function startBrowser() {
       // 'ignoreHTTPSErrors': true
     });
   } catch (err) {
-    console.log("Could not create a browser instance => : ", err);
+    console.log(new Date(), "Could not create a browser instance => : ", err);
   }
   return browser;
 }

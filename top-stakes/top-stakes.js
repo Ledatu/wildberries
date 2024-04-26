@@ -14,7 +14,6 @@ const { writeDetailedByPeriod } = require("../prices/google_sheets");
 
 startServer();
 scheduleJob("20 * * * *", () => writeSpp());
-scheduleJob("55 * * * *", () => fetchAdverts());
 scheduleJob("*/15 * * * *", () => fetchAdvertsMM());
 scheduleJob("50 * * * *", () => {
   if ([3, 9, 15, 21].includes(new Date().getHours())) getPrices(true);
@@ -30,7 +29,7 @@ scheduleJob("10 * * * *", () => RNPupdation());
 const flagFile = "top-stakes-flag.txt";
 
 function cleanup() {
-  console.log("Script exiting...");
+  console.log(new Date(), "Script exiting...");
   deleteFlagFile(flagFile).catch((err) => {
     console.error(`Error deleting flag file: ${err}`);
   });

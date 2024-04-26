@@ -13,7 +13,7 @@ const autoFetchStorage = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
-        console.log(uid, campaignName);
+        console.log(new Date(), uid, campaignName);
         // if (campaignName != "DELICATUS") continue;
         promises.push(
           getPaidStorageCostMM(uid, campaignName).then(

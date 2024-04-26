@@ -5,7 +5,7 @@ const path = require("path");
 
 const autoDepositAdverts = async () => {
   return new Promise(async (resolve, reject) => {
-    console.log(new Date())
+    console.log(new Date(), new Date())
     const customers = JSON.parse(
       fs.readFileSync(path.join(__dirname, "marketMaster", "customers.json"))
     );
@@ -14,7 +14,7 @@ const autoDepositAdverts = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
-        console.log(uid, campaignName);
+        console.log(new Date(), uid, campaignName);
         // if (campaignName != "DELICATUS") continue;
         promises.push(
           autoDepositAdvertsBudgetsAndWriteToJsonMM(uid, campaignName).then(
@@ -27,8 +27,8 @@ const autoDepositAdverts = async () => {
   });
 };
 scheduleJob("1 * * * *", () => {
-  if (new Date().getHours() != 1) { console.log('Too early.'); return; }
+  if (new Date().getHours() != 1) { console.log(new Date(), 'Too early.'); return; }
   autoDepositAdverts();
 });
 // autoDepositAdverts();
-// scheduleJob("22 22 * * *", () => { console.log('MEMEME'); });  
+// scheduleJob("22 22 * * *", () => { console.log(new Date(), 'MEMEME'); });  

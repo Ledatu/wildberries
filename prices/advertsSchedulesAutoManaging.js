@@ -1,17 +1,12 @@
-const { autoSetAdvertsCPMsAndWriteToJsonMM } = require("./main");
+const { autoManageAdvertsSchedule } = require("./main");
 const { scheduleJob } = require("node-schedule");
 const fs = require("fs");
 const path = require("path");
 
-const autoBidder = async (uid, campaignName) => {
-  while (true) {
-
-    await autoSetAdvertsCPMsAndWriteToJsonMM(uid, campaignName).then(() =>
-      console.log(new Date(), uid, campaignName, "Adverts bids set.")
-    )
-
-    await new Promise((resolve) => setTimeout(resolve, 1 * 60 * 1000));
-  }
+const manageActivity = async (uid, campaignName) => {
+  await autoManageAdvertsSchedule(uid, campaignName).then(
+    console.log(new Date(), uid, campaignName, "schedules set")
+  );
 };
 
 const start = async () => {
@@ -23,11 +18,11 @@ const start = async () => {
     for (let i = 0; i < campaignsNames.length; i++) {
       const campaignName = campaignsNames[i];
       console.log(new Date(), uid, campaignName);
-      autoBidder(uid, campaignName);
+      manageActivity(uid, campaignName);
     }
   }
   console.log(new Date(), "Started");
 };
 
-// scheduleJob("*/2 * * * *", () => start());
-start();
+// start();
+scheduleJob("*/20 * * * *", () => start());

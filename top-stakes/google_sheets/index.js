@@ -27,10 +27,10 @@ async function loadSavedCredentialsIfExist() {
     // const content = await fs.readFile(TOKEN_PATH);
     // const credentials = JSON.parse(content);
     const credentials = require(TOKEN_PATH);
-    //console.log('Token loaded')
+    //console.log(new Date(), 'Token loaded')
     return google.auth.fromJSON(credentials);
   } catch (err) {
-    console.log("Failed to load token");
+    console.log(new Date(), "Failed to load token");
     return null;
   }
 }
@@ -88,7 +88,7 @@ async function writeStakes(auth) {
   const data = xlsx.parse(
     path.join(__dirname, "..", "mp_manager", "files", "gathered_stakes.xlsx")
   )[0]["data"];
-  //console.log(data)
+  //console.log(new Date(), data)
   const sheets = google.sheets({ version: "v4", auth });
 
   await sheets.spreadsheets.values.clear({
@@ -158,7 +158,7 @@ async function getStakes(auth) {
     ),
     xlsx.build([{ name: "Terms", data: filteredStakes }])
   );
-  console.log("Synced.");
+  console.log(new Date(), "Synced.");
 }
 
 module.exports = {

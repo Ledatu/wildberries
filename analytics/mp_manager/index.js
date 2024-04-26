@@ -8,11 +8,11 @@ module.exports = {
       .scrapeAll(browserInstance, campaign_id)
       .then(async (pr) => {
         await browserInstance.close();
-        console.log(campaign_id, "complete!");
+        console.log(new Date(), campaign_id, "complete!");
       })
       .catch(async (er) => {
         await browserInstance.close();
-        console.log(campaign_id, "error exited.");
+        console.log(new Date(), campaign_id, "error exited.");
       });
   },
   getSpp: async (campaign_id) => {
@@ -21,11 +21,11 @@ module.exports = {
       .scrapeSpp(browserInstance, campaign_id)
       .then(async (pr) => {
         await browserInstance.close();
-        console.log(campaign_id, "complete!");
+        console.log(new Date(), campaign_id, "complete!");
       })
       .catch(async (er) => {
         await browserInstance.close();
-        console.log(campaign_id, "error exited.");
+        console.log(new Date(), campaign_id, "error exited.");
       });
   },
 };
