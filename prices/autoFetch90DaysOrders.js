@@ -9,8 +9,8 @@ const autoFetchDay = async (uid, campaignName) => {
   await fetchOrdersAndWriteToJsonMM(uid, campaignName)
   await fetchSalesAndWriteToJsonMM(uid, campaignName)
   await new Promise(resolve => setTimeout(resolve, 61 * 1000))
-  for (let i = 0; i < 90; i++) {
-    if (![39, 40, 41, 49, 50, 51].includes(new Date().getMinutes())) {
+  for (let i = 0; i < 8; i++) {
+    if (![13, 14, 0, 1].includes(new Date().getMinutes() % 15)) {
       await fetchOrdersAndWriteToJsonMM(uid, campaignName, i)
       await fetchSalesAndWriteToJsonMM(uid, campaignName, i)
       await new Promise(resolve => setTimeout(resolve, 65 * 1000))

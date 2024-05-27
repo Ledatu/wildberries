@@ -137,7 +137,7 @@ async function getPresets(phrases) {
 
             console.log(new Date(), phrase, i, ' / ', phrases.length);
         } catch (error) {
-            console.log(new Date(), error.response.error);
+            console.log(new Date(), error);
         }
 
 
@@ -187,6 +187,6 @@ const start = async () => {
 }
 
 start()
-// scheduleJob("2 */3 * * *", () => {
-//     start()
-// });
+scheduleJob("2 */3 * * *", () => {
+    start()
+});

@@ -1,9 +1,9 @@
 const { scheduleJob } = require("node-schedule");
 const fs = require("fs");
 const path = require("path");
-const { getPaidStorageCostMM } = require("./main");
+const { fetchArtsPricesAndWriteToJsonMM } = require("./main");
 
-const autoFetchStorage = async () => {
+const autoFetchArtsPrices = async () => {
   return new Promise(async (resolve, reject) => {
     const customers = JSON.parse(
       fs.readFileSync(path.join(__dirname, "marketMaster", "customers.json"))
@@ -14,17 +14,19 @@ const autoFetchStorage = async () => {
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
         console.log(new Date(), uid, campaignName);
-        // if (campaignName != "DELICATUS") continue;
-        promises.push(
-          getPaidStorageCostMM(uid, campaignName).then(
-            () => resolve(uid, campaignName, "paid storage cost updated.")
-          )
-        );
+        try {
+          promises.push(
+            fetchArtsPricesAndWriteToJsonMM(uid, campaignName)
+          );
+        }
+        catch (e) {
+          console.log(e.response.data);
+        }
       }
     }
     await Promise.all(promises).then(() => resolve());
   });
 };
 
-scheduleJob("40 2 * * *", () => autoFetchStorage());
-// autoFetchStorage();
+scheduleJob("*/6 * * * *", () => autoFetchArtsPrices());
+// autoFetchArtsPrices();

@@ -64,7 +64,7 @@ async function scrapeWildberriesData(searchPhrases) {
 
         if (data && data.data && data.data.products && data.data.products.length == 100) {
           const myData = {}
-          const cpms = {}
+          const cpms = { firstPage: [] }
           for (let i = 0; i < data.data.products.length; i++) {
 
             const cur = data.data.products[i];
@@ -95,6 +95,10 @@ async function scrapeWildberriesData(searchPhrases) {
             cur.cpmPrevIndex = old ? old.data ? old.data[id] ? old.data[id].cpmIndex : undefined : undefined : undefined;
             cur.cpmPrevPrevIndex = old ? old.data ? old.data[id] ? old.data[id].cpmPrevIndex : undefined : undefined : undefined;
             myData[id] = cur;
+
+            if (page == 1) {
+              cpms.firstPage.push(cur);
+            }
           }
 
           if (!allCardDataList.data) allCardDataList.data = {}

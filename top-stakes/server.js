@@ -63,6 +63,15 @@ const {
   manageAdvertsNMsMM,
   setAdvertsSchedulesAndWriteToJsonMM,
   calcPricesJsonDataMM,
+  calcPricesMM,
+  updatePricesMM,
+  changeUploadedArtsDataForKeyMM,
+  calcAnalyticsMM,
+  setPlanForKeyAndWriteToJsonMM,
+  fixArtPricesAndWriteToJsonMM,
+  saveNoteMM,
+  setTagsMM,
+  getAllTags,
 } = require("../prices/main");
 const { zipDirectory } = require("../qrGeneration/main");
 const { fetchAnalytics } = require("../analytics/main");
@@ -210,7 +219,11 @@ app.post("/api/updateStorageCost", authenticateToken, (req, res) => {
 const getUid = (uid) => {
   if (!uid || uid == '') return undefined;
   const temp = uid.split('_')
-  return temp[1] == '1' ? temp[0] : undefined;
+  return [
+    '4a1f2828-9a1e-4bbf-8e07-208ba676a806',
+    '46431a09-85c3-4703-8246-d1b5c9e52594',
+    '453a2da6-9458-44bd-b756-0282fbb7557d',
+  ].includes(temp[1]) ? temp[0] : undefined;
 }
 
 app.post("/api/getStatsByDay", authenticateToken, (req, res) => {
@@ -583,11 +596,13 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
           const { statOnMinus } = advertsWords[advertId];
           // if (!stat[keyword]) continue;
           const { sum, ctr, clicks, views } = statOnMinus[keyword] ?? {};
+          const { normquery, catalog_value } = presets.phrases ? presets.phrases[keyword] ?? {} : {};
           // console.log(new Date(), stat[keyword], keyword);
           words.excluded.push({
             cluster: keyword,
             freq: requests[keyword],
-            preset: presets.phrases[keyword] ? presets.phrases[keyword].catalog_value : undefined,
+            preset: catalog_value,
+            normquery: normquery,
             count: views,
             sum: sum,
             ctr: ctr,
@@ -598,50 +613,23 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
         words.excluded.sort((a, b) => { return b.freq - a.freq });
 
         if (type == 8) {
-          for (let j = 0; j < wordsForId.clusters.length; j++) {
-            const { cluster, count, keywords } = wordsForId.clusters[j];
+          for (const [phrase, phraseStats] of Object.entries(wordsForId.stat)) {
+            if (phrase === undefined || phraseStats === undefined) continue;
+            const { views, clicks, sum, } = phraseStats ?? {};
+            const { normquery, catalog_value } = presets.phrases ? presets.phrases[phrase] ?? {} : {};
 
-            const { stat } = advertsWords[advertId];
-            const clusterKeywordsTemp = Array.from(keywords ?? []);
-            const clusterKeywords = clusterKeywordsTemp.filter(
-              (value, index) => {
-                return clusterKeywordsTemp.indexOf(value) === index;
-              }
-            );
-            // if (advertId == "15641202")
-            //   console.log(new Date(), clusterKeywords, keywords);
-            if (!clusterKeywords.includes(cluster))
-              clusterKeywords.push(cluster);
-            const clusterStat = {
-              views: 0,
-              clicks: 0,
-              ctr: 0,
-              sum: 0,
-              freq: 0,
-            };
-            for (let j = 0; j < clusterKeywords.length; j++) {
-
-              clusterStat.freq += requests[clusterKeywords[j]] ?? 0;
-              if (!stat[clusterKeywords[j]]) continue;
-              clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
-              clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
-              clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
-            }
-            clusterStat.ctr = getRoundValue(
-              clusterStat.clicks,
-              clusterStat.views,
-              true
-            );
+            if (wordsForId.excluded.includes(phrase)) continue;
 
             words.clusters.push({
-              cluster: cluster,
-              freq: clusterStat.freq,
-              preset: presets.phrases[cluster] ? presets.phrases[cluster].catalog_value : undefined,
-              count: count,
-              sum: clusterStat.sum,
-              ctr: clusterStat.ctr,
-              clicks: clusterStat.clicks,
-              cpc: getRoundValue(clusterStat.sum, clusterStat.clicks, false, undefined),
+              cluster: phrase,
+              freq: requests[phrase] ?? 0,
+              preset: catalog_value,
+              normquery: normquery,
+              count: views,
+              clicks: clicks,
+              sum: sum,
+              ctr: getRoundValue(clicks, views, true),
+              cpc: getRoundValue(sum, clicks, false, undefined),
             });
           }
         } else if (type == 6) {
@@ -650,33 +638,19 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
             const { stat } = advertsWords[advertId];
             if (!stat[keyword]) continue;
             const { sum, ctr, clicks } = stat[keyword];
+            const { normquery, catalog_value } = presets.phrases ? presets.phrases[keyword] ?? {} : {};
             words.clusters.push({
               cluster: keyword,
               count: count,
               sum: sum,
-              preset: presets.phrases[keyword] ? presets.phrases[keyword].catalog_value : undefined,
+              preset: catalog_value,
+              normquery: normquery,
               ctr: ctr,
               clicks: clicks,
             });
           }
         } else if (type == 9) {
-          for (let j = 0; j < wordsForId.keywords.length; j++) {
-            const { keyword, count } = wordsForId.keywords[j];
-            const { stat } = advertsWords[advertId];
-
-            const { sum, ctr, clicks } = stat ? stat[keyword] ?? {} : {}
-            words.clusters.push({
-              cluster: keyword,
-              freq: requests[keyword],
-              preset: presets.phrases[keyword] ? presets.phrases[keyword].catalog_value : undefined,
-              count: count,
-              sum: sum,
-              ctr: ctr,
-              clicks: clicks,
-            });
-
-          }
-          if (pluse) {
+          if (pluse && pluse.length) {
             for (let j = 0; j < pluse.length; j++) {
               const keyword = pluse[j];
               const { stat } = advertsWords[advertId];
@@ -686,11 +660,30 @@ app.post("/api/getMassAdvertsNew", authenticateToken, (req, res) => {
                 cluster: keyword,
                 freq: requests[keyword],
                 count: views,
-                preset: presets.phrases[keyword] ? presets.phrases[keyword].catalog_value : undefined,
+                preset: presets.phrases ? presets.phrases[keyword] ? presets.phrases[keyword].catalog_value : undefined : undefined,
                 sum: sum,
                 ctr: ctr,
                 clicks: clicks,
               });
+            }
+          }
+          else {
+
+            for (let j = 0; j < wordsForId.keywords.length; j++) {
+              const { keyword, count } = wordsForId.keywords[j];
+              const { stat } = advertsWords[advertId];
+
+              const { sum, ctr, clicks } = stat ? stat[keyword] ?? {} : {}
+              words.clusters.push({
+                cluster: keyword,
+                freq: requests[keyword],
+                preset: presets.phrases ? presets.phrases[keyword] ? presets.phrases[keyword].catalog_value : undefined : undefined,
+                count: count,
+                sum: sum,
+                ctr: ctr,
+                clicks: clicks,
+              });
+
             }
           }
 
@@ -748,6 +741,18 @@ app.post("/api/updateAdvertsSelectedPhrases", authenticateToken, (req, res) => {
   );
 });
 
+app.post("/api/changeUploadedArtsDataForKey", authenticateToken, (req, res) => {
+  const accountUid = getUid(req.body.uid);
+  const campaignName = req.body.campaignName;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  changeUploadedArtsDataForKeyMM(accountUid, campaignName, data);
+  res.send(JSON.stringify('Updating...'));
+});
+
 app.post("/api/getNomenclatures", authenticateToken, (req, res) => {
   const accountUid = getUid(req.body.uid);
   const genForCampaignName = req.body.campaignName;
@@ -770,8 +775,9 @@ app.post("/api/getNomenclatures", authenticateToken, (req, res) => {
 
     const nomenclaturesCampaign = calcNomenclaturesAndWriteToJsonMM(
       accountUid,
-      campaignName
+      campaignName,
     );
+
     nomenclaturesAccount.nomenclatures[campaignName] = nomenclaturesCampaign;
 
     const artsData = readIfExists(path.join(
@@ -783,6 +789,111 @@ app.post("/api/getNomenclatures", authenticateToken, (req, res) => {
   }
   res.send(JSON.stringify(nomenclaturesAccount));
 });
+
+app.post("/api/updatePricesMM", authenticateToken, async (req, res) => {
+  const accountUid = getUid(req.body.uid);
+  const campaignName = req.body.campaignName;
+  const updatePricesParams = req.body.updatePricesParams;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!updatePricesParams || updatePricesParams == "") return;
+
+  await updatePricesMM(accountUid, campaignName, updatePricesParams);
+
+  res.send(JSON.stringify('Updating...'));
+});
+
+app.post("/api/getPricesMM", authenticateToken, async (req, res) => {
+  const accountUid = getUid(req.body.uid);
+  const genForCampaignName = req.body.campaignName;
+  const dateRange = req.body.dateRange;
+  const enteredValue = req.body.enteredValue;
+  const fixPrices = req.body.fixPrices;
+  if (!accountUid || accountUid == "") return;
+
+  const secrets = readIfExists(
+    path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
+  ).byCampaignName;
+
+  const pricesDataAccount = {
+    pricesData: {},
+    artsData: {},
+    fixArtPrices: {},
+  };
+  for (const [campaignName, _] of Object.entries(secrets)) {
+    if (!pricesDataAccount.pricesData[campaignName])
+      pricesDataAccount.pricesData[campaignName] = {};
+    if (!pricesDataAccount.artsData[campaignName])
+      pricesDataAccount.artsData[campaignName] = {};
+    if (!pricesDataAccount.fixArtPrices[campaignName])
+      pricesDataAccount.fixArtPrices[campaignName] = {};
+    if (campaignName != (genForCampaignName ?? "ИП Валерий")) continue;
+
+    const pricesDataCampaign = await calcPricesMM(
+      accountUid,
+      campaignName,
+      dateRange,
+      enteredValue,
+      fixPrices,
+    );
+    pricesDataAccount.pricesData[campaignName] = pricesDataCampaign;
+
+    const artsData = readIfExists(path.join(
+      __dirname,
+      "../prices/marketMaster",
+      accountUid,
+      campaignName, "artsDataUploaded.json"));
+    pricesDataAccount.artsData[campaignName] = artsData;
+
+    const fixArtPrices = readIfExists(path.join(
+      __dirname,
+      "../prices/marketMaster",
+      accountUid,
+      campaignName, "fixArtPrices.json"));
+    pricesDataAccount.fixArtPrices[campaignName] = fixArtPrices;
+  }
+  res.send(JSON.stringify(pricesDataAccount));
+});
+
+app.post("/api/getAnalytics", authenticateToken, async (req, res) => {
+  const accountUid = getUid(req.body.uid);
+  const genForCampaignName = req.body.campaignName;
+  const dateRange = req.body.dateRange;
+  const enteredValues = req.body.enteredValues;
+  if (!accountUid || accountUid == "") return;
+
+  const secrets = readIfExists(
+    path.join(__dirname, "../prices/marketMaster", accountUid, "secrets.json")
+  ).byCampaignName;
+
+  const analyticsDataAccount = {
+    analyticsData: {},
+    plansData: {}
+  };
+  for (const [campaignName, _] of Object.entries(secrets)) {
+    if (!analyticsDataAccount.analyticsData[campaignName])
+      analyticsDataAccount.analyticsData[campaignName] = {};
+    if (!analyticsDataAccount.plansData[campaignName])
+      analyticsDataAccount.plansData[campaignName] = {};
+    if (campaignName != (genForCampaignName ?? "ИП Валерий")) continue;
+
+    const analyticsDataCampaign = await calcAnalyticsMM(
+      accountUid,
+      campaignName,
+      dateRange,
+      enteredValues,
+    );
+    analyticsDataAccount.analyticsData[campaignName] = analyticsDataCampaign;
+
+    const plansData = readIfExists(
+      path.join(__dirname, "../prices/marketMaster", accountUid, campaignName, "plansForKeys.json")
+    )
+    analyticsDataAccount.plansData[campaignName] = plansData;
+
+  }
+  res.send(JSON.stringify(analyticsDataAccount));
+});
+
 
 app.post("/api/createMassAdverts", authenticateToken, async (req, res) => {
   const accountUid = getUid(req.body.uid);
@@ -838,7 +949,7 @@ app.post("/api/uploadFile", authenticateToken, async (req, res) => {
     "../prices/marketMaster",
     accountUid,
     campaignName,
-    `uploadedИнформация о товарах ${campaignName}.xlsx`
+    `Информация о товарах ${campaignName}.xlsx`
   );
 
   if (fs.existsSync(filepath)) fs.rmSync(filepath);
@@ -880,6 +991,35 @@ app.post("/api/depositAdvertsBudgets", authenticateToken, async (req, res) => {
   res.send(JSON.stringify(massAdvertsCampaign));
 });
 
+app.post("/api/saveNote", authenticateToken, async (req, res) => {
+  const accountUid = getUid(req.body.uid);
+  const campaignName = req.body.campaignName;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  const note = await saveNoteMM(
+    accountUid,
+    campaignName,
+    data
+  );
+  res.send(JSON.stringify(note));
+});
+
+app.post("/api/getAllTags", authenticateToken, async (req, res) => {
+  const accountUid = getUid(req.body.uid);
+  const campaignName = req.body.campaignName;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+
+  const allTags = await getAllTags(
+    accountUid,
+    campaignName,
+  );
+  res.send(JSON.stringify(allTags));
+});
+
 app.post("/api/setAdvertsSchedules", authenticateToken, async (req, res) => {
   const accountUid = getUid(req.body.uid);
   const campaignName = req.body.campaignName;
@@ -894,6 +1034,55 @@ app.post("/api/setAdvertsSchedules", authenticateToken, async (req, res) => {
     data
   );
   res.send(JSON.stringify(massAdvertsCampaign));
+});
+
+app.post("/api/setTags", authenticateToken, async (req, res) => {
+  const accountUid = getUid(req.body.uid);
+  const campaignName = req.body.campaignName;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  const tags = await setTagsMM(
+    accountUid,
+    campaignName,
+    data
+  );
+  res.send(JSON.stringify(tags));
+});
+
+app.post("/api/fixArtPrices", authenticateToken, async (req, res) => {
+  const accountUid = getUid(req.body.uid);
+  const campaignName = req.body.campaignName;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  const fixArtPrices = await fixArtPricesAndWriteToJsonMM(
+    accountUid,
+    campaignName,
+    data
+  );
+  res.send(JSON.stringify(fixArtPrices));
+});
+
+app.post("/api/setPlanForKey", authenticateToken, (req, res) => {
+  const accountUid = getUid(req.body.uid);
+  const campaignName = req.body.campaignName;
+  const data = req.body.data;
+  if (!accountUid || accountUid == "") return;
+  if (!campaignName || campaignName == "") return;
+  if (!data || data == "") return;
+
+  setPlanForKeyAndWriteToJsonMM(
+    accountUid,
+    campaignName,
+    data
+  ).then(() => {
+    res.send('Plan set.');
+  })
 });
 
 app.post("/api/setAdvertsCPMs", authenticateToken, async (req, res) => {
@@ -1100,7 +1289,7 @@ app.post("/api/downloadPricesTemplate", authenticateToken, async (req, res) => {
       "../prices/marketMaster",
       accountUid,
       campaignName,
-      `Информация о товарах ${campaignName}.xlsx`
+      `Информация о товарах ${campaignName} download template.xlsx`
     );
     calcPricesTemplateAndWriteToXlsxMM(accountUid, campaignName).then(() => {
       res.download(arch);

@@ -99,6 +99,12 @@ const {
   fetchAdvertsAndWriteToJsonMM,
   calcPricesJsonDataMM,
   fetchPaymentsHistoryMM,
+  calcPricesMM,
+  getNmDetailReport,
+  calcAnalyticsMM,
+  autoSetFixArtPricesMM,
+  changeUploadedArtsDataForKeyMM,
+  getAllTags,
 } = require("./main");
 const {
   getPrices,
@@ -437,12 +443,19 @@ const afs = require("fs");
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //   "ИП Валерий"
 // );
-
+// fetchAdvertsMM()
+// calcSmartDetailedByPeriodAndWriteToJSON('mayusha')
 // fetchAdvertsBudgetsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
 // autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
 // fetchAdvertsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
-autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
-// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифова Р. И.")
+// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
+// calcPricesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий", { lbd: '2024-05-01', rbd: '2024-05-17' }, { useAvgCost: true })
+// autoSetFixArtPricesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Галилова");
+calcAnalyticsMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "Текстиль", { lbd: '2024-05-01', rbd: '2024-05-17' })
+// fetchSalesAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
+// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Оксана")
+// copyZakazToOtherSpreadsheet()
+// calcMassAdvertsNewAndWrixteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий", { to: '', from: '' })
 // const reqs = readIfExists(
 //   path.join(
 //     __dirname,
@@ -498,11 +511,11 @@ autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валери
 
 // fetchOrdersAndWriteToJsonMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
-//   "ИП Артем"
+//   "ИП Иосифова Р. И."
 // );
-// fetchOrdersAndWriteToJsonMM(
+// fetchSalesAndWriteToJsonMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
-//   "ИП Валерий"
+//   "ИП Иосифов А. М."
 // );
 // fetchOrdersAndWriteToJsonMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
@@ -558,8 +571,37 @@ autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валери
 // );
 // fetchNmDetailReportAndWriteToJsonMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
-//   "ИП Валерий"
+//   "ТОРГМАКСИМУМ"
 // );
+// const aut = getAuthTokenMM(
+//   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//   "ИП Иосифова Р. И."
+// );
+// const arts = readIfExists(path.join(
+//   __dirname,
+//   "marketMaster",
+//   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//   "ИП Иосифова Р. И.",
+//   "arts.json"
+// ))
+// for (const [art, artData] of Object.entries(arts.byArt)) {
+//   if (artData.brand != 'MIO STUDIO') continue;
+//   else {
+//     console.log(artData);
+//   }
+// }
+// getNmDetailReport(aut, {
+//   objectIDs: [180],
+//   brandNames: ['MIO STUDIO'], period: { begin: '2024-05-01 00:00:00', end: '2024-05-08 11:00:00' },
+//   page: 1
+// }).then(pr => afs.writeFileSync(path.join(
+//   __dirname,
+//   "marketMaster",
+//   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//   "ИП Иосифова Р. И.",
+//   "jeans.json"
+// ), JSON.stringify(pr.data.cards)))
+
 // getAdvertsStatByArtMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий");
 // getAdvertsStatByArtMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем");
 // getAdvertsStatByArtMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Оксана");
@@ -604,3 +646,16 @@ autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валери
 // );
 
 // fetchDetailedByPeriodAndWriteToJSON("TKS");
+
+// changeUploadedArtsDataForKeyMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий", {
+//   "enteredValue": {
+//     "key": "expences",
+//     "val": "2.1",
+//     "type": "number"
+//   },
+//   "barcodes": [
+//     "2038524617259"
+//   ]
+// })
+
+// getAllTags("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")

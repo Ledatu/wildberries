@@ -555,7 +555,7 @@ function generateTagsRaspredelenniy() {
       //     )
       //   )
       // );
-      const pivot = xlsx.parse(path.join(__dirname, 'ShirtLab.xlsx'))[0][
+      const pivot = xlsx.parse(path.join(__dirname, 'SLUMBER+.xlsx'))[0][
         "data"
       ];
       console.log(new Date(), pivot);
@@ -578,18 +578,18 @@ function generateTagsRaspredelenniy() {
         // if (art.includes("СЛВДР")) {
         //   if (parseInt(array[3]) < 3000) continue;
         // }
-        if (!art.includes("_ПРК")) {
-          if (array[0] == "ПР" || array[0] == "ПРПЭ") {
-            if (
-              array[1] == "120" ||
-              array[1] == "140" ||
-              array[1] == "180" ||
-              array[1] == "200"
-            ) {
-              if (array.slice(-1)[0] != "2") continue;
-            }
-          }
-        }
+        // if (!art.includes("_ПРК")) {
+        //   if (array[0] == "ПР" || array[0] == "ПРПЭ") {
+        //     if (
+        //       array[1] == "120" ||
+        //       array[1] == "140" ||
+        //       array[1] == "180" ||
+        //       array[1] == "200"
+        //     ) {
+        //       if (array.slice(-1)[0] != "2") continue;
+        //     }
+        //   }
+        // }
 
         let mask = getGeneralMaskFromVendorCode(art);
         // mask = mask.split("_");

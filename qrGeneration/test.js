@@ -24,7 +24,7 @@ const {
 // autoGenerateNewTags('mayusha', 'МАЮША');
 // autoGenerateNewTags('delicatus', 'DELICATUS');
 // autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
-// autoGenerateNewTags('ShirtLab', 'ShirtLab');
+// autoGenerateNewTags('SLUMBER+', 'SLUMBER+');
 // exportAll()
 generateTagsRaspredelenniy()
 // fetchOTKArtMathcingAndWriteToJSON()

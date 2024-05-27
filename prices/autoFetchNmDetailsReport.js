@@ -8,7 +8,7 @@ const {
 } = require("./main");
 const { writeLogisticsToDataSpreadsheet } = require("./google_sheets");
 
-const autoLogistics = async () => {
+const autofetchNmDetailReportAndWriteToJsonMM = async (days) => {
   return new Promise(async (resolve, reject) => {
     const customers = JSON.parse(
       fs.readFileSync(path.join(__dirname, "marketMaster", "customers.json"))
@@ -19,19 +19,19 @@ const autoLogistics = async () => {
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
         console.log(new Date(), uid, campaignName);
-        promises.push(await getTariffsBoxAndWriteToJsonMM(uid, campaignName));
-        // promises.push(
-        // await fetchNmDetailReportAndWriteToJsonMM(uid, campaignName)
-        // );
+        promises.push(
+          fetchNmDetailReportAndWriteToJsonMM(uid, campaignName, days)
+        );
       }
     }
     await Promise.all(promises).then(async () => {
       await writeLogisticsToDataSpreadsheet();
-      console.log(new Date(), "Adverts logistics deposited.");
+      console.log(new Date(), "nmDetailReport fetched.");
       resolve();
     });
   });
 };
 
-scheduleJob("2 6 * * *", () => autoLogistics());
-autoLogistics();
+scheduleJob("2 0 * * *", () => autofetchNmDetailReportAndWriteToJsonMM(90));
+scheduleJob("*/15 * * * *", () => autofetchNmDetailReportAndWriteToJsonMM(1));
+autofetchNmDetailReportAndWriteToJsonMM(25);

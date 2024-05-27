@@ -134,7 +134,7 @@ const createDelayedGenTask = (authToken, params) => {
     .catch((error) => console.error(error.response.data));
 };
 
-const getBalance = (authToken) => {
+const getBalance = (authToken, throwException = false) => {
   return axios
     .get("https://advert-api.wb.ru/adv/v1/balance", {
       headers: {
@@ -142,7 +142,11 @@ const getBalance = (authToken) => {
       },
     })
     .then((response) => response.data)
-    .catch((error) => console.log(new Date(), error.response.data));
+    .catch((error) => {
+      console.log(new Date(), error.response.data);
+      if (throwException)
+        throw error
+    });
 };
 
 const fetchBalanceMM = (uid, campaignName) => {
@@ -153,7 +157,7 @@ const fetchBalanceMM = (uid, campaignName) => {
       return;
     }
 
-    getBalance(authToken)
+    getBalance(authToken, true)
       .then((pr) => {
         if (!pr) {
           reject("bad balance", pr);
@@ -185,7 +189,7 @@ const fetchBalanceMM = (uid, campaignName) => {
         resolve(pr);
       })
       .catch((e) => {
-        console.log(new Date(), uid, campaignName, "balance", e);
+        console.log(new Date(), uid, campaignName, "balance", e['response'] ? e.response.data : e);
       });
   });
 };
@@ -281,11 +285,11 @@ const getPaidStorageCostMM = (uid, campaignName) => {
     today.setHours(0, 0, 0, 0);
 
     const taskIds = [];
-    for (let i = 0; i < 1; i++) {
+    for (let i = 0; i < 5; i++) {
       const lbd = new Date(today);
-      lbd.setDate(today.getDate() - 1);
+      lbd.setDate(today.getDate() - (i + 1) * 7 + 1);
       const rbd = new Date(today);
-      rbd.setDate(today.getDate() - 1);
+      rbd.setDate(today.getDate() - i * 7);
 
       const params = {
         dateFrom: getLocaleDateString(lbd).slice(0, 10),
@@ -313,7 +317,7 @@ const getPaidStorageCostMM = (uid, campaignName) => {
     if (!taskIds.length) return;
 
     let readyForDownload = false;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < taskIds.length + 10; i++) {
 
 
       const statusesResponse = await getDelayedGenTasksStatus(authToken, {
@@ -743,13 +747,13 @@ const getGoodsMM = (authToken, params) => {
       }
     )
     .then((response) => response.data)
-    .catch((error) => console.error(error));
+    .catch((error) => console.error(error.response.data));
 };
 
-const getNmDetailReport = (authToken, params) => {
+const getNmDetailReportHistory = (authToken, params) => {
   return axios
     .post(
-      "https://suppliers-api.wildberries.ru/content/v1/analytics/nm-report/detail",
+      "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/detail/history",
       params,
       {
         headers: {
@@ -759,6 +763,21 @@ const getNmDetailReport = (authToken, params) => {
     )
     .then((response) => response.data)
     .catch((error) => console.error(error.response.data));
+};
+
+const getNmDetailReport = (authToken, params, throwError = false) => {
+  return axios
+    .post(
+      "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/detail",
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => { console.error(error.response.data); if (throwError) throw error.response.data; });
 };
 
 const getCardsTemp = (authToken, params) => {
@@ -1269,6 +1288,1030 @@ const writeWarehousesToJson = (data, campaign) => {
     .catch((error) => console.error(error));
 };
 
+const calcAnalyticsMM = (uid, campaignName, dateRange, enteredValues) =>
+  new Promise((resolve, reject) => {
+    dateRange.lbd = new Date(dateRange.lbd)
+    dateRange.rbd = new Date(dateRange.rbd)
+
+    const advertsStatsByArt = readIfExists(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsStatsByArt.json"
+      )
+    );
+
+    const tags = readIfExists(path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "tags.json"
+    ));
+
+    const notes = readIfExists(path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "notes.json"
+    ));
+
+
+    const arts = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'arts.json'
+      )
+    );
+    arts.byBrandArt = {};
+    for (const [nmId, artData] of Object.entries(arts.byNmId)) {
+      artData.nmId = parseInt(nmId);
+      arts.byBrandArt[artData.art] = artData;
+    }
+
+    const nmFullDetailReport = readIfExists(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "nmFullDetailReport.json"
+      )
+    );
+
+    const profitsLog = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'profitsLog.json'
+      )
+    );
+
+    const stocks = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'stocks.json'
+      )
+    );
+
+    const getProfit = (brandArt, date) => {
+      const artsToSumUp = [];
+
+      const sizes = arts.byBrandArt[brandArt].sizes;
+      for (let i = 0; i < sizes.length; i++) {
+        const sku = sizes[i].skus[0];
+        const art = arts.bySku[sku].art;
+        artsToSumUp.push(art);
+      }
+
+      const res = { profit: 0, rentabelnost: 0, count: 0 };
+      for (let i = 0; i < artsToSumUp.length; i++) {
+        const art = artsToSumUp[i];
+        const { profit, rentabelnost } = profitsLog && profitsLog[art] && profitsLog[art][date] ? profitsLog[art][date] : {};
+
+        res.profit += profit ?? 0;
+        res.rentabelnost += rentabelnost ?? 0;
+        res.count++
+      }
+
+      res.profit = getRoundValue(res.profit, res.count)
+      res.rentabelnost = getRoundValue(res.rentabelnost, res.count)
+
+      return res;
+    }
+
+    const getEntities = (artData) => {
+      const entityKeys = enteredValues ? enteredValues['entityKeys'] : ['brand'];
+      let res_str = '';
+      for (const key of entityKeys) {
+        if (key == 'tags') continue;
+        else if (key == 'campaignName') res_str += campaignName + '+'
+        else res_str += String(artData[key]) + '+'
+      }
+      res_str = res_str.substring(0, res_str.length - 1);
+
+      if (entityKeys.includes('tags')) {
+        const res = [];
+        const { nmId } = artData;
+        const all = tags[nmId] ?? []
+
+        if (all === undefined) return [];
+
+        for (const tag of all) {
+          res.push((res_str !== '' ? res_str + '+' : '') + tag);
+        }
+
+        return res;
+
+      }
+
+      return [res_str];
+    }
+
+    const isInDateBoundaries = (strDate) => {
+      const dateObj = new Date(strDate + 'T00:00:00.000Z');
+
+      return (dateRange.lbd.getTime() - 1) <= dateObj.getTime() && dateObj.getTime() <= (dateRange.rbd.getTime() + 1);
+    }
+
+    const byDateEntityStats = {};
+    if (nmFullDetailReport) {
+      for (const [nmId, nmIdData] of Object.entries(nmFullDetailReport)) {
+        if (nmIdData === undefined) continue;
+        const artData = arts.byNmId[nmId];
+        if (!artData) continue;
+        const { art } = artData;
+        const entities = getEntities(artData);
+        if (entities === undefined) continue;
+
+        for (const entity of entities) {
+          if (entity === undefined) continue;
+
+          const stats = nmIdData ? nmIdData.statistics : undefined;
+          if (stats === undefined) continue;
+          for (const [date, artOrdersData] of Object.entries(stats)) {
+            if (!isInDateBoundaries(date)) continue;
+
+            if (!byDateEntityStats[entity]) byDateEntityStats[entity] = {};
+            const { profit, rentabelnost } = getProfit(art, date);
+
+            if (!byDateEntityStats[entity][date]) {
+              byDateEntityStats[entity][date] = {
+                orders: 0,
+                sum_orders: 0,
+                sales: 0,
+                sum_sales: 0,
+                sum: 0,
+                profit: 0,
+                rentabelnost: 0,
+                notes: notes[date],
+                stocks: 0,
+              };
+            }
+
+            // console.log(date, artOrdersData);
+            byDateEntityStats[entity][date].orders += artOrdersData.ordersCount ?? 0;
+            byDateEntityStats[entity][date].sum_orders += artOrdersData.ordersSumRub ?? 0;
+            byDateEntityStats[entity][date].sales += artOrdersData.buyoutsCount ?? 0;
+            byDateEntityStats[entity][date].sum_sales += artOrdersData.buyoutsSumRub ?? 0;
+
+            const realProfit = (profit ?? 0) * (artOrdersData.ordersCount ?? 0)
+            byDateEntityStats[entity][date].profit += realProfit ?? 0;
+
+            byDateEntityStats[entity][date].rentabelnost = getRoundValue(byDateEntityStats[entity][date].profit, byDateEntityStats[entity][date].sum_orders, true)
+          }
+        }
+      }
+    }
+
+    if (stocks) {
+      for (const [date, dateData] of Object.entries(stocks)) {
+        if (!date || !dateData) continue;
+        if (!isInDateBoundaries(date)) continue;
+
+        for (const [art, stocksData] of Object.entries(dateData.all)) {
+          if (art === undefined || stocksData === undefined) continue;
+          const artData = arts.byArt[art];
+          if (!artData) continue;
+          const entities = getEntities(artData);
+          if (entities === undefined) continue;
+
+
+          for (const entity of entities) {
+            if (entity === undefined) continue;
+
+            if (!byDateEntityStats[entity]) byDateEntityStats[entity] = {};
+
+            if (!byDateEntityStats[entity][date]) {
+              byDateEntityStats[entity][date] = {
+                orders: 0,
+                sum_orders: 0,
+                sales: 0,
+                sum_sales: 0,
+                sum: 0,
+                profit: 0,
+                rentabelnost: 0,
+                notes: [],
+                stocks: 0,
+              };
+            }
+
+            const { quantity } = stocksData ?? {};
+
+            byDateEntityStats[entity][date].stocks += quantity ?? 0;
+
+          }
+        }
+      }
+    }
+
+    if (advertsStatsByArt) {
+      for (const [brandArt, artStatsByDay] of Object.entries(advertsStatsByArt)) {
+        if (artStatsByDay === undefined) continue;
+        const artData = arts.byBrandArt[brandArt];
+        if (!artData) continue;
+        const entities = getEntities(artData);
+        if (entities === undefined) continue;
+
+        for (const entity of entities) {
+          if (entity === undefined) continue;
+
+          for (const [date, dateStats] of Object.entries(artStatsByDay)) {
+            if (!isInDateBoundaries(date)) continue;
+            if (!byDateEntityStats[entity]) byDateEntityStats[entity] = {};
+
+            if (!byDateEntityStats[entity][date]) {
+              byDateEntityStats[entity][date] = {
+                orders: 0,
+                sum_orders: 0,
+                sales: 0,
+                sum_sales: 0,
+                sum: 0,
+                profit: 0,
+                rentabelnost: 0,
+                notes: [],
+                stocks: 0,
+              };
+            }
+
+            const { sum } = dateStats;
+
+            byDateEntityStats[entity][date].sum += sum ?? 0;
+          }
+        }
+      }
+    }
+
+    // console.log(byDateEntityStats);
+
+    fs.writeFile(
+      path.join(__dirname, "marketMaster", uid, campaignName, "analyticsMM.json"),
+      JSON.stringify(byDateEntityStats)
+    )
+      .then(() => {
+        resolve(byDateEntityStats);
+      })
+      .catch((error) => console.error(error));
+  });
+
+const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fixPrices = false) =>
+  new Promise((resolve, reject) => {
+    dateRange.lbd = new Date(dateRange.lbd)
+    dateRange.rbd = new Date(dateRange.rbd)
+    console.log(dateRange);
+
+    const advertsStats = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'advertsStats.json'
+      )
+    );
+    const adverts = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'adverts.json'
+      )
+    );
+    const sppPricesParsed = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'sppPricesParsed.json'
+      )
+    );
+    const prices = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'prices.json'
+      )
+    );
+    const storage = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'storage.json'
+      )
+    );
+
+    const arts = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'arts.json'
+      )
+    );
+    arts.byBrandArt = {};
+    for (const [nmId, artData] of Object.entries(arts.byNmId)) {
+      artData.nmId = parseInt(nmId);
+      arts.byBrandArt[artData.art] = artData;
+    }
+
+    const artsDataUploaded = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'artsDataUploaded.json'
+      )
+    );
+    const stocks = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'stocks.json'
+      )
+    );
+
+    const nmDetailReport = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'nmDetailReport.json'
+      )
+    );
+
+    const tariffs = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'tariffs.json'
+      )
+    );
+
+    const tags = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'tags.json'
+      )
+    );
+
+    const nmFullDetailReport = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'nmFullDetailReport.json'
+      )
+    );
+    const orders = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'orders.json'
+      )
+    );
+    const sales = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'sales.json'
+      )
+    );
+
+    const doRecalc = (artData, skipKeys = []) => {
+      if (enteredValue && enteredValue['filters']) {
+        const { brands, objects, arts } = enteredValue['filters'] ?? { brands: [], objects: [], arts: [] };
+
+        const { brand, object, art } = artData;
+
+        if (!skipKeys.includes('brand') && !brands.includes(brand)) return false;
+        if (!skipKeys.includes('object') && !objects.includes(object)) return false;
+        if (!skipKeys.includes('art') && !arts.includes(art)) return false;
+      }
+      return true;
+    }
+
+    const today = new Date();
+    const strTodayDate = getLocaleDateString(today).slice(0, 10);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const strYesterdayDate = getLocaleDateString(yesterday).slice(0, 10);
+
+    const calcOrdersForDay = (brandArt, date, isBrandArt = true) => {
+      const artsToSumUp = [];
+      if (isBrandArt) {
+        const sizes = arts.byBrandArt[brandArt].sizes;
+        for (let i = 0; i < sizes.length; i++) {
+          const sku = sizes[i].skus[0];
+          const art = arts.bySku[sku].art;
+          artsToSumUp.push(art);
+        }
+      }
+      else {
+        artsToSumUp.push(brandArt)
+      }
+
+      const res = { orders: 0, sum_orders: 0 };
+      for (let i = 0; i < artsToSumUp.length; i++) {
+        const art = artsToSumUp[i];
+        if (!orders[date]) continue;
+        if (!orders[date].all[art]) continue;
+
+        res.orders += orders[date].all[art].count
+          ? orders[date].all[art].count
+            ? orders[date].all[art].count
+            : 0
+          : 0;
+        res.sum_orders += orders[date].all[art].sum
+          ? orders[date].all[art].sum
+            ? orders[date].all[art].sum
+            : 0
+          : 0;
+      }
+
+      // console.log(brandArt, artsToSumUp, date);
+
+      return res;
+    };
+
+    const isInDateBoundaries = (strDate) => {
+      const dateObj = new Date(strDate + 'T00:00:00.000Z');
+
+      return dateRange.lbd <= dateObj && dateObj <= dateRange.rbd;
+    }
+
+    const getAvgOrdersPerDay = () => {
+      const avg = {};
+      if (nmFullDetailReport) {
+        for (const [nmId, nmIdData] of Object.entries(nmFullDetailReport)) {
+          if (nmIdData === undefined) continue;
+          const artData = arts.byNmId[nmId];
+          if (!artData) continue;
+          const { art } = artData;
+          if (art === undefined) continue;
+          const stats = nmIdData ? nmIdData.statistics : undefined;
+          if (stats === undefined) continue;
+
+          if (!avg[art]) avg[art] = {
+            orders: 0,
+            sum_orders: 0,
+            count: 0,
+            avgCost: 0,
+            avg: 0,
+          };
+
+          for (const [date, artOrdersData] of Object.entries(stats)) {
+            if (!isInDateBoundaries(date)) continue;
+
+            avg[art].sum_orders += artOrdersData.ordersSumRub ?? 0;
+            avg[art].orders += artOrdersData.ordersCount ?? 0;
+            avg[art].count += artOrdersData.ordersCount ? 1 : 0;
+
+          }
+
+          avg[art].avg = avg[art].count ? avg[art].orders / avg[art].count : 0;
+          avg[art].avgCost = getRoundValue(avg[art].sum_orders, avg[art].orders);
+        }
+      }
+
+      return avg;
+    }
+
+    const getComissionPercent = (art) => {
+      const { lbd, rbd } = dateRange;
+      const daysBetween = Math.abs(lbd.getTime() - rbd.getTime()) / 1000 / 86400;
+
+      const artData = sales[art] ? sales[art].all : {};
+
+      const avg = { forPay: 0, sum: 0, percent: 20 };
+      for (let i = 0; i <= daysBetween; i++) {
+        const tempDate = new Date(lbd);
+        tempDate.setDate(tempDate.getDate() + i);
+        const strTempDate = getLocaleDateString(tempDate).slice(0, 10);
+
+        const { forPay, sum } = artData[strTempDate] ?? {};
+        if (forPay === undefined || sum === undefined) continue;
+
+        avg.forPay += forPay;
+        avg.sum += sum;
+
+      }
+      avg.percent = 100 - getRoundValue(avg.forPay, avg.sum, true, 0.8);
+
+
+      if (avg.forPay == 0) {
+        const { commision } = artsDataUploaded[art] ?? { commision: 0 };
+        return commision;
+      }
+
+      return avg.percent;
+    }
+
+    const getAvgLogistics = (artData, ktr, volume) => {
+      const { lbd, rbd } = dateRange;
+      const daysBetween = Math.abs(lbd.getTime() - rbd.getTime()) / 1000 / 86400;
+
+      const logistics = {
+        delivery: 0,
+        orders: 0,
+        sum_orders: 0,
+        delivery: 0,
+        avg: 0
+      }
+      const { art, brand, object, nmId } = artData;
+
+
+      const detailReport = nmDetailReport[nmId]
+        ? nmDetailReport[nmId].statistics
+        : {};
+      const buyoutsPercent = detailReport ? detailReport.buyoutsPercent ? detailReport.buyoutsPercent : 100 : 100;
+
+      for (let daysAgo = 0; daysAgo <= daysBetween; daysAgo++) {
+        const tempDate = new Date(lbd);
+        tempDate.setDate(tempDate.getDate() + daysAgo);
+        const strTempDate = getLocaleDateString(tempDate).slice(0, 10);
+
+        if (!orders[strTempDate]) continue;
+        if (!tariffs || !Object.keys(tariffs).length) continue;
+        if (!orders[strTempDate].all[art]) {
+          const koef = tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100;
+          logistics.delivery +=
+            (tariffs["Краснодар"].boxDeliveryBase / koef) *
+            (volume < 1 ? volume : 1);
+          if (volume > 1) {
+            logistics.delivery +=
+              (volume - 1) * (tariffs["Краснодар"].boxDeliveryLiter / koef);
+          }
+
+          logistics.delivery += (1 - buyoutsPercent / 100) * 50;
+          logistics.delivery *= ktr ?? 1;
+
+          logistics.orders += 1;
+          continue;
+        }
+
+        for (const [warehouseName, warehouseData] of Object.entries(
+          orders[strTempDate]
+        )) {
+          if (warehouseName == "all") continue;
+
+          const warehouseOrders = { orders: 0, sum_orders: 0, delivery: 0 };
+
+          const ordersData = warehouseData[art] ?? {};
+          const { count, sum } = ordersData;
+          if (count === undefined || sum === undefined) continue;
+
+          warehouseOrders.orders += count;
+          warehouseOrders.sum_orders += sum;
+
+          const boxDeliveryBase = tariffs[warehouseName]
+            ? tariffs[warehouseName].boxDeliveryBase
+            : tariffs["Краснодар"].boxDeliveryBase /
+            (tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100);
+          const boxDeliveryLiter = tariffs[warehouseName]
+            ? tariffs[warehouseName].boxDeliveryLiter
+            : tariffs["Краснодар"].boxDeliveryLiter /
+            (tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100);
+
+          warehouseOrders.delivery +=
+            count * boxDeliveryBase * (volume < 1 ? volume : 1);
+          if (volume > 1) {
+            warehouseOrders.delivery += count * ((volume - 1) * boxDeliveryLiter);
+          }
+
+          warehouseOrders.delivery += count * (1 - buyoutsPercent / 100) * 50;
+          warehouseOrders.delivery *= ktr ?? 1;
+
+          logistics.delivery += warehouseOrders.delivery;
+          logistics.orders += warehouseOrders.orders;
+          logistics.sum_orders += warehouseOrders.sum_orders;
+        }
+      }
+      logistics.avg =
+        getRoundValue(logistics.delivery, logistics.orders, true) / 100;
+
+      return logistics;
+    }
+
+    const getAvgDrr = () => {
+      const { lbd, rbd } = dateRange;
+      const daysBetween = Math.abs(lbd.getTime() - rbd.getTime()) / 1000 / 86400;
+
+      const drrDataAvg = {};
+      for (const [advertId, stats] of Object.entries(advertsStats)) {
+        const days = stats.days;
+        if (!advertId || !days) continue;
+        if (!adverts[advertId]) continue;
+
+        for (let i = 0; i < days.length; i++) {
+          const day = days[i];
+          const date = day.date.slice(0, 10);
+
+          const dateObj = new Date(date);
+          if (dateObj < lbd || dateObj > rbd) continue;
+
+          const ordersByDays = {};
+
+          const apps = day.apps ?? [];
+          for (let j = 0; j < apps.length; j++) {
+            const nmsStats = apps[j].nm ?? [];
+            for (let k = 0; k < nmsStats.length; k++) {
+              const nmStat = nmsStats[k];
+              const nmId = nmStat.nmId;
+
+              const artData = arts.byNmId[nmId] ?? {};
+              const { art, brand, object } = artData;
+              if (!art) continue;
+
+              if (!drrDataAvg[art])
+                drrDataAvg[art] = {
+                  clicks: 0,
+                  views: 0,
+                  sum: 0,
+                  orders: 0,
+                  cpo: 0,
+                  sum_orders: 0,
+                };
+
+
+              drrDataAvg[art].clicks += nmStat.clicks;
+              drrDataAvg[art].views += nmStat.views;
+              drrDataAvg[art].sum += nmStat.sum;
+
+              // brandObj
+              if (!drrDataAvg[brand]) drrDataAvg[brand] = {}
+              if (!drrDataAvg[brand][object])
+                drrDataAvg[brand][object] = {
+                  clicks: 0,
+                  views: 0,
+                  sum: 0,
+                  orders: 0,
+                  cpo: 0,
+                  sum_orders: 0,
+                };
+
+
+              drrDataAvg[brand][object].clicks += nmStat.clicks;
+              drrDataAvg[brand][object].views += nmStat.views;
+              drrDataAvg[brand][object].sum += nmStat.sum;
+
+            }
+          }
+        }
+      }
+
+      if (nmFullDetailReport) {
+        for (const [nmId, nmIdData] of Object.entries(nmFullDetailReport)) {
+          if (nmIdData === undefined) continue;
+          const artData = arts.byNmId[nmId];
+          if (!artData) continue;
+          const { art, brand, object } = artData;
+          if (art === undefined) continue;
+          const stats = nmIdData ? nmIdData.statistics : undefined;
+          if (stats === undefined) continue;
+
+          if (!drrDataAvg[brand]) drrDataAvg[brand] = {}
+          if (!drrDataAvg[brand][object])
+            drrDataAvg[brand][object] = {
+              clicks: 0,
+              views: 0,
+              sum: 0,
+              orders: 0,
+              cpo: 0,
+              sum_orders: 0,
+            };
+
+          for (const [date, artOrdersData] of Object.entries(stats)) {
+            if (!isInDateBoundaries(date)) continue;
+
+            drrDataAvg[brand][object].orders += artOrdersData.ordersCount ?? 0;
+            drrDataAvg[brand][object].sum_orders += artOrdersData.ordersSumRub ?? 0;
+
+          }
+          drrDataAvg[brand][object].drr = getRoundValue(
+            drrDataAvg[brand][object].sum,
+            drrDataAvg[brand][object].sum_orders,
+            true,
+            1
+          );
+          drrDataAvg[brand][object].cpo = getRoundValue(
+            drrDataAvg[brand][object].sum,
+            drrDataAvg[brand][object].orders,
+          );
+        }
+      }
+
+      return drrDataAvg;
+    }
+
+    const getStorageCost = () => {
+      const { lbd, rbd } = dateRange;
+      const daysBetween = Math.abs(lbd.getTime() - rbd.getTime()) / 1000 / 86400;
+
+      const res = {}
+
+      for (let daysAgo = 0; daysAgo <= daysBetween; daysAgo++) {
+        const tempDate = new Date(lbd);
+        tempDate.setDate(tempDate.getDate() + daysAgo);
+        const strTempDate = getLocaleDateString(tempDate).slice(0, 10);
+        for (const [art, artData] of Object.entries(arts.byArt)) {
+          const { brand, object, brand_art } = artData;
+
+          if (!doRecalc(artData, ['art'])) continue;
+
+          const ordersData = calcOrdersForDay(art, strTempDate, false);
+          const { orders, sum_orders } = ordersData ?? {};
+          if (orders === undefined || sum_orders === undefined) continue;
+
+          if (!res[brand]) res[brand] = {}
+          if (!res[brand][object]) res[brand][object] = { warehousePrice: 0, orders: 0, avgCost: 0 };
+
+          const { warehousePrice } = storage[art] ? storage[art].byDate[strTempDate] ?? {} : {};
+          if (warehousePrice) {
+            res[brand][object].warehousePrice += warehousePrice;
+          }
+
+          res[brand][object].orders += orders;
+
+          res[brand][object].avgCost = getRoundValue(
+            res[brand][object].warehousePrice,
+            res[brand][object].orders,
+            false,
+            res[brand][object].warehousePrice
+          );
+        }
+
+      }
+
+      return res;
+    }
+
+    const advertsAvgStatsByArt = getAvgDrr();
+    const groupedStorage = getStorageCost();
+    // console.log(advertsAvgStatsByArt['МАЮША']);
+
+    const iterList = [];
+    for (const [art, artData] of Object.entries(arts.byArt)) {
+      if (!doRecalc(artData)) continue;
+      iterList.push({ art, artData });
+    }
+    iterList.sort((a, b) => {
+      const artA = a.art;
+      const stockA = stocks[strTodayDate] ? stocks[strTodayDate].all[artA] ? stocks[strTodayDate].all[artA].quantity ?? 0 : 0 : 0;
+
+      const artB = b.art;
+      const stockB = stocks[strTodayDate] ? stocks[strTodayDate].all[artB] ? stocks[strTodayDate].all[artB].quantity ?? 0 : 0 : 0;
+
+      return stockB - stockA;
+    })
+
+    const ordersData = getAvgOrdersPerDay();
+    // console.log(ordersData);
+
+    const sppJsonToHelp = {}
+    const jsonData = {}
+    for (let iter = 0; iter < iterList.length; iter++) {
+      const { art, artData } = iterList[iter]
+      if (art === undefined || artData === undefined) continue;
+
+
+      const { brand, brand_art, imtId, nmId, size, barcode, title, object } = artData;
+      const { ktr, length, width, height, tax, expences } = artsDataUploaded[art] ??
+        { ktr: 0, length: 0, width: 0, height: 0, tax: 0, expences: 0 };
+      const volume = (length * width * height) / 1000;
+
+      if (!prices[nmId]) continue;
+
+      const detailReport = nmDetailReport[nmId]
+        ? nmDetailReport[nmId].statistics
+        : {};
+      const buyoutsPercent = detailReport ? detailReport.buyoutsPercent ? detailReport.buyoutsPercent : 100 : 100;
+
+
+
+      const storageCostForArt = (groupedStorage[brand] ? groupedStorage[brand][object] ? groupedStorage[brand][object] ? groupedStorage[brand][object].avgCost : 0 : 0 : 0);
+
+      const priceInfo = prices[nmId].sizes[size];
+
+      if (enteredValue && enteredValue['discount']) {
+        priceInfo.discount = enteredValue['discount'];
+      }
+      else {
+        priceInfo.discount = prices[nmId].discount;
+      }
+
+      priceInfo.spp = sppPricesParsed.arts[nmId] ?
+        sppPricesParsed.arts[nmId].sizes[size] ?
+          sppPricesParsed.arts[nmId].sizes[size].spp
+          : undefined : undefined;
+      if (priceInfo.spp) {
+        if (!sppJsonToHelp[object]) sppJsonToHelp[object] = {}
+        if (!sppJsonToHelp[object][priceInfo.spp]) sppJsonToHelp[object][priceInfo.spp] = 0
+        sppJsonToHelp[object][priceInfo.spp]++;
+      }
+      else {
+        const findSpp = () => {
+          let res = { spp: 0, count: 0 };
+          if (!sppJsonToHelp[object]) return 0;
+          for (let [spp, count] of Object.entries(sppJsonToHelp[object])) {
+            spp = Math.round(Number(spp))
+            if (count > res.count) res = { spp, count }
+          }
+          return res.spp;
+        }
+        priceInfo.spp = findSpp();
+      }
+      priceInfo.wb = priceInfo.spp + 3;
+      // console.log(priceInfo, sppPricesParsed.arts[nmId]);
+
+      const stock = stocks[strTodayDate] ? stocks[strTodayDate].all[art] ? stocks[strTodayDate].all[art].quantity ?? 0 : 0 : 0;
+      const { avg, avgCost } = ordersData[brand_art] ?? { avg: 0, avgCost: 0 };
+      const num_sizes = arts.byBrandArt[brand_art].sizes.length;
+      const art_avg = num_sizes ? avg / num_sizes : 0;
+      // if (art.includes('ФТБЛ')) {
+      //   console.log(art, avg, art_avg);
+      // }
+      const obor = getRoundValue(stock, art_avg ?? 0, false, stock ? 999 : 0);
+
+      const primeCost = artsDataUploaded[art] ? artsDataUploaded[art].prices ? artsDataUploaded[art].prices['Себестоимость 1'] ?? 0 : 0 : 0;
+      const commision = getComissionPercent(art)
+
+      const logistics = getAvgLogistics(artData, ktr, volume)
+      const deliverySum = logistics.avg;
+
+      const cpo = advertsAvgStatsByArt[brand][object]
+        ? advertsAvgStatsByArt[brand][object].cpo
+        : 0;
+
+      const getNumVal = (val, divPers = false) => {
+        let res = val ? val : 0;
+        if (divPers) res = res / buyoutsPercent * 100;
+        res = Math.round(res);
+        return res;
+      }
+      const ad = getNumVal(cpo, true);
+
+      let rozPrice;
+      let sppPrice;
+      let wbWalletPrice;
+
+      if (enteredValue && enteredValue['useAvgCost']) {
+        rozPrice = avgCost ? avgCost : Math.round(priceInfo.price * (1 - priceInfo.discount / 100));
+        sppPrice = Math.floor(rozPrice * (1 - priceInfo.spp / 100));
+        wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
+      }
+      else if (enteredValue && enteredValue['primeCostMarkup']) {
+        rozPrice = primeCost * (1 + enteredValue['primeCostMarkup'] / 100);
+        sppPrice = Math.floor(rozPrice * (1 - priceInfo.spp / 100));
+        wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
+      }
+      else if (enteredValue && enteredValue['rozPrice']) {
+        rozPrice = enteredValue['rozPrice'];
+        sppPrice = Math.floor(rozPrice * (1 - priceInfo.spp / 100));
+        wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
+      }
+      else if (enteredValue && enteredValue['sppPrice']) {
+        sppPrice = enteredValue['sppPrice'];
+        rozPrice = Math.floor(sppPrice / (1 - priceInfo.spp / 100));
+        wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
+      }
+      else if (enteredValue && enteredValue['rentabelnost']) {
+        const rent = enteredValue['rentabelnost'];
+        const sppPercent = (1 - priceInfo.spp / 100);
+        rozPrice = getRoundValue(
+          ad + primeCost + deliverySum + storageCostForArt, 1 - (rent / 100) - (commision / 100) - sppPercent * (tax / 100) - sppPercent * (expences / 100)
+        );
+        sppPrice = Math.floor(rozPrice * sppPercent);
+        wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
+      }
+      else if (enteredValue && enteredValue['profit']) {
+        const profit = enteredValue['profit'];
+        const sppPercent = (1 - priceInfo.spp / 100);
+        rozPrice = getRoundValue(
+          ad + primeCost + deliverySum + storageCostForArt + profit, 1 - (commision / 100) - sppPercent * (tax / 100) - sppPercent * (expences / 100)
+        );
+        sppPrice = Math.floor(rozPrice * sppPercent);
+        wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
+      }
+      else if (enteredValue && enteredValue['wbWalletPrice']) {
+        wbWalletPrice = enteredValue['wbWalletPrice'];
+        rozPrice = Math.floor(wbWalletPrice / (1 - priceInfo.wb / 100));
+        sppPrice = Math.floor(rozPrice * (1 - priceInfo.spp / 100));
+      }
+      else {
+        rozPrice = Math.round(priceInfo.price * (1 - priceInfo.discount / 100));
+        sppPrice = Math.floor(rozPrice * (1 - priceInfo.spp / 100));
+        wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
+      }
+      rozPrice = Math.round(rozPrice);
+      const wbPrice = Math.round(rozPrice / (1 - priceInfo.discount / 100));
+
+
+      const comissionSum = rozPrice * (commision / 100);
+      const expencesSum = (sppPrice * (expences / 100));
+      // if (art == 'КПБ_СЕМ_СТРАЙП_14-4102_ОТК')
+      // console.log(logistics);
+
+      const taxSum = sppPrice * (tax / 100);
+
+      const allExpences = ad
+        + getNumVal(comissionSum)
+        + getNumVal(deliverySum)
+        + getNumVal(storageCostForArt)
+        + getNumVal(taxSum)
+        + getNumVal(expencesSum)
+        + getNumVal(primeCost);
+
+      const profit = rozPrice - allExpences
+
+      const rentabelnost = profit / rozPrice;
+
+      const valuesFixedBy = { ...enteredValue };
+      delete valuesFixedBy.filters;
+
+      const tags_art = tags[nmId] ?? [];
+
+      jsonData[art] = {
+        art,
+        brand,
+        nmId,
+        imtId,
+        tags: tags_art,
+        size,
+        object,
+        barcode,
+        title,
+        priceInfo,
+        rozPrice,
+        sppPrice,
+        wbWalletPrice,
+        wbPrice,
+        profit,
+        stock,
+        obor,
+        rentabelnost,
+        primeCost,
+        ad,
+        comissionSum,
+        deliverySum: getNumVal(deliverySum),
+        logistics,
+        storageCostForArt: getNumVal(storageCostForArt),
+        taxSum,
+        expencesSum: getNumVal(expencesSum),
+        cpo,
+        fixPrices: fixPrices ? valuesFixedBy : undefined,
+        buyoutsPercent,
+        advertsAvgStats: advertsAvgStatsByArt[brand][object],
+        allExpences,
+      }
+    }
+
+    afs.writeFileSync(
+      path.join(__dirname, "marketMaster", uid, campaignName, "sppJsonToHelp.json"),
+      JSON.stringify(sppJsonToHelp)
+    )
+
+    fs.writeFile(
+      path.join(__dirname, "marketMaster", uid, campaignName, "pricesMM.json"),
+      JSON.stringify(jsonData)
+    )
+      .then(() => {
+        resolve(jsonData);
+      })
+      .catch((error) => console.error(error));
+  });
+
 const writeVendorCodeToJson = (data, campaign) => {
   const jsonData = {};
   const jsonDataFull = {};
@@ -1493,9 +2536,9 @@ const writeNmDetailReportToJsonMM = (data, uid, campaignName) => {
       "marketMaster",
       uid,
       campaignName,
-      "nmDetailReport.json"
+      "nmFullDetailReport.json"
     );
-    let nmDetailReport = {};
+    const nmDetailReport = readIfExists(nmDetailReportPath);
 
     data.forEach((item) => {
       if (!item) {
@@ -1503,21 +2546,57 @@ const writeNmDetailReportToJsonMM = (data, uid, campaignName) => {
         return;
       }
       const art = item.vendorCode.replace(/\s/g, "");
-      nmDetailReport[item.nmID] = {
+      const date = item.statistics.selectedPeriod.begin.slice(0, 10);
+      // console.log(item);
+      if (!nmDetailReport[item.nmID]) nmDetailReport[item.nmID] = {
+        nmId: item.nmID,
         art: art,
         object: item.object,
-        brand: item.brandName + (art.includes("_ЕН") ? " ЕН" : ""),
-        statistics: {
-          buyoutsPercent:
-            item.statistics.selectedPeriod.conversions.buyoutsPercent,
-        },
+        brand: item.brandName,
+        statistics: {}
+      }
+      nmDetailReport[item.nmID].statistics[date] = {
+        openCardCount: item.statistics.selectedPeriod.openCardCount,
+        addToCartCount: item.statistics.selectedPeriod.addToCartCount,
+        ordersCount: item.statistics.selectedPeriod.ordersCount,
+        ordersSumRub: item.statistics.selectedPeriod.ordersSumRub,
+        buyoutsCount: item.statistics.selectedPeriod.buyoutsCount,
+        buyoutsSumRub: item.statistics.selectedPeriod.buyoutsSumRub,
+        cancelCount: item.statistics.selectedPeriod.cancelCount,
+        cancelSumRub: item.statistics.selectedPeriod.cancelSumRub,
+        avgPriceRub: item.statistics.selectedPeriod.avgPriceRub,
+        avgPriceRub: item.statistics.selectedPeriod.avgPriceRub,
+        avgOrdersCountPerDay: item.statistics.selectedPeriod.avgOrdersCountPerDay,
+        addToCartPercent: item.statistics.selectedPeriod.conversions.addToCartPercent,
+        cartToOrderPercent: item.statistics.selectedPeriod.conversions.cartToOrderPercent,
+        buyoutsPercent:
+          item.statistics.selectedPeriod.conversions.buyoutsPercent,
       };
+
+      if (!nmDetailReport[item.brandName]) nmDetailReport[item.brandName] = {}
+      if (!nmDetailReport[item.brandName][item.object.name]) nmDetailReport[item.brandName][item.object.name] = {}
+      if (!nmDetailReport[item.brandName][item.object.name][date]) nmDetailReport[item.brandName][item.object.name][date] =
+      {
+        statistics: {
+          buyoutsPercent: 0,
+          sumBuyoutsPercent: 0,
+          countBuyoutsPercent: 0,
+        },
+      }
+
+      nmDetailReport[item.brandName][item.object.name][date].statistics.sumBuyoutsPercent += item.statistics.selectedPeriod.conversions.buyoutsPercent ? item.statistics.selectedPeriod.conversions.buyoutsPercent : 100;
+      nmDetailReport[item.brandName][item.object.name][date].statistics.countBuyoutsPercent++;
+      nmDetailReport[item.brandName][item.object.name][date].statistics.buyoutsPercent = getRoundValue(
+        nmDetailReport[item.brandName][item.object.name][date].statistics.sumBuyoutsPercent,
+        nmDetailReport[item.brandName][item.object.name][date].statistics.countBuyoutsPercent
+      );
+
     });
 
     return fs
       .writeFile(nmDetailReportPath, JSON.stringify(nmDetailReport))
       .then(() => {
-        console.log(new Date(), uid, campaignName, "nmDetailReport.json created.");
+        console.log(new Date(), uid, campaignName, "nmFullDetailReport.json created.");
         resolve();
       })
       .catch((error) => console.error(error));
@@ -1759,6 +2838,16 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
   );
   const sppData = readIfExists(sppDataPath);
 
+  const nmFullDetailReport = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "nmFullDetailReport.json"
+    )
+  )
+
   console.log(new Date(), uid, campaignName);
   const arts = JSON.parse(
     afs.readFileSync(
@@ -1786,8 +2875,7 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
   const orders = {};
   data.forEach((item) => {
     if (!(item.barcode in arts.bySku)) return;
-    if (item.orderType.includes('Возврат')) return;
-
+    if (item.orderType != 'Клиентский') return;
 
     const art = arts.bySku[item.barcode].art;
     const brand_art = arts.bySku[item.barcode].brand_art;
@@ -1806,7 +2894,11 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
     if (order_date < dateFrom) {
       return;
     }
-    const order_date_string = item.date.slice(0, 10);
+
+
+    const order_date_string = getLocaleDateString(order_date).slice(0, 10);
+    if (order_date_string == '2024-04-28' && art == 'КПБ_ЕВРО_СТРАЙП_18-4005_ОТК')
+      console.log(item);
     // if (item.isCancel) return;
     // if (order_date_string == '2024-03-30')
     // console.log(new Date(), item);
@@ -1817,24 +2909,24 @@ const writeOrdersToJsonMM = (data, uid, campaignName, date) => {
       orders[order_date_string] = { all: {} };
     }
 
-    if (campaignName != "Клининг Сервис") {
-      const warehouseName = item.warehouseName;
-      if (!(warehouseName in orders[order_date_string])) {
-        orders[order_date_string][warehouseName] = {};
-      }
 
-      if (!(art in orders[order_date_string][warehouseName])) {
-        orders[order_date_string][warehouseName][art] = {
-          count: 0,
-          sum: 0,
-          sumWithSpp: 0,
-        };
-      }
-      orders[order_date_string][warehouseName][art].count += 1;
-      orders[order_date_string][warehouseName][art].sum += get_item_price();
-      orders[order_date_string][warehouseName][art].sumWithSpp +=
-        get_item_price_spp();
+    const warehouseName = item.warehouseName;
+    if (!(warehouseName in orders[order_date_string])) {
+      orders[order_date_string][warehouseName] = {};
     }
+
+    if (!(art in orders[order_date_string][warehouseName])) {
+      orders[order_date_string][warehouseName][art] = {
+        count: 0,
+        sum: 0,
+        sumWithSpp: 0,
+      };
+    }
+    orders[order_date_string][warehouseName][art].count += 1;
+    orders[order_date_string][warehouseName][art].sum += get_item_price();
+    orders[order_date_string][warehouseName][art].sumWithSpp +=
+      get_item_price_spp();
+
 
     if (!(art in orders[order_date_string].all)) {
       orders[order_date_string].all[art] = { count: 0, sum: 0, sumWithSpp: 0 };
@@ -1896,10 +2988,8 @@ const writeSalesToJsonMM = (data, uid, campaignName, date) => {
   const dateFrom = new Date(date);
   console.log(new Date(), now, dateFrom);
 
-  const arts = JSON.parse(
-    afs.readFileSync(
-      path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
-    )
+  const arts = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
   );
 
   // console.log(new Date(), data);
@@ -1937,26 +3027,8 @@ const writeSalesToJsonMM = (data, uid, campaignName, date) => {
 
     if (!(art in sales)) {
       sales[art] = {
-        lastSale: { date: "1970-01-01" },
-        avg: { count: 0, sum: 0, finishedPrice: 0, spp: 0 },
         all: {},
       };
-    }
-
-    if (new Date(sales[art].lastSale.date) < new Date(item.date)) {
-      sales[art].lastSale = item;
-    }
-
-    // console.log(new Date(), object, sales.byObject[object]);
-    if (!(object in sales.byObject))
-      sales.byObject[object] = {
-        lastSale: { date: "1970-01-01" },
-        avg: { count: 0, sum: 0, finishedPrice: 0, spp: 0 },
-      };
-
-    if (new Date(sales.byObject[object].lastSale.date) < new Date(item.date)) {
-      sales.byObject[object].lastSale = item;
-      // console.log(new Date(), sales.byObject);
     }
 
     const warehouseName = item.warehouseName;
@@ -1969,11 +3041,13 @@ const writeSalesToJsonMM = (data, uid, campaignName, date) => {
         count: 0,
         sum: 0,
         finishedPrice: 0,
+        forPay: 0,
         spp: 0,
       };
     }
     sales[art][warehouseName][sale_date_string].count += 1;
     sales[art][warehouseName][sale_date_string].sum += item.priceWithDisc;
+    sales[art][warehouseName][sale_date_string].forPay += item.forPay;
     sales[art][warehouseName][sale_date_string].finishedPrice +=
       item.finishedPrice;
     sales[art][warehouseName][sale_date_string].spp = Math.round(
@@ -1990,10 +3064,12 @@ const writeSalesToJsonMM = (data, uid, campaignName, date) => {
         count: 0,
         sum: 0,
         finishedPrice: 0,
+        forPay: 0,
         spp: 0,
       };
     }
     sales[art].all[sale_date_string].count += 1;
+    sales[art].all[sale_date_string].forPay += item.forPay;
     sales[art].all[sale_date_string].sum += item.priceWithDisc;
     sales[art].all[sale_date_string].finishedPrice += item.finishedPrice;
     sales[art].all[sale_date_string].spp = Math.round(
@@ -2004,33 +3080,6 @@ const writeSalesToJsonMM = (data, uid, campaignName, date) => {
         true
       )
     );
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const saleDate = new Date(sale_date_string);
-    saleDate.setHours(0, 0, 0, 0);
-    const daysPassed = (today.getTime() - saleDate.getTime()) / 86400 / 1000;
-    if (daysPassed < 7) {
-      sales[art].avg.count += 1;
-      sales[art].avg.sum += item.priceWithDisc;
-      sales[art].avg.finishedPrice += item.finishedPrice;
-      sales[art].avg.spp = Math.round(
-        100 -
-        getRoundValue(sales[art].avg.finishedPrice, sales[art].avg.sum, true)
-      );
-
-      sales.byObject[object].avg.count += 1;
-      sales.byObject[object].avg.sum += item.priceWithDisc;
-      sales.byObject[object].avg.finishedPrice += item.finishedPrice;
-      sales.byObject[object].avg.spp = Math.round(
-        100 -
-        getRoundValue(
-          sales.byObject[object].avg.finishedPrice,
-          sales.byObject[object].avg.sum,
-          true
-        )
-      );
-    }
 
     if (!(brand in sales)) {
       sales[brand] = { all: {} };
@@ -2057,8 +3106,15 @@ const writeSalesToJsonMM = (data, uid, campaignName, date) => {
     );
   });
 
-  for (const [art, artData] of Object.entries(sales)) {
-    salesCurrent[art] = artData;
+  for (const [key, warehouseData] of Object.entries(sales)) {
+    for (const [warehouse, byDateData] of Object.entries(warehouseData)) {
+      for (const [date, dateData] of Object.entries(byDateData)) {
+        if (!salesCurrent[key]) salesCurrent[key] = {}
+        if (!salesCurrent[key][warehouse]) salesCurrent[key][warehouse] = {}
+
+        salesCurrent[key][warehouse][date] = dateData;
+      }
+    }
   }
 
   return Promise.all([fs.writeFile(salesPath, JSON.stringify(salesCurrent))])
@@ -3463,6 +4519,30 @@ const updatePrices = async (brand) => {
   fs.rm(newPricesPath);
 };
 
+const updatePricesMM = async (uid, campaignName, params) => {
+  const authToken = getAuthTokenMM(uid, campaignName);
+  console.log(new Date(), uid, campaignName, params);
+
+  axios
+    .post(
+      "https://discounts-prices-api.wb.ru/api/v2/upload/task",
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => {
+      console.error(error.response.data);
+      fs.writeFile(
+        path.join(__dirname, "marketMaster", uid, campaignName, "updatePricesErrorLog.json"),
+        JSON.stringify(error)
+      );
+    });
+};
+
 const fetchPricesAndWriteToJSON = (campaign) =>
   new Promise(async (resolve, reject) => {
     const authToken = getAuthToken("api-token", campaign);
@@ -3475,6 +4555,7 @@ const fetchPricesAndWriteToJSON = (campaign) =>
     return getInfo(authToken)
       .then((data) => {
         const jsonData = {};
+        if (!data) return
         for (const [index, art_data] of Object.entries(data)) {
           // console.log(new Date(), art_data)
           // console.log(new Date(), artsNmIdsFull[art_data.nmId].supplierArticle);
@@ -4359,429 +5440,532 @@ const changeAdvertName = (authToken, params) => {
 
 const autoSetMinusPhrasesMM = async (uid, campaignName) => {
   return new Promise((resolve, reject) => {
-    const authToken = getAuthTokenMM(uid, campaignName);
-    const startTime = new Date();
+    try {
 
-    const advertsWordsPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsWords.json"
-    );
-    const advertsWords = readIfExists(advertsWordsPath);
-    const advertsPlusPhrasesTemplatesPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsPlusPhrasesTemplates.json"
-    );
-    const advertsPlusPhrasesTemplates = readIfExists(
-      advertsPlusPhrasesTemplatesPath
-    );
-    const presetsPath = path.join(
-      __dirname,
-      "marketMaster",
-      "presets.json"
-    );
-    const presets = readIfExists(
-      presetsPath
-    );
-    const plusPhrasesTemplatesPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "plusPhrasesTemplates.json"
-    );
-    const plusPhrasesTemplates = readIfExists(plusPhrasesTemplatesPath);
-    const advertsInfosPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "advertsInfos.json"
-    );
-    const advertsInfos = readIfExists(advertsInfosPath);
-    const advertsPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "adverts.json"
-    );
-    const adverts = readIfExists(advertsPath);
 
-    const excludeMinusPhrases = async () => {
-      for (const [advertId, templateData] of Object.entries(
-        advertsPlusPhrasesTemplates
-      )) {
-        if (!advertId || !templateData) continue;
-        const { templateName } = templateData;
-        if (!templateName) continue;
+      const authToken = getAuthTokenMM(uid, campaignName);
+      const startTime = new Date();
 
-        if (!adverts[advertId]) continue;
-        if (!advertsInfos[advertId]) continue;
-        const { name, type, status, createTime } = advertsInfos[advertId]
-        if (![8, 6, 9].includes(type)) continue;
-        if (![9, 11].includes(status)) continue;
+      const advertsWordsPath = path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsWords.json"
+      );
+      const advertsWords = readIfExists(advertsWordsPath);
+      const advertsPlusPhrasesTemplatesPath = path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsPlusPhrasesTemplates.json"
+      );
+      const advertsPlusPhrasesTemplates = readIfExists(
+        advertsPlusPhrasesTemplatesPath
+      );
+      const presetsPath = path.join(
+        __dirname,
+        "marketMaster",
+        "presets.json"
+      );
+      const presets = readIfExists(
+        presetsPath
+      );
+      const plusPhrasesTemplatesPath = path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "plusPhrasesTemplates.json"
+      );
+      const plusPhrasesTemplates = readIfExists(plusPhrasesTemplatesPath);
+      const advertsInfosPath = path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "advertsInfos.json"
+      );
+      const advertsInfos = readIfExists(advertsInfosPath);
+      const advertsPath = path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "adverts.json"
+      );
+      const adverts = readIfExists(advertsPath);
 
-        // if (advertId != 16389864) continue;
-        // console.log(new Date(), advertId);
+      const excludeMinusPhrases = async () => {
+        for (const [advertId, templateData] of Object.entries(
+          advertsPlusPhrasesTemplates
+        )) {
+          if (!advertId || !templateData) continue;
+          const { templateName } = templateData;
+          if (!templateName) continue;
 
-        if (!advertsWords[advertId]) continue;
+          if (!adverts[advertId]) continue;
+          if (!advertsInfos[advertId]) continue;
+          const { name, type, status, createTime } = advertsInfos[advertId]
+          if (![8, 6, 9].includes(type)) continue;
+          if (![9, 11].includes(status)) continue;
 
-        const words =
-          type == 8
-            ? advertsWords[advertId]
-            : advertsWords[advertId].words;
+          // console.log(new Date(), advertId);
 
-        if (!words) continue;
-        const stat = advertsWords[advertId].stat ?? {};
-        const statOnMinus = advertsWords[advertId].statOnMinus ?? {};
+          if (!advertsWords[advertId]) continue;
 
-        const plusPhrasesTemplate = plusPhrasesTemplates[templateName];
-        if (!plusPhrasesTemplate) continue;
-        const autoPhrasesTemplate = plusPhrasesTemplate.autoPhrasesTemplate
+          const words =
+            type == 8
+              ? advertsWords[advertId]
+              : advertsWords[advertId].words;
 
-        const addOrNot = (phrase) => {
-          const { includes, notIncludes } = autoPhrasesTemplate;
+          if (!words) continue;
+          const stat = advertsWords[advertId].stat ?? {};
+          const statOnMinus = advertsWords[advertId].statOnMinus ?? {};
 
-          let addFlagInc = includes.length ? 0 : 1;
-          for (let j = 0; j < includes.length; j++) {
-            const rule = includes[j];
+          const plusPhrasesTemplate = plusPhrasesTemplates[templateName];
+          if (!plusPhrasesTemplate) continue;
+          const autoPhrasesTemplate = plusPhrasesTemplate.autoPhrasesTemplate
 
-            if (!rule || rule == '') continue
+          const addOrNot = (phrase) => {
+            const { includes, notIncludes } = autoPhrasesTemplate;
 
-            const rulesForAnd = rule.split('+');
+            let addFlagInc = includes.length ? 0 : 1;
+            for (let j = 0; j < includes.length; j++) {
+              const rule = includes[j];
 
-            let tempFlagInc = 0;
-            for (let k = 0; k < rulesForAnd.length; k++) {
-              const ruleForAdd = rulesForAnd[k];
-              if (phrase.includes(ruleForAdd)) {
-                tempFlagInc++;
+              if (!rule || rule == '') continue
+
+              const rulesForAnd = rule.split('+');
+
+              let tempFlagInc = 0;
+              for (let k = 0; k < rulesForAnd.length; k++) {
+                const ruleForAdd = rulesForAnd[k];
+                if (phrase.includes(ruleForAdd)) {
+                  tempFlagInc++;
+                }
               }
-            }
-            addFlagInc += (tempFlagInc == rulesForAnd.length ? 1 : 0);
-          }
-
-          let addFlagNotInc = 0;
-          for (let j = 0; j < notIncludes.length; j++) {
-            const rule = notIncludes[j];
-
-            if (!rule || rule == '') continue
-
-            const rulesForAnd = rule.split('+');
-
-            let tempFlagNotInc = 0;
-
-            for (let k = 0; k < rulesForAnd.length; k++) {
-              const ruleForAdd = rulesForAnd[k];
-              if (phrase.includes(ruleForAdd)) {
-                tempFlagNotInc++;
-              }
+              addFlagInc += (tempFlagInc == rulesForAnd.length ? 1 : 0);
             }
 
-            addFlagNotInc += tempFlagNotInc;
-          }
+            let addFlagNotInc = 0;
+            for (let j = 0; j < notIncludes.length; j++) {
+              const rule = notIncludes[j];
 
-          // console.log(new Date(), (addFlagInc && !addFlagNotInc), addFlagInc, addFlagInc, phrase, plusPhrasesTemplate.autoPhrasesTemplate);
-          return addFlagInc && !addFlagNotInc
-        }
+              if (!rule || rule == '') continue
 
-        if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-          || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-          const newClusters = []
-          for (const phrase of plusPhrasesTemplate.clusters) {
-            if (addOrNot(phrase)) {
-              if (!newClusters.includes(phrase)) {
-                newClusters.push(phrase)
+              const rulesForAnd = rule.split('+');
+
+              let tempFlagNotInc = 0;
+
+              for (let k = 0; k < rulesForAnd.length; k++) {
+                const ruleForAdd = rulesForAnd[k];
+                if (phrase.includes(ruleForAdd)) {
+                  tempFlagNotInc++;
+                }
               }
+
+              addFlagNotInc += tempFlagNotInc == rulesForAnd.length;
             }
+
+            // if (phrase == 'двуспальное постельное белье')
+            // console.log(new Date(), (addFlagInc && !addFlagNotInc), addFlagInc, addFlagNotInc, phrase, plusPhrasesTemplate.autoPhrasesTemplate);
+            return addFlagInc && !addFlagNotInc
           }
-          plusPhrasesTemplate.clusters = newClusters
-        }
 
-
-        const canBeDeleted = (phrase, activePhrases, type) => {
-          if (!presets.phrases[phrase]) return true;
-          const phrasePreset = presets.phrases[phrase].catalog_value;
-          const temp = []
-          for (let i = 0; i < activePhrases.length; i++) {
-            let cur = '';
-            // if (type == 8) {
-            //   cur = activePhrases[i].cluster;
-            // }
-            // else if (type == 9) {
-            //   cur = activePhrases[i].keyword;
-            // }
-            cur = activePhrases[i];
-            if (cur == phrase) continue;
-            if (presets.phrases[cur])
-              temp.push(presets.phrases[cur].catalog_value)
-          }
-          // if (temp.includes(phrasePreset))
-          //   console.log(new Date(), phrase, temp.includes(phrasePreset), advertId);
-          return !temp.includes(phrasePreset);
-        }
-
-        const isFixed = plusPhrasesTemplate.isFixed ?? false;
-
-        const { excluded, clusters, keywords } = words;
-        if (clusters) {
-          let toExclude = [];
-          for (let i = 0; i < excluded.length; i++) {
-            const phrase = excluded[i];
-            // console.log(new Date(), plusPhrasesTemplate.clusters.includes(phrase), phrase)
-            const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
-            const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
-            if (
-              plusPhrasesTemplate.threshold &&
-              viewsExcluded < plusPhrasesTemplate.threshold
-            )
-              continue;
-            if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
-              plusPhrasesTemplate.ctrThreshold &&
-              ctrExcluded > plusPhrasesTemplate.ctrThreshold
-            )
-              continue;
-
-            if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-              || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+          if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+            || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+            const newClusters = []
+            for (const phrase of plusPhrasesTemplate.clusters) {
               if (addOrNot(phrase)) {
-                if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                  plusPhrasesTemplate.clusters.push(phrase);
+                if (!newClusters.includes(phrase)) {
+                  newClusters.push(phrase)
                 }
               }
             }
-
-            if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
-            toExclude.push(phrase);
+            plusPhrasesTemplate.clusters = newClusters
           }
 
-          let needsUpdate = toExclude.length != excluded.length;
-          for (let i = 0; i < clusters.length; i++) {
-            const { cluster, count, keywords } = clusters[i];
 
-            const clusterKeywordsTemp = new Array(keywords ?? []);
-            const clusterKeywords = clusterKeywordsTemp.filter(
-              (value, index) => {
-                return clusterKeywordsTemp.indexOf(value) === index;
-              }
-            );
-            if (!clusterKeywords.includes(cluster))
-              clusterKeywords.push(cluster);
-            const clusterStat = {
-              views: 0,
-              clicks: 0,
-              ctr: 0,
-              sum: 0,
-            };
-            for (let j = 0; j < clusterKeywords.length; j++) {
-              if (!stat[clusterKeywords[j]]) continue;
-              clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
-              clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
-              clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
+          const canBeDeleted = (phrase, activePhrases, type) => {
+            if (!presets.phrases[phrase]) return true;
+            const phrasePreset = presets.phrases[phrase].catalog_value;
+            const temp = []
+            for (let i = 0; i < activePhrases.length; i++) {
+              let cur = '';
+              // if (type == 8) {
+              //   cur = activePhrases[i].cluster;
+              // }
+              // else if (type == 9) {
+              //   cur = activePhrases[i].keyword;
+              // }
+              cur = activePhrases[i];
+              if (cur == phrase) continue;
+              if (presets.phrases[cur])
+                temp.push(presets.phrases[cur].catalog_value)
             }
-            clusterStat.ctr = getRoundValue(
-              clusterStat.clicks,
-              clusterStat.views,
-              true
-            );
+            // if (temp.includes(phrasePreset))
+            //   console.log(new Date(), phrase, temp.includes(phrasePreset), advertId);
+            return !temp.includes(phrasePreset);
+          }
 
-            const phrase = cluster;
-            if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-              || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-              if (addOrNot(phrase)) {
-                if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                  plusPhrasesTemplate.clusters.push(phrase);
-                }
-              }
-            }
+          const isFixed = plusPhrasesTemplate.isFixed ?? false;
 
+          const { excluded, clusters, keywords } = words;
+          if (clusters) {
+            let toExclude = [];
+            for (let i = 0; i < excluded.length; i++) {
+              const phrase = excluded[i];
+              // console.log(new Date(), plusPhrasesTemplate.clusters.includes(phrase), phrase)
+              const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
+              const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
+              if (
+                plusPhrasesTemplate.threshold &&
+                viewsExcluded < plusPhrasesTemplate.threshold
+              )
+                continue;
+              if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
+                plusPhrasesTemplate.ctrThreshold &&
+                ctrExcluded > plusPhrasesTemplate.ctrThreshold
+              )
+                continue;
 
-            if (plusPhrasesTemplate.threshold > count) continue;
-            if (plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(phrase)) {
-              needsUpdate = true;
-              toExclude.push(phrase);
-              statOnMinus[phrase] = clusterStat;
-              continue;
-            }
-            // console.log(new Date(), advertId, cluster, count, plusPhrasesTemplate.clusters);
-
-            if (plusPhrasesTemplate.ctrThreshold || plusPhrasesTemplate.secondThreshold) {
-
-              if (plusPhrasesTemplate.ctrThreshold) {
-
-                if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(cluster) && !toExclude.includes(cluster)) {
-                  needsUpdate = true;
-                  toExclude.push(cluster);
-                  statOnMinus[cluster] = clusterStat;
-                  continue;
-                };
-
-                if (
-                  clusterStat.ctr >= plusPhrasesTemplate.ctrThreshold
-                )
-                  continue;
-
-                if (!toExclude.includes(cluster)) {
-                  needsUpdate = true;
-                  statOnMinus[cluster] = clusterStat;
-                  toExclude.push(cluster);
-                }
-
-              }
-
-              if (plusPhrasesTemplate.secondThreshold && plusPhrasesTemplate.secondThreshold < count) {
-                if (plusPhrasesTemplate.secondCtrThreshold && plusPhrasesTemplate.secondCtrThreshold >
-                  clusterStat.ctr) {
-                  if (!toExclude.includes(cluster)) {
-                    needsUpdate = true;
-                    statOnMinus[cluster] = clusterStat;
-                    toExclude.push(cluster);
+              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+                if (addOrNot(phrase)) {
+                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                    plusPhrasesTemplate.clusters.push(phrase);
                   }
                 }
               }
-            }
-            else {
-              if (plusPhrasesTemplate.clusters.includes(cluster))
-                continue;
 
-
-              if (!toExclude.includes(cluster)) {
-                needsUpdate = true;
-                statOnMinus[cluster] = clusterStat;
-                toExclude.push(cluster);
-              }
-            }
-
-
-
-          }
-
-          toExclude = toExclude.filter((phrase) => {
-            // if (!canBeDeleted(phrase, clusters, 8))
-            // console.log(new Date(), advertId, phrase, canBeDeleted(phrase, clusters, 8))
-            return canBeDeleted(phrase, plusPhrasesTemplate.clusters, 8)
-          })
-          if (!needsUpdate) needsUpdate = toExclude.length != excluded.length;
-
-          // console.log(new Date(), toExclude);
-          if (toExclude.length > 1000) {
-            console.log(new Date(), "more than a 1000");
-            continue;
-          }
-
-          if (needsUpdate) {
-            const params = {
-              excluded: toExclude,
-            };
-
-            await setExcludedPhrasesAdvert(
-              authToken,
-              advertId,
-              params,
-              type
-            );
-
-            console.log(new Date(),
-              uid,
-              campaignName,
-              name,
-              advertId,
-              "установлены минус фразы",
-              templateName,
-              toExclude.length,
-            );
-
-            await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
-          } else {
-            console.log(new Date(),
-              uid,
-              campaignName,
-              name,
-              advertId,
-              `не требует изменения минус фраз (${toExclude.length})`
-            );
-          }
-        } else if (keywords) {
-
-          let toExclude = [];
-          for (let i = 0; i < excluded.length; i++) {
-            const phrase = excluded[i];
-
-            if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-              || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-              if (addOrNot(phrase)) {
-                if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                  plusPhrasesTemplate.clusters.push(phrase);
-                }
-              }
-            }
-
-            const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
-            const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
-            if (
-              plusPhrasesTemplate.threshold &&
-              viewsExcluded < plusPhrasesTemplate.threshold
-            ) {
-              if (plusPhrasesTemplate.secondThreshold) {
-                if (viewsExcluded < plusPhrasesTemplate.secondThreshold) continue;
-              } else
-                continue;
-            }
-            if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
-              plusPhrasesTemplate.ctrThreshold &&
-              ctrExcluded >= plusPhrasesTemplate.ctrThreshold
-            ) {
-              if (plusPhrasesTemplate.secondCtrThreshold) {
-                if (ctrExcluded >= plusPhrasesTemplate.secondCtrThreshold) continue;
-              } else
-                continue;
-            }
-            if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
-            toExclude.push(phrase);
-          }
-
-          let needsUpdate = toExclude.length != excluded.length;
-          for (let i = 0; i < keywords.length; i++) {
-            const { keyword, count } = keywords[i];
-            const phrase = keyword;
-
-            if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
-              || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
-              if (addOrNot(phrase)) {
-                if (!plusPhrasesTemplate.clusters.includes(phrase)) {
-                  plusPhrasesTemplate.clusters.push(phrase);
-                }
-              }
-            }
-
-            if (plusPhrasesTemplate.threshold > count) continue;
-            if (plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(phrase)) {
-              needsUpdate = true;
+              if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
               toExclude.push(phrase);
-              statOnMinus[phrase] = stat[phrase] ?? { views: count };
+            }
+
+            let needsUpdate = toExclude.length != excluded.length;
+
+            for (const [phrase, phraseStats] of Object.entries(words.stat)) {
+              if (phrase === undefined || phraseStats === undefined) continue;
+              const { views, clicks, sum, } = phraseStats ?? {};
+              const { normquery, catalog_value } = presets.phrases[phrase] ?? {};
+
+              if (toExclude.includes(phrase)) continue;
+
+              const ctr = getRoundValue(clicks, views, true);
+
+              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+                if (addOrNot(phrase)) {
+                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                    plusPhrasesTemplate.clusters.push(phrase);
+                  }
+                }
+              }
+
+
+              if (plusPhrasesTemplate.threshold > views) continue;
+              if (plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(phrase)) {
+                needsUpdate = true;
+                toExclude.push(phrase);
+                statOnMinus[phrase] = phraseStats;
+                continue;
+              }
+              // console.log(new Date(), advertId, cluster, count, plusPhrasesTemplate.clusters);
+
+              if (plusPhrasesTemplate.ctrThreshold || plusPhrasesTemplate.secondThreshold) {
+
+                if (plusPhrasesTemplate.ctrThreshold) {
+
+                  if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(phrase) && !toExclude.includes(phrase)) {
+                    needsUpdate = true;
+                    toExclude.push(phrase);
+                    statOnMinus[phrase] = phraseStats;
+                    continue;
+                  };
+
+                  if (
+                    ctr >= plusPhrasesTemplate.ctrThreshold
+                  )
+                    continue;
+
+                  if (!toExclude.includes(phrase)) {
+                    needsUpdate = true;
+                    statOnMinus[phrase] = phraseStats;
+                    toExclude.push(phrase);
+                  }
+
+                }
+
+                if (plusPhrasesTemplate.secondThreshold && plusPhrasesTemplate.secondThreshold < views) {
+                  if (plusPhrasesTemplate.secondCtrThreshold && plusPhrasesTemplate.secondCtrThreshold >
+                    ctr) {
+                    if (!toExclude.includes(phrase)) {
+                      needsUpdate = true;
+                      statOnMinus[phrase] = phraseStats;
+                      toExclude.push(phrase);
+                    }
+                  }
+                }
+              }
+              else {
+                if (plusPhrasesTemplate.clusters.includes(phrase))
+                  continue;
+
+
+                if (!toExclude.includes(phrase)) {
+                  needsUpdate = true;
+                  statOnMinus[phrase] = phraseStats;
+                  toExclude.push(phrase);
+                }
+              }
+            }
+
+            // for (let i = 0; i < clusters.length; i++) {
+            //   const { cluster, count, keywords } = clusters[i];
+
+            //   const clusterKeywordsTemp = new Array(keywords ?? []);
+            //   const clusterKeywords = clusterKeywordsTemp.filter(
+            //     (value, index) => {
+            //       return clusterKeywordsTemp.indexOf(value) === index;
+            //     }
+            //   );
+            //   if (!clusterKeywords.includes(cluster))
+            //     clusterKeywords.push(cluster);
+            //   const clusterStat = {
+            //     views: 0,
+            //     clicks: 0,
+            //     ctr: 0,
+            //     sum: 0,
+            //   };
+            //   for (let j = 0; j < clusterKeywords.length; j++) {
+            //     if (!stat[clusterKeywords[j]]) continue;
+            //     clusterStat.views += stat[clusterKeywords[j]].views ?? 0;
+            //     clusterStat.clicks += stat[clusterKeywords[j]].clicks ?? 0;
+            //     clusterStat.sum += stat[clusterKeywords[j]].sum ?? 0;
+            //   }
+            //   clusterStat.ctr = getRoundValue(
+            //     clusterStat.clicks,
+            //     clusterStat.views,
+            //     true
+            //   );
+
+            //   const phrase = cluster;
+            //   if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+            //     || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+            //     if (addOrNot(phrase)) {
+            //       if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+            //         plusPhrasesTemplate.clusters.push(phrase);
+            //       }
+            //     }
+            //   }
+
+
+            //   if (plusPhrasesTemplate.threshold > count) continue;
+            //   if (plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(phrase)) {
+            //     needsUpdate = true;
+            //     toExclude.push(phrase);
+            //     statOnMinus[phrase] = clusterStat;
+            //     continue;
+            //   }
+            //   // console.log(new Date(), advertId, cluster, count, plusPhrasesTemplate.clusters);
+
+            //   if (plusPhrasesTemplate.ctrThreshold || plusPhrasesTemplate.secondThreshold) {
+
+            //     if (plusPhrasesTemplate.ctrThreshold) {
+
+            //       if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(cluster) && !toExclude.includes(cluster)) {
+            //         needsUpdate = true;
+            //         toExclude.push(cluster);
+            //         statOnMinus[cluster] = clusterStat;
+            //         continue;
+            //       };
+
+            //       if (
+            //         clusterStat.ctr >= plusPhrasesTemplate.ctrThreshold
+            //       )
+            //         continue;
+
+            //       if (!toExclude.includes(cluster)) {
+            //         needsUpdate = true;
+            //         statOnMinus[cluster] = clusterStat;
+            //         toExclude.push(cluster);
+            //       }
+
+            //     }
+
+            //     if (plusPhrasesTemplate.secondThreshold && plusPhrasesTemplate.secondThreshold < count) {
+            //       if (plusPhrasesTemplate.secondCtrThreshold && plusPhrasesTemplate.secondCtrThreshold >
+            //         clusterStat.ctr) {
+            //         if (!toExclude.includes(cluster)) {
+            //           needsUpdate = true;
+            //           statOnMinus[cluster] = clusterStat;
+            //           toExclude.push(cluster);
+            //         }
+            //       }
+            //     }
+            //   }
+            //   else {
+            //     if (plusPhrasesTemplate.clusters.includes(cluster))
+            //       continue;
+
+
+            //     if (!toExclude.includes(cluster)) {
+            //       needsUpdate = true;
+            //       statOnMinus[cluster] = clusterStat;
+            //       toExclude.push(cluster);
+            //     }
+            //   }
+
+
+
+            // }
+
+            toExclude = toExclude.filter((phrase) => {
+              // if (!canBeDeleted(phrase, clusters, 8))
+              // console.log(new Date(), advertId, phrase, canBeDeleted(phrase, clusters, 8))
+              return canBeDeleted(phrase, plusPhrasesTemplate.clusters, 8)
+            })
+            if (!needsUpdate) needsUpdate = toExclude.length != excluded.length;
+
+            // console.log(new Date(), toExclude);
+            if (toExclude.length > 1000) {
+              console.log(new Date(), "more than a 1000");
               continue;
             }
 
-            if (plusPhrasesTemplate.ctrThreshold || plusPhrasesTemplate.secondThreshold) {
-              if (plusPhrasesTemplate.ctrThreshold) {
+            if (needsUpdate) {
+              const params = {
+                excluded: toExclude,
+              };
 
-                if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(keyword) && !toExclude.includes(keyword)) {
-                  needsUpdate = true;
-                  toExclude.push(keyword);
-                  statOnMinus[keyword] = stat[keyword] ?? { views: count };
-                  continue;
-                };
+              await setExcludedPhrasesAdvert(
+                authToken,
+                advertId,
+                params,
+                type
+              );
 
-                if (
-                  stat[keyword] &&
-                  stat[keyword].ctr >= plusPhrasesTemplate.ctrThreshold
-                )
+              console.log(new Date(),
+                uid,
+                campaignName,
+                name,
+                advertId,
+                "установлены минус фразы",
+                templateName,
+                toExclude.length,
+              );
+
+              await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
+            } else {
+              console.log(new Date(),
+                uid,
+                campaignName,
+                name,
+                advertId,
+                `не требует изменения минус фраз (${toExclude.length})`
+              );
+            }
+          } else if (keywords) {
+
+            let toExclude = [];
+            for (let i = 0; i < excluded.length; i++) {
+              const phrase = excluded[i];
+
+              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+                if (addOrNot(phrase)) {
+                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                    plusPhrasesTemplate.clusters.push(phrase);
+                  }
+                }
+              }
+
+              const ctrExcluded = statOnMinus[phrase] ? statOnMinus[phrase].ctr : 0;
+              const viewsExcluded = statOnMinus[phrase] ? statOnMinus[phrase].views : 0;
+              if (
+                plusPhrasesTemplate.threshold &&
+                viewsExcluded < plusPhrasesTemplate.threshold
+              ) {
+                if (plusPhrasesTemplate.secondThreshold) {
+                  if (viewsExcluded < plusPhrasesTemplate.secondThreshold) continue;
+                } else
                   continue;
+              }
+              if ((!plusPhrasesTemplate.clusters || (plusPhrasesTemplate.clusters && !plusPhrasesTemplate.clusters.length)) &&
+                plusPhrasesTemplate.ctrThreshold &&
+                ctrExcluded >= plusPhrasesTemplate.ctrThreshold
+              ) {
+                if (plusPhrasesTemplate.secondCtrThreshold) {
+                  if (ctrExcluded >= plusPhrasesTemplate.secondCtrThreshold) continue;
+                } else
+                  continue;
+              }
+              if (plusPhrasesTemplate.clusters.includes(phrase)) continue;
+              toExclude.push(phrase);
+            }
+
+            let needsUpdate = toExclude.length != excluded.length;
+            for (let i = 0; i < keywords.length; i++) {
+              const { keyword, count } = keywords[i];
+              const phrase = keyword;
+
+              if (autoPhrasesTemplate && ((autoPhrasesTemplate.includes && autoPhrasesTemplate.includes.length)
+                || (autoPhrasesTemplate.notIncludes && autoPhrasesTemplate.notIncludes.length))) {
+                if (addOrNot(phrase)) {
+                  if (!plusPhrasesTemplate.clusters.includes(phrase)) {
+                    plusPhrasesTemplate.clusters.push(phrase);
+                  }
+                }
+              }
+
+              if (plusPhrasesTemplate.threshold > count) continue;
+              if (plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(phrase)) {
+                needsUpdate = true;
+                toExclude.push(phrase);
+                statOnMinus[phrase] = stat[phrase] ?? { views: count };
+                continue;
+              }
+
+              if (plusPhrasesTemplate.ctrThreshold || plusPhrasesTemplate.secondThreshold) {
+                if (plusPhrasesTemplate.ctrThreshold) {
+
+                  if (plusPhrasesTemplate.clusters && plusPhrasesTemplate.clusters.length && !plusPhrasesTemplate.clusters.includes(keyword) && !toExclude.includes(keyword)) {
+                    needsUpdate = true;
+                    toExclude.push(keyword);
+                    statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                    continue;
+                  };
+
+                  if (
+                    stat[keyword] &&
+                    stat[keyword].ctr >= plusPhrasesTemplate.ctrThreshold
+                  )
+                    continue;
+
+                  if (!toExclude.includes(keyword)) {
+                    needsUpdate = true;
+                    statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                    toExclude.push(keyword);
+                  }
+                }
+
+
+                if (plusPhrasesTemplate.secondThreshold && plusPhrasesTemplate.secondThreshold < count) {
+                  if (plusPhrasesTemplate.secondCtrThreshold && stat[keyword] && plusPhrasesTemplate.secondCtrThreshold >
+                    stat[keyword].ctr) {
+                    if (!toExclude.includes(keyword)) {
+                      needsUpdate = true;
+                      statOnMinus[keyword] = stat[keyword] ?? { views: count };
+                      toExclude.push(keyword);
+                    }
+                  }
+                }
+              } else {
+                if (plusPhrasesTemplate.clusters.includes(keyword))
+                  continue;
+
 
                 if (!toExclude.includes(keyword)) {
                   needsUpdate = true;
@@ -4791,155 +5975,136 @@ const autoSetMinusPhrasesMM = async (uid, campaignName) => {
               }
 
 
-              if (plusPhrasesTemplate.secondThreshold && plusPhrasesTemplate.secondThreshold < count) {
-                if (plusPhrasesTemplate.secondCtrThreshold && stat[keyword] && plusPhrasesTemplate.secondCtrThreshold >
-                  stat[keyword].ctr) {
-                  if (!toExclude.includes(keyword)) {
-                    needsUpdate = true;
-                    statOnMinus[keyword] = stat[keyword] ?? { views: count };
-                    toExclude.push(keyword);
-                  }
-                }
-              }
-            } else {
-              if (plusPhrasesTemplate.clusters.includes(keyword))
-                continue;
 
 
-              if (!toExclude.includes(keyword)) {
-                needsUpdate = true;
-                statOnMinus[keyword] = stat[keyword] ?? { views: count };
-                toExclude.push(keyword);
-              }
+              // console.log(new Date(), advertId, cluster, count, keywords);
             }
+            // console.log(new Date(), toExclude);
+            toExclude = toExclude.filter((phrase) => {
+              return canBeDeleted(phrase, plusPhrasesTemplate.clusters, 9)
+            })
+            if (!needsUpdate) needsUpdate = toExclude.length != excluded.length;
 
-
-
-
-            // console.log(new Date(), advertId, cluster, count, keywords);
-          }
-          // console.log(new Date(), toExclude);
-          toExclude = toExclude.filter((phrase) => {
-            return canBeDeleted(phrase, plusPhrasesTemplate.clusters, 9)
-          })
-          if (!needsUpdate) needsUpdate = toExclude.length != excluded.length;
-
-          if (toExclude.length > 1000) {
-            console.log(new Date(), "more than a 1000");
-            continue;
-          } else if (needsUpdate) {
-            const params = {
-              excluded: toExclude,
-            };
-
-            await setExcludedPhrasesAdvert(
-              authToken,
-              advertId,
-              params,
-              type
-            );
-            await setPlusPhrasesAdvert(authToken, advertId, {
-              pluse: [],
-            });
-
-            console.log(new Date(),
-              uid,
-              campaignName,
-              name,
-              advertId,
-              "установлены минус фразы",
-              templateName,
-              toExclude.length
-            );
-
-            await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
-          } else {
-            console.log(new Date(),
-              uid,
-              campaignName,
-              name,
-              advertId,
-              `не требует изменения минус фраз (${toExclude.length})`
-            );
-          }
-          if (isFixed) {
-            const toPlus = plusPhrasesTemplate.clusters;
-
-            if (toPlus.length > 100) {
-              console.log(new Date(), "more than a 100");
+            if (toExclude.length > 1000) {
+              console.log(new Date(), "more than a 1000");
               continue;
+            } else if (needsUpdate) {
+              const params = {
+                excluded: toExclude,
+              };
+
+              await setExcludedPhrasesAdvert(
+                authToken,
+                advertId,
+                params,
+                type
+              );
+              await setPlusPhrasesAdvert(authToken, advertId, {
+                pluse: [],
+              });
+
+              console.log(new Date(),
+                uid,
+                campaignName,
+                name,
+                advertId,
+                "установлены минус фразы",
+                templateName,
+                toExclude.length
+              );
+
+              await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
+            } else {
+              console.log(new Date(),
+                uid,
+                campaignName,
+                name,
+                advertId,
+                `не требует изменения минус фраз (${toExclude.length})`
+              );
             }
-            const params = {
-              pluse: toPlus,
-            };
+            if (isFixed) {
+              const toPlus = plusPhrasesTemplate.clusters;
 
-            await setPlusPhrasesAdvert(authToken, advertId, params);
-            await setPlusPhrasesActivityAdvert(authToken, {
-              id: advertId,
-              fixed: true,
-            });
+              if (toPlus.length > 100) {
+                console.log(new Date(), "more than a 100");
+                continue;
+              }
+              const params = {
+                pluse: toPlus,
+              };
 
-            console.log(new Date(),
-              uid,
-              campaignName,
-              name,
-              advertId,
-              "установлены плюс фразы",
-              templateName,
-              toPlus
-            );
+              await setPlusPhrasesAdvert(authToken, advertId, params);
+              await setPlusPhrasesActivityAdvert(authToken, {
+                id: advertId,
+                fixed: true,
+              });
 
-            await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
+              console.log(new Date(),
+                uid,
+                campaignName,
+                name,
+                advertId,
+                "установлены плюс фразы",
+                templateName,
+                toPlus
+              );
+
+              await new Promise((resolve) => setTimeout(resolve, 2 * 1000));
+            }
           }
+
+          plusPhrasesTemplates[templateName] = plusPhrasesTemplate;
+
+          advertsWords[advertId].statOnMinus = statOnMinus;
+
         }
 
-        plusPhrasesTemplates[templateName] = plusPhrasesTemplate;
+      };
 
-        advertsWords[advertId].statOnMinus = statOnMinus;
-
-      }
-
-    };
-
-    excludeMinusPhrases().then(() => {
-      const currentPlusPhrasesTemplates = readIfExists(path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "plusPhrasesTemplates.json"
-      ))
-      for (const [name, data] of Object.entries(plusPhrasesTemplates)) {
-        if (new Date(currentPlusPhrasesTemplates[name].updateTime) > startTime) {
-          console.log(new Date(), uid, campaignName, name, 'plus phrases template was updated after the start of this exec.');
-          continue;
-        };
-
-        currentPlusPhrasesTemplates[name] = data;
-      }
-      afs.writeFileSync(
-        path.join(
+      excludeMinusPhrases().then(() => {
+        const currentPlusPhrasesTemplates = readIfExists(path.join(
           __dirname,
           "marketMaster",
           uid,
           campaignName,
           "plusPhrasesTemplates.json"
-        ),
-        JSON.stringify(currentPlusPhrasesTemplates));
+        ))
+        for (const [name, data] of Object.entries(plusPhrasesTemplates)) {
+          if (new Date(currentPlusPhrasesTemplates[name].updateTime) > startTime) {
+            console.log(new Date(), uid, campaignName, name, 'plus phrases template was updated after the start of this exec.');
+            continue;
+          };
 
-      afs.writeFileSync(
-        path.join(
-          __dirname,
-          "marketMaster",
-          uid,
-          campaignName,
-          "advertsWords.json"
-        ),
-        JSON.stringify(advertsWords));
+          currentPlusPhrasesTemplates[name] = data;
+        }
+        afs.writeFileSync(
+          path.join(
+            __dirname,
+            "marketMaster",
+            uid,
+            campaignName,
+            "plusPhrasesTemplates.json"
+          ),
+          JSON.stringify(currentPlusPhrasesTemplates));
+
+        afs.writeFileSync(
+          path.join(
+            __dirname,
+            "marketMaster",
+            uid,
+            campaignName,
+            "advertsWords.json"
+          ),
+          JSON.stringify(advertsWords));
 
 
+        resolve();
+      });
+    } catch (error) {
+      console.log(error);
       resolve();
-    });
+    }
   });
 };
 
@@ -5819,6 +6984,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
           const art = advertsArts[advertId].topArt.art;
 
           if (!campaignMassAdvertsData[art]) continue;
+          if (!campaignMassAdvertsData[art].placements) continue;
           const { index, prevIndex, prevPrevIndex, cpmIndex, updateTime, cpmPrevIndex, cpmPrevPrevIndex, phrase, log } =
             campaignMassAdvertsData[art].placements;
 
@@ -6122,7 +7288,11 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
           }
           if (type == 9) {
             params["instrument"] = 4
-            await setAdvertCPM(authToken, params);
+            await setAdvertCPM(authToken, {
+              advertId: params.advertId,
+              type: params.type,
+              cpm: 150,
+            });
             await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
 
             params["instrument"] = 6
@@ -6165,6 +7335,30 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
       };
 
       setAdvertsCPMs().then(() => {
+        // const currentadvertsBidsLog = readIfExists(path.join(
+        //   __dirname,
+        //   "marketMaster",
+        //   uid,
+        //   campaignName,
+        //   "advertsBidsLog.json"
+        // ))
+        // for (const [name, data] of Object.entries(plusPhrasesTemplates)) {
+        //   if (new Date(currentadvertsBidsLog[name].updateTime) > startTime) {
+        //     console.log(new Date(), uid, campaignName, name, 'plus phrases template was updated after the start of this exec.');
+        //     continue;
+        //   };
+
+        //   currentPlusPhrasesTemplates[name] = data;
+        // }
+        // afs.writeFileSync(
+        //   path.join(
+        //     __dirname,
+        //     "marketMaster",
+        //     uid,
+        //     campaignName,
+        //     "advertsBidsLog2.json"
+        //   ),
+        //   JSON.stringify(currentadvertsBidsLog));
         afs.writeFileSync(advertsBidsLogPath, JSON.stringify(advertsBidsLog));
         resolve();
       });
@@ -7184,15 +8378,16 @@ const fetchArtsAndWriteToJsonMM = async (uid, campaignName) => {
   const params = {
     settings: {
       cursor: {
-        limit: 1000,
+        limit: 100,
       },
       filter: {
         withPhoto: -1,
       },
     },
   };
-  for (let i = 1; i < 10; i++) {
+  for (let i = 1; i < 100; i++) {
     let isNextPage = false;
+    let dropOutOfFunc = false;
 
     promises.push(
       await getCardsMM(authToken, params)
@@ -7202,7 +8397,7 @@ const fetchArtsAndWriteToJsonMM = async (uid, campaignName) => {
 
           console.log(new Date(), campaignName, i, res.cursor.total);
 
-          if (res.cursor.total >= 1000) {
+          if (res.cursor.total >= 100) {
             isNextPage = true;
             await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
             const { updatedAt, nmID } = tempCards.slice(-1)[0];
@@ -7212,8 +8407,13 @@ const fetchArtsAndWriteToJsonMM = async (uid, campaignName) => {
         })
         .catch((e) => {
           console.log(new Date(), e);
+          dropOutOfFunc = true;
         })
     );
+
+    if (dropOutOfFunc) {
+      return;
+    }
 
     if (!isNextPage) {
       break;
@@ -7269,54 +8469,111 @@ const fetchArtsPricesAndWriteToJsonMM = async (uid, campaignName) => {
   });
 };
 
-const fetchNmDetailReportAndWriteToJsonMM = (uid, campaignName) => {
+const fetchNmDetailReportHistoryAndWriteToJsonMM = (uid, campaignName) => {
+  return new Promise(async (resolve) => {
+    const authToken = getAuthTokenMM(uid, campaignName);
+    const arts = readIfExists(path.join(__dirname, "files", campaign, "arts.json"),)
+
+
+
+    const batches = []
+    for (const [art, artData] of Object.entries()) { }
+
+
+    const datePrev = new Date(date);
+    datePrev.setDate(datePrev.getDate() - 7);
+
+    const params = {
+      period: {
+        begin: getLocaleDateString(date).slice(0, 10),
+        end: getLocaleDateString(date).slice(0, 10),
+      },
+    };
+
+    await getNmDetailReportHistory(authToken, params)
+      .then(async (res) => {
+        if (!res) return;
+        cards = cards.concat(res.data);
+      })
+      .catch((e) => {
+        console.log(new Date(), e);
+      });
+
+
+    writeNmDetailReportToJsonMM(cards, uid, campaignName).then(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30 * 1000));
+      resolve();
+    })
+
+
+    let cards = [];
+    for (let j = 0; j < 1; j++) {
+      const date = new Date();
+      date.setDate(date.getDate() - j);
+
+      console.log(new Date(), uid, campaignName, date);
+      await fetchDay(date, j);
+
+    }
+    resolve()
+  });
+};
+
+const fetchNmDetailReportAndWriteToJsonMM = (uid, campaignName, days) => {
   return new Promise(async (resolve) => {
     const authToken = getAuthTokenMM(uid, campaignName);
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    const fetchDay = (date, j) => new Promise(async (resolve) => {
+      for (let i = 1; i < 10; i++) {
+        const params = {
+          period: {
+            begin: getLocaleDateString(date).slice(0, 10) + " 00:00:00",
+            end: getLocaleDateString(date).slice(0, 10) + (j == 0 ? " " + new Date().toLocaleTimeString('ru-RU') : " 23:59:59"),
+          },
+          page: i,
+        };
+        let isNextPage = false;
+        await getNmDetailReport(authToken, params, true)
+          .then(async (res) => {
+            // console.log(new Date(), res.data.page, res.data.isNextPage);
+            if (!res) return;
 
-    const monthAgo = new Date();
-    monthAgo.setDate(monthAgo.getDate() - 31);
+            cards = cards.concat(res.data.cards);
+            // console.log(new Date(), cards, res.data.cards);
+
+            if (!res.data.isNextPage) {
+              isNextPage = true;
+            } else {
+              console.log(new Date(), uid, campaignName, "waiting");
+              await new Promise((resolve) => setTimeout(resolve, 30 * 1000));
+              console.log(new Date(), uid, campaignName, "done waiting");
+            }
+          })
+          .catch((e) => {
+            console.log(new Date(), uid, campaignName, e);
+          });
+
+        if (isNextPage) {
+          break;
+        }
+      }
+
+      writeNmDetailReportToJsonMM(cards, uid, campaignName).then(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30 * 1000));
+        resolve();
+      });
+    })
 
     let cards = [];
-    for (let i = 1; i < 10; i++) {
-      const params = {
-        period: {
-          begin: getLocaleDateString(monthAgo).slice(0, 10) + " 00:00:00",
-          end: getLocaleDateString(yesterday).slice(0, 10) + " 00:00:00",
-        },
-        page: i,
-      };
-      let isNextPage = false;
-      await getNmDetailReport(authToken, params)
-        .then(async (res) => {
-          // console.log(new Date(), res.data.page, res.data.isNextPage);
-          if (!res) return;
+    for (let j = 0; j < days; j++) {
+      const date = new Date();
+      date.setDate(date.getDate() - j);
 
-          cards = cards.concat(res.data.cards);
-          // console.log(new Date(), cards, res.data.cards);
+      console.log(new Date(), uid, campaignName, date);
+      await fetchDay(date, j);
 
-          if (!res.data.isNextPage) {
-            isNextPage = true;
-          } else {
-            console.log(new Date(), "waiting");
-            await new Promise((resolve) => setTimeout(resolve, 22 * 1000));
-            console.log(new Date(), "done waiting");
-          }
-        })
-        .catch((e) => {
-          console.log(new Date(), e);
-        });
-
-      if (isNextPage) {
-        break;
-      }
     }
-
-    await writeNmDetailReportToJsonMM(cards, uid, campaignName).then(() =>
-      resolve()
-    );
+    resolve()
   });
 };
 
@@ -7571,8 +8828,8 @@ const fetchOrdersAndWriteToJsonMM = (uid, campaignName, daysAgo = undefined) => 
   return new Promise((resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
     const dateFrom = new Date();
-    dateFrom.setDate(dateFrom.getDate() - (daysAgo ?? 7));
-    const date = dateFrom.toISOString().slice(0, 10);
+    dateFrom.setDate(dateFrom.getDate() - (daysAgo ?? 0));
+    const date = getLocaleDateString(dateFrom).slice(0, 10);
     console.log(new Date(), date);
     const params = {
       dateFrom: date,
@@ -7584,6 +8841,9 @@ const fetchOrdersAndWriteToJsonMM = (uid, campaignName, daysAgo = undefined) => 
         if (!data) return;
         // afs.writeFileSync(
         //   path.join(
+        writeOrdersToJsonMM(data, uid, campaignName, date).then(() =>
+          resolve()
+        );
         //     __dirname, 
         //     "marketMaster",
         //     uid,
@@ -7592,9 +8852,6 @@ const fetchOrdersAndWriteToJsonMM = (uid, campaignName, daysAgo = undefined) => 
         //   ),
         //   JSON.stringify(data)
         // );
-        writeOrdersToJsonMM(data, uid, campaignName, date).then((pr) =>
-          resolve()
-        );
       })
       .catch((error) => console.error(error));
   });
@@ -7604,7 +8861,7 @@ const fetchSalesAndWriteToJsonMM = (uid, campaignName, daysAgo = undefined) => {
   return new Promise((resolve, reject) => {
     const authToken = getAuthTokenMM(uid, campaignName);
     const dateFrom = new Date();
-    dateFrom.setDate(dateFrom.getDate() - (daysAgo ?? 35));
+    dateFrom.setDate(dateFrom.getDate() - (daysAgo ?? 0));
     const date = getLocaleDateString(dateFrom).slice(0, 10);
     console.log(new Date(), date);
     const params = {
@@ -7708,6 +8965,7 @@ const calcSmartDetailedByPeriodAndWriteToJSON = (campaign) => {
         jsonData[art].delivery *= ktr ?? 1;
 
         jsonData[art].orders += 1;
+        continue;
       }
 
       for (const [warehouseName, warehouseData] of Object.entries(
@@ -7720,6 +8978,9 @@ const calcSmartDetailedByPeriodAndWriteToJSON = (campaign) => {
         const ordersData = warehouseData[art] ?? {};
         const { count, sum } = ordersData;
         if (count === undefined || sum === undefined) continue;
+
+        if (art == 'КПБ_1.5_СТРАЙП_14-4102_ОТК')
+          console.log(yesterdayStr, ordersData);
 
         warehouseOrders.orders += count;
         warehouseOrders.sum_orders += sum;
@@ -7770,8 +9031,8 @@ const calcSmartDetailedByPeriodAndWriteToJSON = (campaign) => {
 
         // jsonData[art].orders += warehouseOrders.orders;
         // jsonData[art].delivery +=
-        // if (art == 'КПБ_1.5_СЛВДР_2496_ОТК')
-        //   console.log(new Date(), warehouseName, tariffs[warehouseName], art, warehouseOrders, jsonData[art], yesterdayStr);
+        // if (art == 'КПБ_1.5_СТРАЙП_14-4102_ОТК')
+        // console.log(new Date(), warehouseName, tariffs[warehouseName], art, warehouseOrders, jsonData[art], yesterdayStr);
       }
     }
   }
@@ -7795,6 +9056,14 @@ const calcNomenclaturesAndWriteToJsonMM = (uid, campaignName) => {
   );
   const warehousesData = readIfExists(warehousesDataPath);
 
+  const tags = readIfExists(path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "tags.json"
+  ));
+
   const nomenclaturesPath = path.join(
     __dirname,
     "marketMaster",
@@ -7805,7 +9074,15 @@ const calcNomenclaturesAndWriteToJsonMM = (uid, campaignName) => {
   // const nomenclatures = readIfExists(nomenclaturesPath);
   const nomenclatures = {};
 
-  const artsPrices = calcPricesJsonDataMM(uid, campaignName);
+  const artsDataUploaded = readIfExists(path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "artsDataUploaded.json"
+  ))
+
+  const artsPrices = artsDataUploaded;
 
   for (const [art, artData] of Object.entries(arts.byArt)) {
     if (!(art in nomenclatures)) nomenclatures[art] = { byWarehouses: {} };
@@ -7835,6 +9112,7 @@ const calcNomenclaturesAndWriteToJsonMM = (uid, campaignName) => {
     nomenclatures[art].imtId = artData.imtId;
     nomenclatures[art].nmId = artData.nmId;
     nomenclatures[art].barcode = artData.barcode;
+    nomenclatures[art].tags = tags[artData.nmId] ?? [];
   }
 
   afs.writeFileSync(nomenclaturesPath, JSON.stringify(nomenclatures));
@@ -7852,7 +9130,7 @@ const calcPricesJsonDataMM = (uid, campaignName) => {
     "marketMaster",
     uid,
     campaignName,
-    `uploadedИнформация о товарах ${campaignName}.xlsx`
+    `Информация о товарах ${campaignName}.xlsx`
   );
   let sheetData = [];
   if (afs.existsSync(uploadedpricesTemplatePath))
@@ -7864,21 +9142,21 @@ const calcPricesJsonDataMM = (uid, campaignName) => {
     const row = sheetData[i];
     if (!row) continue;
     if (!row[0] || row[0] == "") continue;
-    const barcode = row[1];
+    const barcode = row[sheetData[0].findIndex(val => val == "Баркод")];
     const { art } = arts.bySku[barcode] ?? {};
     if (!art) continue;
-    const factoryArt = row[2];
-    const multiplicity = row[3];
-    const length = row[4];
-    const width = row[5];
-    const height = row[6];
-    const ktr = row[7];
-    const weight = row[8];
-    const commision = row[9];
-    const tax = row[10];
-    const expences = row[11];
+    const factoryArt = row[sheetData[0].findIndex(val => val == "Артикул фабрики")];
+    const multiplicity = row[sheetData[0].findIndex(val => val == "Кратность короба, шт.")];
+    const length = row[sheetData[0].findIndex(val => val == "Длина, см.")];
+    const width = row[sheetData[0].findIndex(val => val == "Ширина, см.")];
+    const height = row[sheetData[0].findIndex(val => val == "Высота, см.")];
+    const weight = row[sheetData[0].findIndex(val => val == "Вес, кг.")];
+    const ktr = row[sheetData[0].findIndex(val => val == "КТР WB, %")];
+    const commision = row[sheetData[0].findIndex(val => val == "Комисcия WB, %")];
+    const tax = row[sheetData[0].findIndex(val => val == "Ставка налога, %")];
+    const expences = row[sheetData[0].findIndex(val => val == "Дополнительные расходы, %")];
     const prices = {};
-    for (let j = 12; j < row.length; j++) {
+    for (let j = sheetData[0].findIndex(val => val == "Себестоимость 1"); j < row.length; j++) {
       const priceName = sheetData[0][j];
       if (!priceName || priceName == "") continue;
       const price = Number(row[j]);
@@ -7908,13 +9186,66 @@ const calcPricesJsonDataMM = (uid, campaignName) => {
   return jsonData;
 };
 
-const calcPricesTemplateAndWriteToXlsxMM = (uid, campaignName) => {
+const changeUploadedArtsDataForKeyMM = async (uid, campaignName, data) => {
+  const arts = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
+  )
+  const artsDataUploaded = readIfExists(
+    path.join(__dirname, "marketMaster", uid, campaignName, "artsDataUploaded.json")
+  )
+
+  console.log(new Date(), uid, campaignName, data);
+
+  const { barcodes, enteredValue } = data ?? {};
+  if (barcodes === undefined || enteredValue === undefined) return;
+
+  const { key, val, type } = enteredValue;
+  if (key === undefined || val === undefined || type === undefined) return;
+
+  for (const barcode of barcodes) {
+    const artData = arts.bySku[barcode];
+    const { art } = artData ?? {}
+    if (!art) continue;
+
+    console.log(art, key, val, type);
+
+    if (!artsDataUploaded[art]) artsDataUploaded[art] = {}
+
+    if (key.includes('primeCost')) {
+      if (!artsDataUploaded[art]['prices']) artsDataUploaded[art]['prices'] = {}
+      artsDataUploaded[art]['prices'][`Себестоимость ${key.slice(-1)}`] = Number(
+        val.replace("%", "").replace(",", ".")
+      )
+    } else {
+      if (type == 'number') {
+        artsDataUploaded[art][key] = Number(
+          val.replace("%", "").replace(",", ".")
+        )
+      }
+      else {
+        artsDataUploaded[art][key] = val;
+      }
+    }
+    // console.log(artsDataUploaded[art][key]);
+  }
+
+
+  afs.writeFileSync(
+    path.join(__dirname, "marketMaster", uid, campaignName, "artsDataUploaded.json"),
+    JSON.stringify(artsDataUploaded)
+  );
+
+  // await calcPricesTemplateAndWriteToXlsxMM(uid, campaignName, artsDataUploaded);
+
+}
+
+const calcPricesTemplateAndWriteToXlsxMM = (uid, campaignName, dataUploaded = undefined) => {
   return new Promise((resolve, reject) => {
     console.log(new Date(), uid, campaignName, "generating prices template.xlsx");
     const arts = readIfExists(
       path.join(__dirname, "marketMaster", uid, campaignName, "arts.json")
     )
-    const artsDataUploaded = readIfExists(
+    const artsDataUploaded = dataUploaded ?? readIfExists(
       path.join(__dirname, "marketMaster", uid, campaignName, "artsDataUploaded.json")
     )
 
@@ -7930,6 +9261,7 @@ const calcPricesTemplateAndWriteToXlsxMM = (uid, campaignName) => {
         height,
         weight,
         commision,
+        ktr,
         tax,
         expences,
         prices } = artsDataUploaded[art] ?? {};
@@ -7947,6 +9279,7 @@ const calcPricesTemplateAndWriteToXlsxMM = (uid, campaignName) => {
         width,
         height,
         weight,
+        ktr,
         commision,
         tax,
         expences,
@@ -7969,8 +9302,8 @@ const calcPricesTemplateAndWriteToXlsxMM = (uid, campaignName) => {
       "Длина, см.",
       "Ширина, см.",
       "Высота, см.",
-      "КТР WB, %",
       "Вес, кг.",
+      "КТР WB, %",
       "Комисcия WB, %",
       "Ставка налога, %",
       "Дополнительные расходы, %",
@@ -7985,7 +9318,7 @@ const calcPricesTemplateAndWriteToXlsxMM = (uid, campaignName) => {
         "marketMaster",
         uid,
         campaignName,
-        `Информация о товарах ${campaignName}.xlsx`
+        `Информация о товарах ${campaignName} download template.xlsx`
       ),
       xlsx.build([{ name: "Лист 1", data: sheetData }])
     );
@@ -8417,6 +9750,27 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     )
   );
 
+
+  const tags = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "tags.json"
+    )
+  );
+
+  const nmFullDetailReport = readIfExists(
+    path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "nmFullDetailReport.json"
+    )
+  );
+
   const advertsInfos = readIfExists(
     path.join(__dirname, "marketMaster", uid, campaignName, "advertsInfos.json")
   );
@@ -8433,12 +9787,7 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
   const stocks = readIfExists(
     path.join(__dirname, "marketMaster", uid, campaignName, "stocks.json")
   );
-  const orders = readIfExists(
-    path.join(__dirname, "marketMaster", uid, campaignName, "orders.json")
-  );
-  const sales = readIfExists(
-    path.join(__dirname, "marketMaster", uid, campaignName, "sales.json")
-  );
+
   const placements = readIfExists(
     path.join(__dirname, "marketMaster", uid, campaignName, "placements.json")
   );
@@ -8459,14 +9808,17 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
   }
 
   ////// orders
-  if (orders) {
-    for (const [date, ordersData] of Object.entries(orders)) {
-      for (const [local_art, artOrdersData] of Object.entries(ordersData.all)) {
-        if (!(local_art in arts.byArt)) continue;
-        const art = arts.byArt[local_art].brand_art;
-        if (!(art in advertsStatsByArt)) advertsStatsByArt[art] = {};
+  if (nmFullDetailReport) {
+    for (const [nmId, nmIdData] of Object.entries(nmFullDetailReport)) {
+      if (nmIdData === undefined) continue;
+      const stats = nmIdData ? nmIdData.statistics : undefined;
+      if (stats === undefined) continue;
+      for (const [date, artOrdersData] of Object.entries(stats)) {
+        if (!arts.byNmId[nmId]) continue;
+        const art = arts.byNmId[nmId].art;
+        if (!advertsStatsByArt[art]) advertsStatsByArt[art] = {};
 
-        if (!(date in advertsStatsByArt[art])) {
+        if (!advertsStatsByArt[art][date]) {
           advertsStatsByArt[art][date] = {
             orders: 0,
             sum_orders: 0,
@@ -8478,35 +9830,10 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
           };
         }
 
-        advertsStatsByArt[art][date].orders += artOrdersData.count;
-        advertsStatsByArt[art][date].sum_orders += artOrdersData.sum;
-
-      }
-    }
-  }
-
-  ///// sales
-  if (sales) {
-    for (const [local_art, artSalesData] of Object.entries(sales)) {
-      if (local_art == 'byObject') continue;
-      for (const [date, salesData] of Object.entries(artSalesData.all)) {
-        if (!(local_art in arts.byArt)) continue;
-        const art = arts.byArt[local_art].brand_art;
-        if (!(art in advertsStatsByArt)) advertsStatsByArt[art] = {};
-        if (!(date in advertsStatsByArt[art])) {
-          advertsStatsByArt[art][date] = {
-            orders: 0,
-            sum_orders: 0,
-            sum: 0,
-            views: 0,
-            clicks: 0,
-            sales: 0,
-            sum_sales: 0,
-          };
-        }
-
-        advertsStatsByArt[art][date].sales += salesData.count;
-        advertsStatsByArt[art][date].sum_sales += salesData.sum;
+        advertsStatsByArt[art][date].orders += artOrdersData.ordersCount;
+        advertsStatsByArt[art][date].sum_orders += artOrdersData.ordersSumRub;
+        advertsStatsByArt[art][date].sales += artOrdersData.buyoutsCount;
+        advertsStatsByArt[art][date].sum_sales += artOrdersData.buyoutsSumRub;
 
       }
     }
@@ -8570,12 +9897,15 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     const art = artData.art;
     if (!(art in jsonData)) jsonData[art] = {};
 
+    const tags_art = tags[nmId] ?? [];
+
     jsonData[art].art = art;
     jsonData[art].object = artData.object;
     jsonData[art].photos = artData.photos;
     jsonData[art].imtId = artData.imtId;
     jsonData[art].nmId = parseInt(nmId);
     jsonData[art].title = artData.title;
+    jsonData[art].tags = tags_art;
     jsonData[art].size = artData.size;
     jsonData[art].adverts = artsWithAdverts[art];
     jsonData[art].advertsStats = advertsStatsByArt[art];
@@ -8585,6 +9915,7 @@ const calcMassAdvertsNewAndWriteToJsonMM = (
     jsonData[art].advertsStocksThreshold = advertsStocksThreshold[art];
     jsonData[art].placements = placements[art];
     jsonData[art].advertsSelectedPhrases = advertsSelectedPhrases[art];
+    jsonData[art].nmFullDetailReport = nmFullDetailReport[nmId];
 
 
     const sizes = artData.sizes;
@@ -8687,6 +10018,107 @@ const updateAdvertsSelectedPhrasesMM = (uid, campaignName, data) => {
   });
 };
 
+const saveNoteMM = (uid, campaignName, data) => {
+  return new Promise((resolve, reject) => {
+    const notesPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "notes.json"
+    );
+    const notes = readIfExists(notesPath);
+
+    console.log(new Date(), uid, campaignName, data);
+
+    const { note, tags } = data;
+    if (note === undefined) {
+      resolve();
+      return;
+    }
+
+    const date = new Date();
+    const strFullDate = getLocaleDateString(date);
+    const strDate = strFullDate.slice(0, 10);
+    if (!notes[strDate]) notes[strDate] = { all: [] };
+    notes[strDate].all.push({ note: note, tags: tags, time: date.toISOString() });
+
+    afs.writeFileSync(
+      notesPath,
+      JSON.stringify(notes)
+    );
+
+    resolve();
+  });
+};
+
+const setTagsMM = (uid, campaignName, data) => {
+  return new Promise((resolve, reject) => {
+    const tagsPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "tags.json"
+    );
+    const tags = readIfExists(tagsPath);
+
+    console.log(new Date(), uid, campaignName, data);
+
+    const { mode, tag, nmIds } = data;
+    if (mode === undefined || tag === undefined || nmIds === undefined) {
+      resolve();
+      return;
+    }
+
+    for (const nmId of nmIds) {
+      if (!tags[nmId]) tags[nmId] = []
+
+      if (mode == 'Установить') {
+        if (!tags[nmId].includes(tag))
+          tags[nmId].push(tag)
+      }
+      else if (mode == 'Удалить') {
+        tags[nmId] = tags[nmId].filter((val) => val != tag);
+      }
+    }
+
+    afs.writeFileSync(
+      tagsPath,
+      JSON.stringify(tags)
+    );
+
+    resolve();
+  });
+};
+
+const getAllTags = (uid, campaignName) => {
+  return new Promise((resolve, reject) => {
+
+    const tags = readIfExists(path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "tags.json"
+    ));
+
+    const jsonData = { tags: [] }
+    for (const [nmId, nmIdTags] of Object.entries(tags)) {
+      if (!nmId || !nmIdTags) continue;
+      for (const tag of nmIdTags) {
+        if (jsonData.tags.includes(tag)) continue;
+
+        jsonData.tags.push(tag);
+
+      }
+    }
+    // console.log(jsonData);
+
+    resolve(jsonData);
+  })
+}
+
 const setAdvertsSchedulesAndWriteToJsonMM = (uid, campaignName, data) => {
   return new Promise((resolve, reject) => {
     const advertsSchedulesPath = path.join(
@@ -8700,23 +10132,316 @@ const setAdvertsSchedulesAndWriteToJsonMM = (uid, campaignName, data) => {
 
     console.log(new Date(), uid, campaignName, data);
 
-    const { schedule } = data;
+    const { schedule, mode } = data;
 
     if (data.advertsIds)
       for (const [advertId, advertData] of Object.entries(data.advertsIds)) {
         if (!advertId || !advertData) continue;
-        if (!advertsSchedules[advertId]) advertsSchedules[advertId] = {};
-        advertsSchedules[advertId].schedule = schedule;
-        advertsSchedules[advertId].updateTime =
-          new Date().toISOString();
+        if (mode == 'Установить') {
+          if (!advertsSchedules[advertId]) advertsSchedules[advertId] = {};
+          advertsSchedules[advertId].schedule = schedule;
+          advertsSchedules[advertId].updateTime =
+            new Date().toISOString();
 
-        console.log(new Date(), uid, campaignName, advertId, 'set schedule.');
+          console.log(new Date(), uid, campaignName, advertId, 'set schedule.');
+        }
+        else if (mode == 'Удалить') {
+          advertsSchedules[advertId] = undefined;
+          console.log(new Date(), uid, campaignName, advertId, 'delete schedule.');
+        }
       }
 
 
     afs.writeFileSync(
       advertsSchedulesPath,
       JSON.stringify(advertsSchedules)
+    )
+
+    resolve();
+  })
+};
+
+const fixArtPricesAndWriteToJsonMM = (uid, campaignName, data) => {
+  return new Promise((resolve, reject) => {
+    const fixArtPricesPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "fixArtPrices.json"
+    );
+    const fixArtPrices = readIfExists(fixArtPricesPath);
+
+    console.log(new Date(), uid, campaignName, data);
+
+    const { nmIds } = data;
+
+    if (nmIds)
+      for (const [_, nmIdData] of Object.entries(nmIds)) {
+        const { nmId, enteredValue } = nmIdData ?? {};
+        if (nmId === undefined) continue;
+        if (enteredValue !== undefined) {
+          if (!fixArtPrices[nmId]) fixArtPrices[nmId] = {};
+          fixArtPrices[nmId].enteredValue = enteredValue;
+          fixArtPrices[nmId].updateTime =
+            new Date().toISOString();
+
+          console.log(new Date(), uid, campaignName, nmId, 'fixed prices', enteredValue);
+        }
+        else {
+          if (!fixArtPrices[nmId]) continue;
+          delete fixArtPrices[nmId];
+          console.log(new Date(), uid, campaignName, nmId, 'delete fixed prices');
+        }
+      }
+
+
+    afs.writeFileSync(
+      fixArtPricesPath,
+      JSON.stringify(fixArtPrices)
+    )
+
+    resolve();
+  })
+};
+
+const autoSetFixArtPricesMM = (uid, campaignName) => {
+  return new Promise(async (resolve, reject) => {
+
+    const fixArtPricesPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "fixArtPrices.json"
+    );
+    const fixArtPrices = readIfExists(fixArtPricesPath);
+
+    const arts = readIfExists(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "arts.json"
+      )
+    );
+    const stocks = readIfExists(
+      path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "stocks.json"
+      )
+    )
+
+    const sppPricesParsed = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'sppPricesParsed.json'
+      )
+    );
+
+
+    const strTodayDate = getLocaleDateString(new Date()).slice(0, 10)
+
+    const iterList = [];
+    for (const [art, artData] of Object.entries(arts.byArt)) {
+      iterList.push({ art, artData });
+    }
+    iterList.sort((a, b) => {
+      const artA = a.art;
+      const stockA = stocks[strTodayDate] ? stocks[strTodayDate].all[artA] ? stocks[strTodayDate].all[artA].quantity ?? 0 : 0 : 0;
+
+      const artB = b.art;
+      const stockB = stocks[strTodayDate] ? stocks[strTodayDate].all[artB] ? stocks[strTodayDate].all[artB].quantity ?? 0 : 0 : 0;
+
+      return stockB - stockA;
+    })
+
+    const sppJsonToHelp = {}
+    const sppData = {}
+    for (let iter = 0; iter < iterList.length; iter++) {
+      const { art, artData } = iterList[iter]
+      if (art === undefined || artData === undefined) continue;
+
+
+      const { nmId, size, object } = artData;
+
+      let spp = sppPricesParsed.arts[nmId] ?
+        sppPricesParsed.arts[nmId].sizes[size] ?
+          sppPricesParsed.arts[nmId].sizes[size].spp
+          : undefined : undefined;
+
+      if (spp) {
+        if (!sppJsonToHelp[object]) sppJsonToHelp[object] = {}
+        if (!sppJsonToHelp[object][spp]) sppJsonToHelp[object][spp] = 0
+        sppJsonToHelp[object][spp]++;
+      }
+      else {
+        const findSpp = () => {
+          let res = { spp: 0, count: 0 };
+          if (!sppJsonToHelp[object]) return 0;
+          for (let [spp, count] of Object.entries(sppJsonToHelp[object])) {
+            spp = Math.round(Number(spp))
+            if (count > res.count) res = { spp, count }
+          }
+          return res.spp;
+        }
+        spp = findSpp();
+      }
+
+      sppData[nmId] = spp;
+    }
+
+    const artsDataUploaded = readIfExists(
+      path.join(
+        __dirname,
+        'marketMaster',
+        uid,
+        campaignName,
+        'artsDataUploaded.json'
+      )
+    );
+
+    const getSomeArt = (nmId) => {
+      const sizes = arts.byNmId[nmId].sizes;
+      for (let i = 0; i < sizes.length; i++) {
+        const sku = sizes[i].skus[0];
+        return arts.bySku[sku];
+      }
+    }
+
+    const byNmId = {}
+    const paramsToUpdate = {
+      data: [],
+    }
+
+    for (const [id, nmIdData] of Object.entries(fixArtPrices)) {
+      if (id === undefined || nmIdData === undefined) continue;
+      const { enteredValue } = nmIdData;
+      const { nmId } = arts.byNmId[id] ?? {};
+      if (nmId === undefined || enteredValue === undefined) continue;
+
+      const { discount } = enteredValue;
+
+      const { art, object, brand } = getSomeArt(nmId);
+      // console.log(art, artsDataUploaded[art]);
+
+      const { prices } = artsDataUploaded[art] ?? {};
+      const primeCost = prices['Себестоимость 1'] ?? {};
+      if (primeCost === undefined) continue;
+
+      const spp = sppData[nmId];
+
+      let rozPrice = undefined;
+      let sppPrice = undefined;
+
+      if (enteredValue['primeCostMarkup'] && primeCost) {
+        rozPrice = primeCost * (1 + enteredValue['primeCostMarkup'] / 100);
+      }
+      else if (enteredValue['rozPrice']) {
+        rozPrice = enteredValue['rozPrice'];
+      }
+      else if (enteredValue['sppPrice'] && spp) {
+        sppPrice = enteredValue['sppPrice'];
+        rozPrice = sppPrice / (1 - spp / 100);
+      }
+      else if (enteredValue['profit'] !== undefined || enteredValue['rentabelnost'] !== undefined) {
+        try {
+          const date = new Date();
+          const yesterday = new Date(date);
+          yesterday.setDate(yesterday.getDate() - 1);
+          const weekAgo = new Date(date);
+          weekAgo.setDate(yesterday.getDate() - 6);
+          const params = {
+            ...enteredValue, filters: {
+              arts: [art],
+              brands: [brand],
+              objects: [object],
+            }
+          };
+          console.log(params);
+          const pr = await calcPricesMM(uid, campaignName, { lbd: weekAgo, rbd: yesterday },
+            params
+          );
+          if (!pr) continue;
+          rozPrice = pr[art] ? pr[art].rozPrice : undefined;
+
+          delete pr;
+        }
+        catch (e) {
+          console.log(e);
+        }
+      }
+
+      const wbPrice = Math.round(rozPrice / (1 - discount / 100));
+      // console.log(art, nmId, rozPrice, wbPrice, primeCost, spp);
+
+      if (rozPrice && wbPrice && rozPrice > primeCost) {
+        byNmId[nmId] = {
+          nmID: nmId,
+          price: wbPrice,
+          discount: discount,
+        }
+      };
+    }
+
+    for (const [_, nmIdData] of Object.entries(byNmId)) {
+      paramsToUpdate.data.push(nmIdData);
+    }
+
+    console.log(paramsToUpdate.data);
+
+    updatePricesMM(uid, campaignName, paramsToUpdate).then(() => resolve()).catch((e) => { console.log(e); resolve() })
+  })
+};
+
+const setPlanForKeyAndWriteToJsonMM = (uid, campaignName, data) => {
+  return new Promise((resolve, reject) => {
+    const plansForKeysPath = path.join(
+      __dirname,
+      "marketMaster",
+      uid,
+      campaignName,
+      "plansForKeys.json"
+    );
+    const plansForKeys = readIfExists(plansForKeysPath);
+
+    console.log(new Date(), uid, campaignName, data);
+
+    const { plan, mode, entity, planKey } = data;
+    if (plan === undefined || mode === undefined || entity === undefined || planKey === undefined) {
+      resolve();
+      return;
+    }
+
+    const { monthName, dayPlan } = plan;
+
+    if (mode == 'Установить') {
+      if (!plansForKeys[entity]) plansForKeys[entity] = {};
+      if (!plansForKeys[entity][planKey]) plansForKeys[entity][planKey] = {};
+      plansForKeys[entity][planKey][monthName] = { dayPlan };
+      plansForKeys[entity][planKey].updateTime =
+        new Date().toISOString();
+
+      console.log(new Date(), uid, campaignName, entity, planKey, plan, 'set plan.');
+    }
+    else if (mode == 'Удалить') {
+      if (plansForKeys[entity] && plansForKeys[entity][planKey])
+        delete plansForKeys[entity][planKey];
+
+      console.log(new Date(), uid, campaignName, entity, planKey, 'delete plan.');
+    }
+
+
+    afs.writeFileSync(
+      plansForKeysPath,
+      JSON.stringify(plansForKeys)
     )
 
     resolve();
@@ -8986,7 +10711,7 @@ const depositAndStart = async (uid, campaignName, advertsIdsArray) => {
       }
       await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
     }
-    await new Promise((resolve) => setTimeout(resolve, 120 * 1000));
+    await new Promise((resolve) => setTimeout(resolve, 7 * 60 * 1000));
     for (let i = 0; i < advertsIdsArray.length; i++) {
       const advertId = parseInt(advertsIdsArray[i]);
       await changeAdvertActivity(authToken, "start", { id: advertId });
@@ -10119,7 +11844,7 @@ const calculateNewValuesAndWriteToXlsx = (campaign) => {
   }
   // console.log(new Date(), data);
   for (const [index, brand] of Object.entries(brands)) {
-    console.log(new Date(), brand, json_data);
+    // console.log(new Date(), brand, json_data);
     if (!json_data[brand]) continue;
     json_data[brand][0][19] = "Наценка";
     for (let i = 1; i < json_data[brand].length; i++) {
@@ -10401,6 +12126,7 @@ module.exports = {
   autoSetMinusPhrasesMM,
   calcNomenclaturesAndWriteToJsonMM,
   setByWarehousesInfoMM,
+  updatePricesMM,
   calcPricesTemplateAndWriteToXlsxMM,
   depositAndStart,
   calcPricesJsonDataMM,
@@ -10411,20 +12137,32 @@ module.exports = {
   getTariffsBoxAndWriteToJsonMM,
   fetchNmDetailReportAndWriteToJsonMM,
   calcSmartDetailedByPeriodAndWriteToJSON,
+  saveNoteMM,
   autoManageAdvertsSchedule,
   calcMassAdvertsNewAndWriteToJsonMM,
   getRoundValue,
   autoAdvertsManagingMM,
   changeAdvertActivity,
   updateAdvertsManagerRulesMM,
+  calcPricesMM,
+  changeUploadedArtsDataForKeyMM,
   updateAdvertsSelectedPhrasesMM,
   autoAdvertsStopMM,
   setAdvertsSchedulesAndWriteToJsonMM,
+  getLocaleDateString,
   getPlacements,
   fetchPaymentsHistoryMM,
+  autoSetFixArtPricesMM,
   fetchBalanceWithRetry,
+  fixArtPricesAndWriteToJsonMM,
   getDaysInWork,
+  setPlanForKeyAndWriteToJsonMM,
+  setTagsMM,
   fetchAdvertWords,
   fetchArtsPricesAndWriteToJsonMM,
+  getNmDetailReport,
+  getRoundValue,
+  getAllTags,
+  calcAnalyticsMM,
   readIfExists,
 };
