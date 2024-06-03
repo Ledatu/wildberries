@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { fetchBalanceWithRetry } = require("./main");
+const { fetchBalanceWithRetry, readIfExists } = require("./main");
 
 const autoTest = async () => {
   return new Promise(async (resolve, reject) => {
@@ -12,8 +12,18 @@ const autoTest = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
-        fetchBalanceWithRetry(uid, campaignName).then(() => { console.log(uid, campaignName, 'fetched'); }).catch((e) => console.log(uid, campaignName, e))
 
+        // const advertsAutoBidsRulesPath = path.join(__dirname, "marketMaster", uid, campaignName, 'advertsAutoBidsRules.json')
+
+        // const advertsAutoBidsRules = readIfExists(advertsAutoBidsRulesPath);
+
+        // for (const [advertId, rules] of Object.entries(advertsAutoBidsRules)) {
+        // advertsAutoBidsRules[advertId].updateTime = new Date().toISOString()
+        // }
+
+        // console.log(advertsAutoBidsRules);
+
+        // fs.writeFileSync(advertsAutoBidsRulesPath, JSON.stringify(advertsAutoBidsRules))
       }
     }
     await Promise.all(promises).then(() => resolve());

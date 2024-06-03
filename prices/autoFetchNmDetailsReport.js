@@ -34,4 +34,4 @@ const autofetchNmDetailReportAndWriteToJsonMM = async (days) => {
 
 scheduleJob("2 0 * * *", () => autofetchNmDetailReportAndWriteToJsonMM(90));
 scheduleJob("*/15 * * * *", () => autofetchNmDetailReportAndWriteToJsonMM(1));
-autofetchNmDetailReportAndWriteToJsonMM(25);
+autofetchNmDetailReportAndWriteToJsonMM(30);

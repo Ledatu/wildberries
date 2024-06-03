@@ -11,7 +11,7 @@ const autoFetchAdvertsMM = async (uid, campaignName, batchSize, daysCount) => {
       batchSize,
       daysCount
     ).then(() => console.log(new Date(), uid, campaignName, "Adverts updated."));
-    await new Promise((resolve) => setTimeout(resolve, 10 * 61 * 1000));
+    await new Promise((resolve) => setTimeout(resolve, 2 * 61 * 1000));
   }
 };
 
@@ -23,7 +23,7 @@ const start = async () => {
     const campaignsNames = customerData.campaignsNames;
     for (let i = 0; i < campaignsNames.length; i++) {
       const campaignName = campaignsNames[i];
-      // if (campaignName != "Объединённая текстильная компания") continue;
+
       console.log(new Date(), uid, campaignName);
       autoFetchAdvertsMM(uid, campaignName, 100, 2);
     }
@@ -32,4 +32,4 @@ const start = async () => {
 };
 
 start();
-// autoFetchAdvertsMM(100, 22);
+// autoFetchAdvertsMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ОТК ПРОИЗВОДСТВО", 100, 25);

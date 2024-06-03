@@ -5,7 +5,11 @@ const { readIfExists, autoSetFixArtPricesMM } = require("./main");
 
 const processCampaign = async (uid, campaignName, numDates) => {
   console.log(new Date(), uid, campaignName);
-  await autoSetFixArtPricesMM(uid, campaignName);
+  try {
+    await autoSetFixArtPricesMM(uid, campaignName);
+  } catch (error) {
+    console.log(new Date(), uid, campaignName, error);
+  }
 };
 
 const start = async () => {

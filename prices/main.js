@@ -190,6 +190,7 @@ const fetchBalanceMM = (uid, campaignName) => {
       })
       .catch((e) => {
         console.log(new Date(), uid, campaignName, "balance", e['response'] ? e.response.data : e);
+        reject(e);
       });
   });
 };
@@ -702,6 +703,54 @@ const getWarehouseStocks = (authToken, warehouseId, params) => {
       }
     )
     .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const dzhemCreate = (uid, campaignName, params = {
+  id: "6a99dbe9-60de-465c-bf6b-9f6dd1b831ef",
+  reportType: "DETAIL_HISTORY_REPORT",
+  params: {
+    startDate: "2024-01-01",
+    endDate: "2024-05-30",
+  }
+}) => {
+  const authToken = getAuthTokenMM(uid, campaignName);
+  return axios
+    .post(
+      `https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads`,
+      params,
+      {
+        headers: {
+          Authorization: authToken,
+        },
+      }
+    )
+    .then((response) => response.data)
+    .catch((error) => console.error(error));
+};
+
+const dzhemCheck = (uid, campaignName) => {
+  const authToken = getAuthTokenMM(uid, campaignName);
+  return axios
+    .get(`https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads`, {
+      headers: {
+        Authorization: authToken,
+      },
+    })
+    .then((response) => console.log(response.data))
+    .catch((error) => console.error(error));
+};
+
+const dzhemGet = (uid, campaignName, uuid = "6a99dbe9-60de-465c-bf6b-9f6dd1b831ef") => {
+  const authToken = getAuthTokenMM(uid, campaignName);
+  return axios
+    .get(`https://seller-analytics-api.wildberries.ru/api/v2/nm-report/downloads/file/${uuid}`, {
+      headers: {
+        Authorization: authToken,
+        'Content-Type': 'text/csv',
+      },
+    })
+    .then((response) => afs.writeFileSync(path.join(__dirname, 'marketMaster', uid, campaignName, 'dzhem.zip'), response.data))
     .catch((error) => console.error(error));
 };
 
@@ -1375,24 +1424,28 @@ const calcAnalyticsMM = (uid, campaignName, dateRange, enteredValues) =>
         artsToSumUp.push(art);
       }
 
-      const res = { profit: 0, rentabelnost: 0, count: 0 };
+      const res = { profit: 0, rentabelnost: 0, count: 0, storageCost: 0, sppPrice: 0 };
       for (let i = 0; i < artsToSumUp.length; i++) {
         const art = artsToSumUp[i];
-        const { profit, rentabelnost } = profitsLog && profitsLog[art] && profitsLog[art][date] ? profitsLog[art][date] : {};
+        const { profit, rentabelnost, storageCost, sppPrice } = profitsLog && profitsLog[art] && profitsLog[art][date] ? profitsLog[art][date] : {};
 
         res.profit += profit ?? 0;
         res.rentabelnost += rentabelnost ?? 0;
+        res.storageCost += storageCost ?? 0;
+        res.sppPrice += sppPrice ?? 0;
         res.count++
       }
 
       res.profit = getRoundValue(res.profit, res.count)
       res.rentabelnost = getRoundValue(res.rentabelnost, res.count)
+      res.sppPrice = getRoundValue(res.sppPrice, res.count)
+      res.storageCost = getRoundValue(res.storageCost, res.count)
 
       return res;
     }
 
     const getEntities = (artData) => {
-      const entityKeys = enteredValues ? enteredValues['entityKeys'] : ['brand'];
+      const entityKeys = enteredValues ? enteredValues['entityKeys'] : ['campaignName'];
       let res_str = '';
       for (const key of entityKeys) {
         if (key == 'tags') continue;
@@ -1444,10 +1497,11 @@ const calcAnalyticsMM = (uid, campaignName, dateRange, enteredValues) =>
             if (!isInDateBoundaries(date)) continue;
 
             if (!byDateEntityStats[entity]) byDateEntityStats[entity] = {};
-            const { profit, rentabelnost } = getProfit(art, date);
+            const { profit, rentabelnost, storageCost, sppPrice } = getProfit(art, date);
 
             if (!byDateEntityStats[entity][date]) {
               byDateEntityStats[entity][date] = {
+                count: 0,
                 orders: 0,
                 sum_orders: 0,
                 sales: 0,
@@ -1457,17 +1511,37 @@ const calcAnalyticsMM = (uid, campaignName, dateRange, enteredValues) =>
                 rentabelnost: 0,
                 notes: notes[date],
                 stocks: 0,
+                openCardCount: 0,
+                addToCartCount: 0,
+                addToCartPercent: 0,
+                cartToOrderPercent: 0,
+                buyoutsPercent: 0,
+                storageCost: 0,
+                clicks: 0,
+                sppPriceTemp: 0,
+                sppPrice: 0,
               };
             }
-
+            byDateEntityStats[entity][date].count += 1;
+            byDateEntityStats[entity][date].sppPriceTemp += sppPrice;
+            byDateEntityStats[entity][date].sppPrice = getRoundValue(byDateEntityStats[entity][date].sppPriceTemp, byDateEntityStats[entity][date].count);
             // console.log(date, artOrdersData);
             byDateEntityStats[entity][date].orders += artOrdersData.ordersCount ?? 0;
             byDateEntityStats[entity][date].sum_orders += artOrdersData.ordersSumRub ?? 0;
             byDateEntityStats[entity][date].sales += artOrdersData.buyoutsCount ?? 0;
             byDateEntityStats[entity][date].sum_sales += artOrdersData.buyoutsSumRub ?? 0;
+            byDateEntityStats[entity][date].openCardCount += artOrdersData.openCardCount ?? 0;
+            byDateEntityStats[entity][date].addToCartCount += artOrdersData.addToCartCount ?? 0;
+            byDateEntityStats[entity][date].addToCartPercent = getRoundValue(byDateEntityStats[entity][date].addToCartCount,
+              byDateEntityStats[entity][date].openCardCount, true);
+            byDateEntityStats[entity][date].cartToOrderPercent = getRoundValue(byDateEntityStats[entity][date].orders,
+              byDateEntityStats[entity][date].addToCartCount, true);
+            byDateEntityStats[entity][date].buyoutsPercent = getRoundValue(byDateEntityStats[entity][date].sales,
+              byDateEntityStats[entity][date].orders, true);
 
             const realProfit = (profit ?? 0) * (artOrdersData.ordersCount ?? 0)
             byDateEntityStats[entity][date].profit += realProfit ?? 0;
+            byDateEntityStats[entity][date].storageCost += storageCost ?? 0;
 
             byDateEntityStats[entity][date].rentabelnost = getRoundValue(byDateEntityStats[entity][date].profit, byDateEntityStats[entity][date].sum_orders, true)
           }
@@ -1504,6 +1578,13 @@ const calcAnalyticsMM = (uid, campaignName, dateRange, enteredValues) =>
                 rentabelnost: 0,
                 notes: [],
                 stocks: 0,
+                openCardCount: 0,
+                addToCartCount: 0,
+                addToCartPercent: 0,
+                cartToOrderPercent: 0,
+                buyoutsPercent: 0,
+                storageCost: 0,
+                clicks: 0,
               };
             }
 
@@ -1542,12 +1623,20 @@ const calcAnalyticsMM = (uid, campaignName, dateRange, enteredValues) =>
                 rentabelnost: 0,
                 notes: [],
                 stocks: 0,
+                openCardCount: 0,
+                addToCartCount: 0,
+                addToCartPercent: 0,
+                cartToOrderPercent: 0,
+                buyoutsPercent: 0,
+                storageCost: 0,
+                clicks: 0,
               };
             }
 
-            const { sum } = dateStats;
+            const { sum, clicks } = dateStats;
 
             byDateEntityStats[entity][date].sum += sum ?? 0;
+            byDateEntityStats[entity][date].clicks += clicks ?? 0;
           }
         }
       }
@@ -1775,6 +1864,8 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
       const avg = {};
       if (nmFullDetailReport) {
         for (const [nmId, nmIdData] of Object.entries(nmFullDetailReport)) {
+          const temp_date_array = []
+
           if (nmIdData === undefined) continue;
           const artData = arts.byNmId[nmId];
           if (!artData) continue;
@@ -1798,10 +1889,16 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
             avg[art].orders += artOrdersData.ordersCount ?? 0;
             avg[art].count += artOrdersData.ordersCount ? 1 : 0;
 
+            if (artOrdersData.ordersCount && !temp_date_array.includes(date))
+              temp_date_array.push(date);
           }
+          temp_date_array.sort((a, b) => new Date(b) - new Date(a))
+          const last_date = temp_date_array[0] ?? '';
+          avg[art].avgCost = stats[last_date] ?
+            getRoundValue(stats[last_date].ordersSumRub, stats[last_date].ordersCount)
+            : getRoundValue(avg[art].sum_orders, avg[art].orders);
 
           avg[art].avg = avg[art].count ? avg[art].orders / avg[art].count : 0;
-          avg[art].avgCost = getRoundValue(avg[art].sum_orders, avg[art].orders);
         }
       }
 
@@ -1864,22 +1961,6 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
 
         if (!orders[strTempDate]) continue;
         if (!tariffs || !Object.keys(tariffs).length) continue;
-        if (!orders[strTempDate].all[art]) {
-          const koef = tariffs["Краснодар"].boxDeliveryAndStorageExpr / 100;
-          logistics.delivery +=
-            (tariffs["Краснодар"].boxDeliveryBase / koef) *
-            (volume < 1 ? volume : 1);
-          if (volume > 1) {
-            logistics.delivery +=
-              (volume - 1) * (tariffs["Краснодар"].boxDeliveryLiter / koef);
-          }
-
-          logistics.delivery += (1 - buyoutsPercent / 100) * 50;
-          logistics.delivery *= ktr ?? 1;
-
-          logistics.orders += 1;
-          continue;
-        }
 
         for (const [warehouseName, warehouseData] of Object.entries(
           orders[strTempDate]
@@ -1913,13 +1994,32 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
           warehouseOrders.delivery += count * (1 - buyoutsPercent / 100) * 50;
           warehouseOrders.delivery *= ktr ?? 1;
 
-          logistics.delivery += warehouseOrders.delivery;
+          logistics.delivery += warehouseOrders.delivery / (buyoutsPercent / 100);
           logistics.orders += warehouseOrders.orders;
           logistics.sum_orders += warehouseOrders.sum_orders;
+
         }
       }
+
+      if (!logistics.orders) {
+        const koef = tariffs[Object.keys(tariffs)[0]].boxDeliveryAndStorageExpr / 100;
+        logistics.delivery +=
+          (tariffs[Object.keys(tariffs)[0]].boxDeliveryBase / koef) *
+          (volume < 1 ? volume : 1);
+        if (volume > 1) {
+          logistics.delivery +=
+            (volume - 1) * (tariffs[Object.keys(tariffs)[0]].boxDeliveryLiter / koef);
+        }
+
+        logistics.delivery += (1 - buyoutsPercent / 100) * 50;
+        logistics.delivery *= ktr ?? 1;
+
+        logistics.orders += 1;
+      }
+
       logistics.avg =
         getRoundValue(logistics.delivery, logistics.orders, true) / 100;
+
 
       return logistics;
     }
@@ -2001,6 +2101,15 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
           const stats = nmIdData ? nmIdData.statistics : undefined;
           if (stats === undefined) continue;
 
+          if (!drrDataAvg[art]) drrDataAvg[art] = {
+            clicks: 0,
+            views: 0,
+            sum: 0,
+            orders: 0,
+            cpo: 0,
+            sum_orders: 0,
+          };
+
           if (!drrDataAvg[brand]) drrDataAvg[brand] = {}
           if (!drrDataAvg[brand][object])
             drrDataAvg[brand][object] = {
@@ -2015,10 +2124,27 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
           for (const [date, artOrdersData] of Object.entries(stats)) {
             if (!isInDateBoundaries(date)) continue;
 
+            drrDataAvg[art].orders += artOrdersData.ordersCount ?? 0;
+            drrDataAvg[art].sum_orders += artOrdersData.ordersSumRub ?? 0;
+
+
             drrDataAvg[brand][object].orders += artOrdersData.ordersCount ?? 0;
             drrDataAvg[brand][object].sum_orders += artOrdersData.ordersSumRub ?? 0;
 
           }
+          drrDataAvg[art].drr = getRoundValue(
+            drrDataAvg[art].sum,
+            drrDataAvg[art].sum_orders,
+            true,
+            1
+          );
+          drrDataAvg[art].cpo = getRoundValue(
+            drrDataAvg[art].sum,
+            drrDataAvg[art].orders,
+            false,
+            drrDataAvg[art].sum,
+          );
+
           drrDataAvg[brand][object].drr = getRoundValue(
             drrDataAvg[brand][object].sum,
             drrDataAvg[brand][object].sum_orders,
@@ -2054,15 +2180,25 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
           const { orders, sum_orders } = ordersData ?? {};
           if (orders === undefined || sum_orders === undefined) continue;
 
+          if (!res[art]) res[art] = { warehousePrice: 0, orders: 0, avgCost: 0 };
           if (!res[brand]) res[brand] = {}
           if (!res[brand][object]) res[brand][object] = { warehousePrice: 0, orders: 0, avgCost: 0 };
 
           const { warehousePrice } = storage[art] ? storage[art].byDate[strTempDate] ?? {} : {};
           if (warehousePrice) {
+            res[art].warehousePrice += warehousePrice;
             res[brand][object].warehousePrice += warehousePrice;
           }
 
+          res[art].orders += orders;
           res[brand][object].orders += orders;
+
+          res[art].avgCost = getRoundValue(
+            res[art].warehousePrice,
+            res[art].orders,
+            false,
+            res[art].warehousePrice
+          );
 
           res[brand][object].avgCost = getRoundValue(
             res[brand][object].warehousePrice,
@@ -2120,7 +2256,8 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
 
 
 
-      const storageCostForArt = (groupedStorage[brand] ? groupedStorage[brand][object] ? groupedStorage[brand][object] ? groupedStorage[brand][object].avgCost : 0 : 0 : 0);
+      // const storageCostForArt = (groupedStorage[brand] ? groupedStorage[brand][object] ? groupedStorage[brand][object] ? groupedStorage[brand][object].avgCost : 0 : 0 : 0);
+      const storageCostForArt = (groupedStorage[art] ? groupedStorage[art].avgCost : 0);
 
       const priceInfo = prices[nmId].sizes[size];
 
@@ -2131,10 +2268,10 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
         priceInfo.discount = prices[nmId].discount;
       }
 
-      priceInfo.spp = sppPricesParsed.arts[nmId] ?
+      priceInfo.spp = sppPricesParsed.arts ? sppPricesParsed.arts[nmId] !== undefined ?
         sppPricesParsed.arts[nmId].sizes[size] ?
           sppPricesParsed.arts[nmId].sizes[size].spp
-          : undefined : undefined;
+          : undefined : undefined : undefined;
       if (priceInfo.spp) {
         if (!sppJsonToHelp[object]) sppJsonToHelp[object] = {}
         if (!sppJsonToHelp[object][priceInfo.spp]) sppJsonToHelp[object][priceInfo.spp] = 0
@@ -2159,10 +2296,10 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
       const { avg, avgCost } = ordersData[brand_art] ?? { avg: 0, avgCost: 0 };
       const num_sizes = arts.byBrandArt[brand_art].sizes.length;
       const art_avg = num_sizes ? avg / num_sizes : 0;
+      const obor = getRoundValue(stock, art_avg ?? 0, false, stock ? 999 : 0);
       // if (art.includes('ФТБЛ')) {
       //   console.log(art, avg, art_avg);
       // }
-      const obor = getRoundValue(stock, art_avg ?? 0, false, stock ? 999 : 0);
 
       const primeCost = artsDataUploaded[art] ? artsDataUploaded[art].prices ? artsDataUploaded[art].prices['Себестоимость 1'] ?? 0 : 0 : 0;
       const commision = getComissionPercent(art)
@@ -2170,8 +2307,11 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
       const logistics = getAvgLogistics(artData, ktr, volume)
       const deliverySum = logistics.avg;
 
-      const cpo = advertsAvgStatsByArt[brand][object]
-        ? advertsAvgStatsByArt[brand][object].cpo
+      // const cpo = advertsAvgStatsByArt[brand][object]
+      //   ? advertsAvgStatsByArt[brand][object].cpo
+      //   : 0;
+      const cpo = advertsAvgStatsByArt[brand_art]
+        ? advertsAvgStatsByArt[brand_art].cpo
         : 0;
 
       const getNumVal = (val, divPers = false) => {
@@ -2186,28 +2326,38 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
       let sppPrice;
       let wbWalletPrice;
 
+      let valueFromOborRuleSet = undefined;
+      if (enteredValue && enteredValue['oborRuleSet']) {
+        for (const [key, val] of Object.entries(enteredValue['oborRuleSet'])) {
+          if (parseInt(key != '999' ? key : '999999') >= obor) {
+            valueFromOborRuleSet = val;
+            break;
+          }
+        }
+      }
+
       if (enteredValue && enteredValue['useAvgCost']) {
         rozPrice = avgCost ? avgCost : Math.round(priceInfo.price * (1 - priceInfo.discount / 100));
         sppPrice = Math.floor(rozPrice * (1 - priceInfo.spp / 100));
         wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
       }
       else if (enteredValue && enteredValue['primeCostMarkup']) {
-        rozPrice = primeCost * (1 + enteredValue['primeCostMarkup'] / 100);
+        rozPrice = primeCost * (1 + (valueFromOborRuleSet ?? enteredValue['primeCostMarkup']) / 100);
         sppPrice = Math.floor(rozPrice * (1 - priceInfo.spp / 100));
         wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
       }
       else if (enteredValue && enteredValue['rozPrice']) {
-        rozPrice = enteredValue['rozPrice'];
+        rozPrice = valueFromOborRuleSet ?? enteredValue['rozPrice'];
         sppPrice = Math.floor(rozPrice * (1 - priceInfo.spp / 100));
         wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
       }
       else if (enteredValue && enteredValue['sppPrice']) {
-        sppPrice = enteredValue['sppPrice'];
+        sppPrice = valueFromOborRuleSet ?? enteredValue['sppPrice'];
         rozPrice = Math.floor(sppPrice / (1 - priceInfo.spp / 100));
         wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
       }
       else if (enteredValue && enteredValue['rentabelnost']) {
-        const rent = enteredValue['rentabelnost'];
+        const rent = valueFromOborRuleSet ?? enteredValue['rentabelnost'];
         const sppPercent = (1 - priceInfo.spp / 100);
         rozPrice = getRoundValue(
           ad + primeCost + deliverySum + storageCostForArt, 1 - (rent / 100) - (commision / 100) - sppPercent * (tax / 100) - sppPercent * (expences / 100)
@@ -2216,7 +2366,7 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
         wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
       }
       else if (enteredValue && enteredValue['profit']) {
-        const profit = enteredValue['profit'];
+        const profit = valueFromOborRuleSet ?? enteredValue['profit'];
         const sppPercent = (1 - priceInfo.spp / 100);
         rozPrice = getRoundValue(
           ad + primeCost + deliverySum + storageCostForArt + profit, 1 - (commision / 100) - sppPercent * (tax / 100) - sppPercent * (expences / 100)
@@ -2225,7 +2375,7 @@ const calcPricesMM = (uid, campaignName, dateRange, enteredValue = undefined, fi
         wbWalletPrice = Math.floor(rozPrice * (1 - priceInfo.wb / 100));
       }
       else if (enteredValue && enteredValue['wbWalletPrice']) {
-        wbWalletPrice = enteredValue['wbWalletPrice'];
+        wbWalletPrice = valueFromOborRuleSet ?? enteredValue['wbWalletPrice'];
         rozPrice = Math.floor(wbWalletPrice / (1 - priceInfo.wb / 100));
         sppPrice = Math.floor(rozPrice * (1 - priceInfo.spp / 100));
       }
@@ -4535,7 +4685,7 @@ const updatePricesMM = async (uid, campaignName, params) => {
     )
     .then((response) => response.data)
     .catch((error) => {
-      console.error(error.response.data);
+      console.error(error.response ? error.response.data : error);
       fs.writeFile(
         path.join(__dirname, "marketMaster", uid, campaignName, "updatePricesErrorLog.json"),
         JSON.stringify(error)
@@ -6408,7 +6558,6 @@ const depositAdvertsBudgetsAndWriteToJsonMM = async (
 
           if (advertData.type != 8 && advertData.type != 9 && advertData.type != 6) continue;
 
-          console.log(new Date(), uid, campaignName, advertData.name, advertId, mode, budget);
 
           let payType = 0;
           if (balance.net && balance.net >= budget) payType = 1;
@@ -6438,6 +6587,7 @@ const depositAdvertsBudgetsAndWriteToJsonMM = async (
             : advertsBudgets[advertId];
           toRestart.push(advertId);
           await new Promise((resolve) => setTimeout(resolve, 1.5 * 1000));
+          console.log(new Date(), uid, campaignName, advertData.name, advertId, mode, budget, newBudget);
 
         } else if (mode == "Установить лимит") {
           advertsBudgetsToKeep[advertId] = budget == 0 ? undefined : budget;
@@ -6718,7 +6868,11 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
           }
           if (type == 9) {
             params["instrument"] = 4
-            await setAdvertCPM(authToken, params);
+            await setAdvertCPM(authToken, {
+              advertId: params.advertId,
+              type: params.type,
+              cpm: 150,
+            });
             await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
 
             params["instrument"] = 6
@@ -6742,13 +6896,18 @@ const setAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName, data) => {
           if (desiredDRR == undefined) continue;
           console.log(new Date(), uid, campaignName, advertId, mode, desiredDRR, maxBid, placementsRange);
 
+          let oldRules = undefined;
           if (!advertsAutoBidsRules[advertId]) advertsAutoBidsRules[advertId] = {};
+          else {
+            oldRules = advertsAutoBidsRules[advertId];
+          }
 
           advertsAutoBidsRules[advertId] = {
             desiredDRR: desiredDRR,
             maxBid: maxBid,
             autoBidsMode: autoBidsMode,
             placementsRange: placementsRange,
+            updateTime: oldRules ? (autoBidsMode != oldRules.autoBidsMode || placementsRange.from != oldRules.placementsRange.from || placementsRange.to != oldRules.placementsRange.to) ? new Date().toISOString() : oldRules.updateTime : new Date().toISOString(),
           };
 
           // if (!advertsStocksThreshold[art]) advertsStocksThreshold[art] = {};
@@ -6824,6 +6983,22 @@ const getDaysInWork = (createTime) => {
 }
 
 const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
+  const outputLog = afs.createWriteStream(path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "autoSetAdvertsCPMsLog.log"
+  ), { flags: 'a' });
+  const errorsLog = afs.createWriteStream(path.join(
+    __dirname,
+    "marketMaster",
+    uid,
+    campaignName,
+    "autoSetAdvertsCPMsErrorsLog.log"
+  ), { flags: 'a' });
+  const consoler = new console.Console(outputLog, errorsLog);
+
   return new Promise((resolve, reject) => {
     try {
 
@@ -6845,6 +7020,13 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
         campaignName,
         "advertsInfos.json"
       );
+      const placementsAuctions = readIfExists(path.join(
+        __dirname,
+        "marketMaster",
+        uid,
+        campaignName,
+        "placementsAuctions.json"
+      ));
       const advertsPath = path.join(
         __dirname,
         "marketMaster",
@@ -6884,7 +7066,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
         );
       }
       catch (e) {
-        console.log(new Date(), e);
+        consoler.log(new Date(), e);
         resolve();
         return;
       }
@@ -6930,7 +7112,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
 
             const { imtId, art } = arts.byNmId[nmId]
             if (!campaignMassAdvertsData[art]) continue;
-            const { index } = campaignMassAdvertsData[art].placements;
+            const { index } = campaignMassAdvertsData[art].placements ?? { index: -1 };
             if (advertsArts[advertId].topArt.art == '' || advertsArts[advertId].topArt.index == -1 || advertsArts[advertId].topArt.index > (index == -1 ? 10 * 1000 : index)) {
               advertsArts[advertId].topArt.index = index;
               advertsArts[advertId].topArt.art = art;
@@ -6941,8 +7123,8 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
               else continue;
               advertsArts[advertId].imtIdNms.nms = advertsArts[advertId].imtIdNms.nms.concat(artsByImntId[imtId] ?? []);
             } catch (e) {
-              console.log(new Date(), e, campaignName, "ASDASDASDASd");
-              console.log(new Date(), advertsArts[advertId], advertsArts[advertId].imtIdNms, advertsArts[advertId].imtIdNms.included);
+              consoler.log(new Date(), e, campaignName, "ASDASDASDASd");
+              consoler.log(new Date(), advertsArts[advertId], advertsArts[advertId].imtIdNms, advertsArts[advertId].imtIdNms.included);
             }
           }
 
@@ -6952,10 +7134,12 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
           if (!id || !advertInfos) continue;
           if (!adverts[id]) continue;
 
+          if (id != '17542128') continue;
+
+
           const { name, type, status, createTime, advertId } = advertInfos;
           if (![8, 6, 9].includes(type)) continue;
           if (status != 9) continue;
-
 
           const daysInWork = getDaysInWork(createTime);
 
@@ -6989,8 +7173,10 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             campaignMassAdvertsData[art].placements;
 
           let position = undefined;
+          let supplier = undefined
           if (log) {
             position = log.position + 1;
+            supplier = log.supplier;
           }
 
           const prevBids = advertsBidsLog[advertId]
@@ -6998,7 +7184,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
 
           const bidsRules = advertsAutoBidsRules[id]
 
-          console.log(new Date(), uid, campaignName, id, 'bidsRules:', bidsRules, `index: ${index} cpmIndex: ${cpmIndex}`);
+          consoler.log(new Date(), uid, campaignName, id, 'bidsRules:', bidsRules, `index: ${index} cpmIndex: ${cpmIndex}`);
 
           if (!bidsRules) {
             if (!(advertId in advertsBidsLog))
@@ -7070,7 +7256,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
                   //   campaignMassAdvertsData[art].advertsStats &&
                   //   !campaignMassAdvertsData[art].advertsStats[strDate]
                   // )
-                  // console.log(new Date(), uid, campaignName, art, strDate, sum, orders, sum_orders);
+                  // consoler.log(new Date(), uid, campaignName, art, strDate, sum, orders, sum_orders);
 
                   if (nms.includes(arts.byBrandArt[art].nmId)) {
                     res.orders += orders;
@@ -7093,18 +7279,51 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             res.cr = getRoundValue(res.orders, res.views, true);
             res.drr = getRoundValue(res.sum, res.sum_orders, true, 1);
 
-            // console.log(new Date(), uid, campaignName, advertsType, res);
+            // consoler.log(new Date(), uid, campaignName, advertsType, res);
 
             return res;
           };
 
-          if (prevBids && prevBids.length > 0) {
-            if (new Date(updateTime).getTime() <=
-              new Date(
-                prevBids.slice(-1)[0].time
-              ).getTime()) continue;
+          if (['auction', 'placements', 'bestPlacement'].includes(bidsRules.autoBidsMode)) {
+            if (prevBids && prevBids.length > 0) {
 
-            bid = prevBids.slice(-1)[0].val ?? currentBid;
+              if (new Date(updateTime).getTime() <=
+                new Date(
+                  prevBids.slice(-1)[0].time
+                ).getTime()) continue;
+            }
+          }
+
+          if (['auction', 'placements'].includes(bidsRules.autoBidsMode)) {
+            if (prevBids && prevBids.length > 0) {
+
+              bid = prevBids.slice(-1)[0].val ?? currentBid;
+              consoler.log(bidsRules.updateTime, prevBids.slice(-1)[0].rulesUpdateTime, new Date(bidsRules.updateTime).getTime() >
+                new Date(
+                  prevBids.slice(-1)[0].rulesUpdateTime
+                ).getTime());
+
+              if (!prevBids.slice(-1)[0].rulesUpdateTime || (prevBids.slice(-1)[0].rulesUpdateTime && new Date(bidsRules.updateTime).getTime() >
+                new Date(
+                  prevBids.slice(-1)[0].rulesUpdateTime
+                ).getTime())) {
+                bid = placementsAuctions[phrase] ?
+                  placementsAuctions[phrase].avgCpms ?
+                    placementsAuctions[phrase].avgCpms[type == 8 ? 'auto' : 'search'] ?
+                      placementsAuctions[phrase].avgCpms[type == 8 ? 'auto' : 'search'].median ?? currentBid
+                      : currentBid : currentBid : currentBid;
+                consoler.log(new Date(), uid, campaignName, advertId, 'tryed to take median cpm');
+              }
+            }
+            else {
+              bid = placementsAuctions[phrase] ?
+                placementsAuctions[phrase].avgCpms ?
+                  placementsAuctions[phrase].avgCpms[type == 8 ? 'auto' : 'search'] ?
+                    placementsAuctions[phrase].avgCpms[type == 8 ? 'auto' : 'search'].median ?? currentBid
+                    : currentBid : currentBid : currentBid;
+              consoler.log(new Date(), uid, campaignName, advertId, 'tryed to take median cpm');
+
+            }
           }
 
           if (autoBidsMode == 'auction') {
@@ -7117,7 +7336,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             )
               continue;
 
-            // console.log(new Date(), 'asasdasdasd', advertId, updateTime, cpmIndex, cpmPrevIndex, cpmPrevPrevIndex);
+            // consoler.log(new Date(), 'asasdasdasd', advertId, updateTime, cpmIndex, cpmPrevIndex, cpmPrevPrevIndex);
             // //////////////////////////////////// +1 rub
             // let phrasePlacements = {};
             // try {
@@ -7135,14 +7354,14 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
 
             // const logs = cpms[type == 8 ? 'auto' : 'search'];
             // if (logs.length) {
-            //   console.log(new Date(), logs);
+            //   consoler.log(new Date(), logs);
             //    let position = placementsRange.from
             //   if (position >= logs.length) position = logs.length - 1;
-            //   console.log(new Date(), position);
+            //   consoler.log(new Date(), position);
             //   for (let i = position - 1; i < logs.length; i++) {
             //     if (logs[i].advertId == advertId) break;
             //     bid = logs[i].cpm + 1;
-            //     console.log(new Date(), bid, logs[i]);
+            //     consoler.log(new Date(), bid, logs[i]);
             //     if (bid <= maxBid) break;
             //   }
 
@@ -7164,6 +7383,38 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
 
             }
           }
+          else if (autoBidsMode == 'bestPlacement') {
+            if (!updateTime) continue;
+            if (
+              (new Date().getTime() - new Date(updateTime).getTime()) /
+              1000 /
+              60 >
+              60
+            )
+              continue;
+
+            let cardsCpms = placementsAuctions[phrase] ?
+              placementsAuctions[phrase][type == 8 ? 'auto' : 'search'] ?
+                placementsAuctions[phrase][type == 8 ? 'auto' : 'search'] ?? [] : [] : [];
+
+            const getOrganicRange = (pos) => {
+              if (pos <= 100) return 1;
+              if (pos <= 500) return 2;
+              return 3;
+            }
+
+            console.log(cardsCpms.length);
+            cardsCpms = cardsCpms.filter(item => item.supplier != supplier);
+            console.log(cardsCpms.length);
+            cardsCpms = cardsCpms.sort((a, b) => b.cpm - a.cpm);
+            for (let i = 0; i < cardsCpms.length; i++) {
+              const card = cardsCpms[i];
+              if (card.cpm < maxBid) {
+                bid = card.cpm + 1;
+                break;
+              }
+            }
+          }
           else if (autoBidsMode == 'placements') {
             if (!updateTime) continue;
             if (
@@ -7174,7 +7425,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             )
               continue;
 
-            // console.log(new Date(), 
+            // consoler.log(new Date(), 
             //   art,
             //   index,
             //   new Date(updateTime).toLocaleString("ru-RU"),
@@ -7185,7 +7436,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
 
             // if (prevBids && prevBids.length >= 3) {
             //   const prevData = prevBids.slice(-3);
-            //   // console.log(new Date(), prevData);
+            //   // consoler.log(new Date(), prevData);
             //   if (!prevData[2].rollback) {
             //     if (prevData[0].index != -1 && prevData[1].index != -1 && prevData[2].index != -1) {
             //       if (prevData[2].val > prevData[1].val && prevData[1].val > prevData[0].val && prevData[1].index <= prevData[2].index) {
@@ -7223,15 +7474,16 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
           else if (autoBidsMode == 'drr') {
 
             if (prevBids && prevBids.length > 0) {
-              if (new Date().getTime() <=
-                (new Date(
-                  prevBids.slice(-1)[0].time
-                ).getTime() + 20 * 60 * 1000)) continue;
+              if (prevBids.slice(-1)[0].autoBidsMode != 'none')
+                if (new Date().getTime() <=
+                  (new Date(
+                    prevBids.slice(-1)[0].time
+                  ).getTime() + 20 * 60 * 1000)) continue;
             }
 
             const { cr, sum, sum_orders, orders } = min_recalc(daysInWork);
 
-            // console.log(advertInfos, daysInWork, sum, currentBid, subjectId, bidsRules, prevBids.slice(-3));
+            // consoler.log(advertInfos, daysInWork, sum, currentBid, subjectId, bidsRules, prevBids.slice(-3));
             const avgBill = getRoundValue(
               sum_orders,
               orders
@@ -7246,7 +7498,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             }
             else bid = Math.round(calculatedCPO * cr * 10);
 
-            console.log(new Date(), uid, campaignName, advertId, `cr: ${cr}`, sum_orders, orders, avgBill, `cpo: ${calculatedCPO}`, bid);
+            consoler.log(new Date(), uid, campaignName, advertId, `cr: ${cr}`, sum_orders, orders, avgBill, `cpo: ${calculatedCPO}`, bid);
           }
           else if (autoBidsMode == 'cpo') {
             if (prevBids && prevBids.length > 0) {
@@ -7265,7 +7517,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             } else
               bid = Math.round(calculatedCPO * cr * 10);
 
-            console.log(new Date(), uid, campaignName, advertId, `cr: ${cr}`, orders, `cpo: ${calculatedCPO}`, bid);
+            consoler.log(new Date(), uid, campaignName, advertId, `cr: ${cr}`, orders, `cpo: ${calculatedCPO}`, bid);
           }
 
           // if (drr == desiredDRR) continue;
@@ -7300,7 +7552,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
 
           await setAdvertCPM(authToken, params);
           await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
-          console.log(new Date(),
+          consoler.log(new Date(),
             uid,
             campaignName,
             advertId,
@@ -7329,6 +7581,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
             phrase: phrase,
             position: position,
             rollback: rollback,
+            rulesUpdateTime: bidsRules.updateTime,
           });
 
         }
@@ -7344,7 +7597,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
         // ))
         // for (const [name, data] of Object.entries(plusPhrasesTemplates)) {
         //   if (new Date(currentadvertsBidsLog[name].updateTime) > startTime) {
-        //     console.log(new Date(), uid, campaignName, name, 'plus phrases template was updated after the start of this exec.');
+        //     consoler.log(new Date(), uid, campaignName, name, 'plus phrases template was updated after the start of this exec.');
         //     continue;
         //   };
 
@@ -7362,7 +7615,7 @@ const autoSetAdvertsCPMsAndWriteToJsonMM = async (uid, campaignName) => {
         afs.writeFileSync(advertsBidsLogPath, JSON.stringify(advertsBidsLog));
         resolve();
       });
-    } catch (e) { console.log(new Date(), e); resolve() }
+    } catch (e) { consoler.log(new Date(), e); resolve() }
   });
 };
 
@@ -7509,8 +7762,8 @@ const fetchAdvertsStatsAndWriteToJsonMM = async (
       params[numOfButches].push({
         id: advertData.advertId,
         // interval: {
-        //   begin: "2022-01-01",
-        //   end: today_str,
+        //   begin: "2024-04-01",
+        //   end: "2024-04-30",
         // },
         // dates: dates,
       });
@@ -9677,6 +9930,21 @@ const getPlacements = (uid, campaignName) => {
       const phrasePlacements = readIfExists(phrasePlacementsPath);
       const { updateTime, data, firstAdvertIndex, cpms } = phrasePlacements;
 
+      const avgCpms = {};
+      if (cpms) {
+
+        for (const [auctionType, cards] of Object.entries(cpms)) {
+          if (auctionType == 'firstPage') continue;
+          if (!avgCpms[auctionType]) avgCpms[auctionType] = { cardsCpms: [], median: 0 };
+          for (const card of cards) {
+            const { cpm } = card;
+            avgCpms[auctionType].cardsCpms.push(cpm);
+          }
+          avgCpms[auctionType].cardsCpms = avgCpms[auctionType].cardsCpms.sort((a, b) => a - b);
+          avgCpms[auctionType].median = avgCpms[auctionType].cardsCpms[Math.floor(avgCpms[auctionType].cardsCpms.length / 2)];
+        }
+        cpms.avgCpms = avgCpms;
+      }
       placementsAuctions[topPhrase.phrase] = cpms;
 
       const { nmId } = arts.byBrandArt[art] ?? {};
@@ -10207,197 +10475,304 @@ const fixArtPricesAndWriteToJsonMM = (uid, campaignName, data) => {
 
 const autoSetFixArtPricesMM = (uid, campaignName) => {
   return new Promise(async (resolve, reject) => {
+    try {
 
-    const fixArtPricesPath = path.join(
-      __dirname,
-      "marketMaster",
-      uid,
-      campaignName,
-      "fixArtPrices.json"
-    );
-    const fixArtPrices = readIfExists(fixArtPricesPath);
 
-    const arts = readIfExists(
-      path.join(
+      const fixArtPricesPath = path.join(
         __dirname,
         "marketMaster",
         uid,
         campaignName,
-        "arts.json"
+        "fixArtPrices.json"
+      );
+      const fixArtPrices = readIfExists(fixArtPricesPath);
+
+      const arts = readIfExists(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "arts.json"
+        )
+      );
+      arts.byBrandArt = {};
+      for (const [nmId, artData] of Object.entries(arts.byNmId)) {
+        artData.nmId = parseInt(nmId);
+        arts.byBrandArt[artData.art] = artData;
+      }
+
+      const stocks = readIfExists(
+        path.join(
+          __dirname,
+          "marketMaster",
+          uid,
+          campaignName,
+          "stocks.json"
+        )
       )
-    );
-    const stocks = readIfExists(
-      path.join(
-        __dirname,
-        "marketMaster",
-        uid,
-        campaignName,
-        "stocks.json"
-      )
-    )
 
-    const sppPricesParsed = readIfExists(
-      path.join(
-        __dirname,
-        'marketMaster',
-        uid,
-        campaignName,
-        'sppPricesParsed.json'
-      )
-    );
+      const sppPricesParsed = readIfExists(
+        path.join(
+          __dirname,
+          'marketMaster',
+          uid,
+          campaignName,
+          'sppPricesParsed.json'
+        )
+      );
 
+      const nmFullDetailReport = readIfExists(
+        path.join(
+          __dirname,
+          'marketMaster',
+          uid,
+          campaignName,
+          'nmFullDetailReport.json'
+        )
+      );
 
-    const strTodayDate = getLocaleDateString(new Date()).slice(0, 10)
+      const date = new Date();
+      const yesterday = new Date(date);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const weekAgo = new Date(date);
+      weekAgo.setDate(date.getDate() - 7);
+      const dateRange = { lbd: getLocaleDateString(weekAgo).slice(0, 10), rbd: getLocaleDateString(yesterday).slice(0, 10) }
 
-    const iterList = [];
-    for (const [art, artData] of Object.entries(arts.byArt)) {
-      iterList.push({ art, artData });
-    }
-    iterList.sort((a, b) => {
-      const artA = a.art;
-      const stockA = stocks[strTodayDate] ? stocks[strTodayDate].all[artA] ? stocks[strTodayDate].all[artA].quantity ?? 0 : 0 : 0;
+      const isInDateBoundaries = (strDate) => {
+        const temp_dateRange = { lbd: new Date(dateRange.lbd), rbd: new Date(dateRange.rbd) };
+        const dateObj = new Date(strDate + 'T00:00:00.000Z');
 
-      const artB = b.art;
-      const stockB = stocks[strTodayDate] ? stocks[strTodayDate].all[artB] ? stocks[strTodayDate].all[artB].quantity ?? 0 : 0 : 0;
-
-      return stockB - stockA;
-    })
-
-    const sppJsonToHelp = {}
-    const sppData = {}
-    for (let iter = 0; iter < iterList.length; iter++) {
-      const { art, artData } = iterList[iter]
-      if (art === undefined || artData === undefined) continue;
-
-
-      const { nmId, size, object } = artData;
-
-      let spp = sppPricesParsed.arts[nmId] ?
-        sppPricesParsed.arts[nmId].sizes[size] ?
-          sppPricesParsed.arts[nmId].sizes[size].spp
-          : undefined : undefined;
-
-      if (spp) {
-        if (!sppJsonToHelp[object]) sppJsonToHelp[object] = {}
-        if (!sppJsonToHelp[object][spp]) sppJsonToHelp[object][spp] = 0
-        sppJsonToHelp[object][spp]++;
-      }
-      else {
-        const findSpp = () => {
-          let res = { spp: 0, count: 0 };
-          if (!sppJsonToHelp[object]) return 0;
-          for (let [spp, count] of Object.entries(sppJsonToHelp[object])) {
-            spp = Math.round(Number(spp))
-            if (count > res.count) res = { spp, count }
-          }
-          return res.spp;
-        }
-        spp = findSpp();
+        return (temp_dateRange.lbd.getTime() - 1) <= dateObj.getTime() && dateObj.getTime() <= (temp_dateRange.rbd.getTime() + 1);
       }
 
-      sppData[nmId] = spp;
-    }
+      const getAvgOrdersPerDay = () => {
+        const avg = {};
+        if (nmFullDetailReport) {
+          for (const [nmId, nmIdData] of Object.entries(nmFullDetailReport)) {
+            const temp_date_array = []
 
-    const artsDataUploaded = readIfExists(
-      path.join(
-        __dirname,
-        'marketMaster',
-        uid,
-        campaignName,
-        'artsDataUploaded.json'
-      )
-    );
+            if (nmIdData === undefined) continue;
+            const artData = arts.byNmId[nmId];
+            if (!artData) continue;
+            const { art } = artData;
+            if (art === undefined) continue;
+            const stats = nmIdData ? nmIdData.statistics : undefined;
+            if (stats === undefined) continue;
 
-    const getSomeArt = (nmId) => {
-      const sizes = arts.byNmId[nmId].sizes;
-      for (let i = 0; i < sizes.length; i++) {
-        const sku = sizes[i].skus[0];
-        return arts.bySku[sku];
-      }
-    }
+            if (!avg[art]) avg[art] = {
+              orders: 0,
+              sum_orders: 0,
+              count: 0,
+              avgCost: 0,
+              avg: 0,
+            };
 
-    const byNmId = {}
-    const paramsToUpdate = {
-      data: [],
-    }
+            for (const [date, artOrdersData] of Object.entries(stats)) {
+              if (nmId == '208981678') console.log(date, artOrdersData);
+              if (!isInDateBoundaries(date)) continue;
 
-    for (const [id, nmIdData] of Object.entries(fixArtPrices)) {
-      if (id === undefined || nmIdData === undefined) continue;
-      const { enteredValue } = nmIdData;
-      const { nmId } = arts.byNmId[id] ?? {};
-      if (nmId === undefined || enteredValue === undefined) continue;
 
-      const { discount } = enteredValue;
+              avg[art].sum_orders += artOrdersData.ordersSumRub ?? 0;
+              avg[art].orders += artOrdersData.ordersCount ?? 0;
+              avg[art].count += artOrdersData.ordersCount ? 1 : 0;
 
-      const { art, object, brand } = getSomeArt(nmId);
-      // console.log(art, artsDataUploaded[art]);
-
-      const { prices } = artsDataUploaded[art] ?? {};
-      const primeCost = prices['Себестоимость 1'] ?? {};
-      if (primeCost === undefined) continue;
-
-      const spp = sppData[nmId];
-
-      let rozPrice = undefined;
-      let sppPrice = undefined;
-
-      if (enteredValue['primeCostMarkup'] && primeCost) {
-        rozPrice = primeCost * (1 + enteredValue['primeCostMarkup'] / 100);
-      }
-      else if (enteredValue['rozPrice']) {
-        rozPrice = enteredValue['rozPrice'];
-      }
-      else if (enteredValue['sppPrice'] && spp) {
-        sppPrice = enteredValue['sppPrice'];
-        rozPrice = sppPrice / (1 - spp / 100);
-      }
-      else if (enteredValue['profit'] !== undefined || enteredValue['rentabelnost'] !== undefined) {
-        try {
-          const date = new Date();
-          const yesterday = new Date(date);
-          yesterday.setDate(yesterday.getDate() - 1);
-          const weekAgo = new Date(date);
-          weekAgo.setDate(yesterday.getDate() - 6);
-          const params = {
-            ...enteredValue, filters: {
-              arts: [art],
-              brands: [brand],
-              objects: [object],
+              if (artOrdersData.ordersCount && !temp_date_array.includes(date))
+                temp_date_array.push(date);
             }
-          };
-          console.log(params);
-          const pr = await calcPricesMM(uid, campaignName, { lbd: weekAgo, rbd: yesterday },
-            params
-          );
-          if (!pr) continue;
-          rozPrice = pr[art] ? pr[art].rozPrice : undefined;
+            temp_date_array.sort((a, b) => new Date(b) - new Date(a))
+            const last_date = temp_date_array[0] ?? '';
+            avg[art].avgCost = stats[last_date] ?
+              getRoundValue(stats[last_date].ordersSumRub, stats[last_date].ordersCount)
+              : getRoundValue(avg[art].sum_orders, avg[art].orders);
 
-          delete pr;
+            avg[art].avg = avg[art].count ? avg[art].orders / avg[art].count : 0;
+          }
         }
-        catch (e) {
-          console.log(e);
+
+        return avg;
+      }
+
+      const ordersData = getAvgOrdersPerDay();
+
+      const strTodayDate = getLocaleDateString(new Date()).slice(0, 10)
+
+      const iterList = [];
+      for (const [art, artData] of Object.entries(arts.byArt)) {
+        iterList.push({ art, artData });
+      }
+      iterList.sort((a, b) => {
+        const artA = a.art;
+        const stockA = stocks[strTodayDate] ? stocks[strTodayDate].all[artA] ? stocks[strTodayDate].all[artA].quantity ?? 0 : 0 : 0;
+
+        const artB = b.art;
+        const stockB = stocks[strTodayDate] ? stocks[strTodayDate].all[artB] ? stocks[strTodayDate].all[artB].quantity ?? 0 : 0 : 0;
+
+        return stockB - stockA;
+      })
+
+      const sppJsonToHelp = {}
+      const sppData = {}
+      for (let iter = 0; iter < iterList.length; iter++) {
+        const { art, artData } = iterList[iter]
+        if (art === undefined || artData === undefined) continue;
+
+
+        const { nmId, size, object } = artData;
+
+        let spp = sppPricesParsed.arts[nmId] ?
+          sppPricesParsed.arts[nmId].sizes[size] ?
+            sppPricesParsed.arts[nmId].sizes[size].spp
+            : undefined : undefined;
+
+        if (spp) {
+          if (!sppJsonToHelp[object]) sppJsonToHelp[object] = {}
+          if (!sppJsonToHelp[object][spp]) sppJsonToHelp[object][spp] = 0
+          sppJsonToHelp[object][spp]++;
+        }
+        else {
+          const findSpp = () => {
+            let res = { spp: 0, count: 0 };
+            if (!sppJsonToHelp[object]) return 0;
+            for (let [spp, count] of Object.entries(sppJsonToHelp[object])) {
+              spp = Math.round(Number(spp))
+              if (count > res.count) res = { spp, count }
+            }
+            return res.spp;
+          }
+          spp = findSpp();
+        }
+
+        sppData[nmId] = spp;
+      }
+
+      const artsDataUploaded = readIfExists(
+        path.join(
+          __dirname,
+          'marketMaster',
+          uid,
+          campaignName,
+          'artsDataUploaded.json'
+        )
+      );
+
+      const getSomeArt = (nmId) => {
+        const sizes = arts.byNmId[nmId].sizes;
+        for (let i = 0; i < sizes.length; i++) {
+          const sku = sizes[i].skus[0];
+          return arts.bySku[sku];
         }
       }
 
-      const wbPrice = Math.round(rozPrice / (1 - discount / 100));
-      // console.log(art, nmId, rozPrice, wbPrice, primeCost, spp);
+      const byNmId = {}
+      const paramsToUpdate = {
+        data: [],
+      }
 
-      if (rozPrice && wbPrice && rozPrice > primeCost) {
-        byNmId[nmId] = {
-          nmID: nmId,
-          price: wbPrice,
-          discount: discount,
+      for (const [id, nmIdData] of Object.entries(fixArtPrices)) {
+        if (id === undefined || nmIdData === undefined) continue;
+        const { enteredValue } = nmIdData;
+        const { nmId } = arts.byNmId[id] ?? {};
+        if (nmId === undefined || enteredValue === undefined) continue;
+
+        const { discount } = enteredValue;
+
+        const { art, object, brand, brand_art } = getSomeArt(nmId);
+        // console.log(art, artsDataUploaded[art]);
+
+        const { prices } = artsDataUploaded[art] ?? {};
+        const primeCost = prices['Себестоимость 1'] ?? {};
+        if (primeCost === undefined) continue;
+
+        const spp = sppData[nmId];
+
+        let rozPrice = undefined;
+        let sppPrice = undefined;
+
+        const artsToSumUp = [];
+        const sizes = arts.byBrandArt[brand_art].sizes;
+        for (let i = 0; i < sizes.length; i++) {
+          const sku = sizes[i].skus[0];
+          const art = arts.bySku[sku].art;
+          artsToSumUp.push(art);
         }
-      };
+
+        let stock = 0
+        for (let i = 0; i < artsToSumUp.length; i++) {
+          const art = artsToSumUp[i];
+          stock += stocks[strTodayDate] ? stocks[strTodayDate].all[art] ? stocks[strTodayDate].all[art].quantity ?? 0 : 0 : 0;
+        }
+        const { avg } = ordersData[brand_art] ?? { avg: 0 };
+        const art_avg = avg;
+        const obor = getRoundValue(stock, art_avg ?? 0, false, stock ? 999 : 0);
+
+        if (nmId == 208981678) console.log(art_avg, stock, obor);
+
+        let valueFromOborRuleSet = undefined;
+        if (enteredValue && enteredValue['oborRuleSet']) {
+          for (const [key, val] of Object.entries(enteredValue['oborRuleSet'])) {
+            if (parseInt(key) >= obor) {
+              valueFromOborRuleSet = val;
+              break;
+            }
+          }
+        }
+
+
+        if (enteredValue['primeCostMarkup'] && primeCost) {
+          rozPrice = primeCost * (1 + (valueFromOborRuleSet ?? enteredValue['primeCostMarkup']) / 100);
+        }
+        else if (enteredValue['rozPrice']) {
+          rozPrice = valueFromOborRuleSet ?? enteredValue['rozPrice'];
+        }
+        else if (enteredValue['sppPrice'] && spp) {
+          sppPrice = valueFromOborRuleSet ?? enteredValue['sppPrice'];
+          rozPrice = sppPrice / (1 - spp / 100);
+        }
+        else if (enteredValue['profit'] !== undefined || enteredValue['rentabelnost'] !== undefined) {
+          try {
+            const params = {
+              ...enteredValue, filters: {
+                arts: [art],
+                brands: [brand],
+                objects: [object],
+              }
+            };
+            console.log(params);
+            const pr = await calcPricesMM(uid, campaignName, dateRange, params);
+            if (!pr) continue;
+            rozPrice = pr[art] ? pr[art].rozPrice : undefined;
+
+            delete pr;
+          }
+          catch (e) {
+            console.log(e);
+          }
+        }
+
+        const wbPrice = Math.round(rozPrice / (1 - discount / 100));
+        // console.log(art, nmId, rozPrice, wbPrice, primeCost, spp);
+
+        if (rozPrice && wbPrice && rozPrice > primeCost) {
+          byNmId[nmId] = {
+            nmID: nmId,
+            price: wbPrice,
+            discount: discount,
+          }
+        };
+      }
+
+      for (const [_, nmIdData] of Object.entries(byNmId)) {
+        paramsToUpdate.data.push(nmIdData);
+      }
+
+      console.log(paramsToUpdate.data);
+
+      updatePricesMM(uid, campaignName, paramsToUpdate).then(() => resolve()).catch((e) => { console.log(e); resolve() })
     }
-
-    for (const [_, nmIdData] of Object.entries(byNmId)) {
-      paramsToUpdate.data.push(nmIdData);
+    catch (error) {
+      reject(error)
     }
-
-    console.log(paramsToUpdate.data);
-
-    updatePricesMM(uid, campaignName, paramsToUpdate).then(() => resolve()).catch((e) => { console.log(e); resolve() })
   })
 };
 
@@ -11243,6 +11618,7 @@ const createMassAdvertsMM = (uid, campaignName, data) => {
         }
       }
       if (advertsToStart.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 10 * 60 * 1000))
         await depositAndStart(uid, campaignName, advertsToStart);
         for (const advertId of Object.entries(advertsToStart)) {
           const { rkName } = createdAdvertsIds[advertId];
@@ -12122,6 +12498,7 @@ module.exports = {
   setAdvertsCPMsAndWriteToJsonMM,
   autoSetAdvertsCPMsAndWriteToJsonMM,
   fetchAdvertsWordsAndWriteToJsonMM,
+  dzhemGet,
   setAdvertsPlusPhrasesTemplatesMM,
   autoSetMinusPhrasesMM,
   calcNomenclaturesAndWriteToJsonMM,
@@ -12162,7 +12539,9 @@ module.exports = {
   fetchArtsPricesAndWriteToJsonMM,
   getNmDetailReport,
   getRoundValue,
+  dzhemCreate,
   getAllTags,
+  dzhemCheck,
   calcAnalyticsMM,
   readIfExists,
 };

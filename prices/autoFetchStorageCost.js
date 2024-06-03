@@ -27,4 +27,4 @@ const autoFetchStorage = async () => {
 };
 
 scheduleJob("40 2 * * *", () => autoFetchStorage());
-// autoFetchStorage();
+autoFetchStorage();
