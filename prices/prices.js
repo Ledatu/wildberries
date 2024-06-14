@@ -307,7 +307,7 @@ const fetchAdvertsMM = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
-        // if (campaignName != "ИП Валерий") continue;
+        // if (campaignName != "ОТК-С" && campaignName != 'Сальвадор37') continue;
         console.log(new Date(), uid, campaignName);
         promises.push(
           new Promise(async (resolve, reject) => {

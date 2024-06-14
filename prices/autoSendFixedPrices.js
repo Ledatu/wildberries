@@ -18,10 +18,10 @@ const start = async () => {
   for (const [uid, customerData] of Object.entries(customers)) {
     const campaignsNames = customerData.campaignsNames;
     for (let i = 0; i < campaignsNames.length; i++) {
-      await processCampaign(uid, campaignsNames[i], 0);
+      processCampaign(uid, campaignsNames[i], 0);
     }
   }
 };
 
-scheduleJob("0 */3 * * *", () => start());
-start();
+scheduleJob("59 * * * *", () => start());
+// start();

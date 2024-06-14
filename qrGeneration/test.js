@@ -4,7 +4,7 @@ const {
   fetchCurrentZakazAndWriteToXLSX,
   fetchOTKArtMathcingAndWriteToJSON,
 } = require("./google_sheets/index");
-const { generateNewTags, autoGenerateNewTags, generateTagsRaspredelenniy } = require("./main");
+const { generateNewTags, autoGenerateNewTags, generateTagsRaspredelenniy, getGeneralMaskFromVendorCode, getMaskFromVendorCode } = require("./main");
 const {
   qrGeneration,
   tagsGeneration,
@@ -24,7 +24,8 @@ const {
 // autoGenerateNewTags('mayusha', 'МАЮША');
 // autoGenerateNewTags('delicatus', 'DELICATUS');
 // autoGenerateNewTags('TKS', 'Объединённая текстильная компания');
-// autoGenerateNewTags('SLUMBER+', 'SLUMBER+');
+// autoGenerateNewTags('Amaze wear', 'Amaze wear');
 // exportAll()
 generateTagsRaspredelenniy()
+// console.log(getMaskFromVendorCode('ФТБЛ_ЖЕН_ОВЕР_Ф-13_Хаки_43'), getGeneralMaskFromVendorCode('ФТБЛ_ЖЕН_ОВЕР_Ф-13_Хаки_XL'));
 // fetchOTKArtMathcingAndWriteToJSON()

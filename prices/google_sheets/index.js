@@ -3270,7 +3270,7 @@ const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
     if (code.includes("МАЮ")) code.splice(-2, 1);
     else if (code.includes("СС")) code.splice(-2, 1);
     else if (code.includes("TF")) code.splice(-2, 1);
-    if (isNaN(parseInt(code.slice(-1)))) code.splice(-1, 1);
+    if (isNaN(parseInt(code.slice(-1))) && !['XS', 'S', 'M', 'L', 'XL'].includes(code.slice(-1)[0])) code.splice(-1, 1);
     else code.splice(-2, 2);
   } else code.splice(2, 1);
 

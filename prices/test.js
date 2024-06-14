@@ -108,6 +108,10 @@ const {
   dzhemCreate,
   dzhemGet,
   dzhemCheck,
+  calcMassAdvertsNewNewAndWriteToJsonMM,
+  parseDzhem,
+  calcPlansTemplateAndWriteToXlsxMM,
+  parsePlansXlsx,
 } = require("./main");
 const {
   getPrices,
@@ -406,6 +410,7 @@ const path = require("path");
 // );
 // calcSmartDetailedByPeriodAndWriteToJSON("mayusha");
 const afs = require("fs");
+const { tempFUNCTIONFORTEST } = require("../top-stakes/server");
 // const path = require("path");
 // const authToken = getAuthTokenMM(
 //   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
@@ -452,37 +457,75 @@ const afs = require("fs");
 // autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "Текстиль")
 // fetchAdvertsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
 // autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
-// calcPricesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Галилова", { lbd: '2024-05-24', rbd: '2024-05-30' })
+// calcPricesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Галилова", { lbd: '2024-05-31', rbd: '2024-06-06' })
 // autoSetFixArtPricesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ОТК ПРОИЗВОДСТВО");
-autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий");
+// autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ОТК ПРОИЗВОДСТВО");
 // dzhemCreate("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ОТК ПРОИЗВОДСТВО");
 // dzhemGet("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ОТК ПРОИЗВОДСТВО", '6a99dbe9-60de-465c-bf6b-9f6dd1b831ef');
 // dzhemCheck("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ОТК ПРОИЗВОДСТВО");
-// calcAnalyticsMM("4a1fvG6zM3uRFZd2828-9a1e-4bbf-8e07-208ba676a806", "Текстиль", { lbd: '2024-05-01', rbd: '2024-05-17' })
+// calcAnalyticsMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий", { lbd: '2024-06-10', rbd: '2024-06-10' })
 // fetchSalesAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
 // autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Оксана")
 // copyZakazToOtherSpreadsheet()
-// calcMassAdvertsNewAndWrixteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий", { to: '', from: '' })
+// fetchArtsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий");
+// calcMassAdvertsNewNewAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифова Р. И.", { lbd: '2024-05-01', rbd: '2024-06-06' })
+// const dd = new Date();
+// tempFUNCTIONFORTEST("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифова Р. И.");
+// tempFUNCTIONFORTEST("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий");
+// parseDzhem("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифова Р. И.");
+// autoSetFixArtPricesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифов А. М.");
+// console.log((new Date() - dd) / 1000);
 // const reqs = readIfExists(
 //   path.join(
 //     __dirname,
 //     "marketMaster",
 //     "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
-//     "requests.json"
+//     "requests_2024-06-10.json"
 //   )
 // );
-// // console.log(new Date(), reqs);
+// console.log(new Date(), reqs);
 // const nws = {};
-// for (let i = 1; i < reqs.length; i++) {
+// for (let i = 0; i < reqs.length; i++) {
 //   const obj = reqs[i];
-//   const key = obj['кроссовки женские']
-//   const val = obj['5533015']
-//   // console.log(obj);
+//   const key = obj['футболка женская']
+//   const val = obj['4893900']
 //   nws[key] = parseInt(val);
-//   // console.log(key, nws[key]);
 // }
-// nws['кроссовки женские'] = 5533015
-// // console.log(new Date(), nws);
+// nws['футболка женская'] = 4893900
+// console.log(new Date(), nws);
+// afs.writeFileSync(
+//   path.join(
+//     __dirname,
+//     "marketMaster",
+//     "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//     "requests_2024-06-10.json"
+//   ),
+//   JSON.stringify(nws)
+// );
+
+// const requests_cur = readIfExists(
+//   path.join(
+//     __dirname,
+//     "marketMaster",
+//     "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//     "requests_2024-06-10.json"
+//   )
+// );
+// const requests_old = readIfExists(
+//   path.join(
+//     __dirname,
+//     "marketMaster",
+//     "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+//     "requests_2024-06-03.json"
+//   )
+// );
+// const jsonData = {}
+// for (const [key, val] of Object.entries(requests_cur)) {
+//   const oldVal = requests_old[key] ?? 0;
+//   jsonData[key] = { val: val, trend: val - oldVal }
+// }
+
+
 // afs.writeFileSync(
 //   path.join(
 //     __dirname,
@@ -490,7 +533,7 @@ autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП
 //     "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //     "requests.json"
 //   ),
-//   JSON.stringify(nws)
+//   JSON.stringify(jsonData)
 // );
 
 // autoSetAdvertsCPMsAndWriteToJsonMM(
@@ -561,8 +604,8 @@ autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП
 // fetchAdvertsMM();
 
 // autoSetAdvertsCPMsAndWriteToJsonMM(
-//   "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
-//   "Текстиль"
+// "4a1f2828-9a1e-4bbf-8e07-208ba676a806",
+// "ИП Валерий"
 // );
 // autoManageAdvertsSchedule("4a1f2828-9a1e-4bbf-8e07-208ba676a806",
 //   "ИП Валерий")
@@ -632,8 +675,15 @@ autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП
 // fetchAdvertsWordsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Артем")
 // calcPricesJsonDataMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
 // autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
-// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Галилова")
+// autoSetMinusPhrasesMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ОТК ПРОИЗВОДСТВО")
 // writeSpp
+
+// calcPlansTemplateAndWriteToXlsxMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий", { entities: ['#ПРПЭ_140', '#ПРПЭ_160', '#ПРПЭ_180'] })
+
+// parseDzhem("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифов М.С.")
+// parseDzhem("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифов А. М.")
+// parseDzhem("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Иосифова Р. И.")
+// parseDzhem("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ОТК ПРОИЗВОДСТВО")
 
 // fetchAdvertsMM()
 // const d = new Date('2024-01-30T05:58:00.000Z')
@@ -666,3 +716,4 @@ autoSetAdvertsCPMsAndWriteToJsonMM("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП
 // })
 
 // getAllTags("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")
+parsePlansXlsx("4a1f2828-9a1e-4bbf-8e07-208ba676a806", "ИП Валерий")

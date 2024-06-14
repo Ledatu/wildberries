@@ -55,5 +55,5 @@ const start = async () => {
   }
 };
 
-scheduleJob("58 23 * * *", () => start());
-// start();
+// scheduleJob("58 23 * * *", () => start());
+start();

@@ -72,7 +72,9 @@ async function scrapeWildberriesData(searchPhrases) {
             const { id, log, name, brand, supplier } = cur;
 
             cur.sppPrice = getRoundValue(cur.sizes ? cur.sizes[0] ? cur.sizes[0].price ? cur.sizes[0].price.total ?? 0 : 0 : 0 : 0, 100);
-            cur.log.sppPrice = cur.sppPrice;
+            if (log) {
+              cur.log.sppPrice = cur.sppPrice;
+            }
 
             const { tp } = log ?? {};
             if (tp) {
@@ -131,11 +133,11 @@ async function scrapeWildberriesData(searchPhrases) {
         } else {
           page--;
           retryCount++;
-          if (retryCount % 100 == 0) {
+          if (retryCount % 50 == 0) {
             console.log(new Date(), searchPhrase, retryCount);
             await new Promise(resolve => setTimeout(resolve, 100))
           }
-          if (retryCount == 200) {
+          if (retryCount == 50) {
             retryCount = 0;
             break;
           }

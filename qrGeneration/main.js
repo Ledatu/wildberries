@@ -256,7 +256,7 @@ async function autoGenerateNewTags(campaign, brand) {
         font: openSans,
       });
 
-      if (parseInt(size)) {
+      if (size != '0') {
         const fontSizeVeryBig = 42;
         const size_width = openSans.widthOfTextAtSize(size, fontSizeVeryBig);
         page.drawText(size, {
@@ -290,8 +290,8 @@ async function autoGenerateNewTags(campaign, brand) {
         font: openSans,
       });
 
-      const filepath = path.join(__dirname, "files", "tags_ozon", `${art}.pdf`);
-      // const filepath = path.join(__dirname, "files", "tags", `${art}.pdf`);
+      // const filepath = path.join(__dirname, "files", "tags_ozon", `${art}.pdf`);
+      const filepath = path.join(__dirname, "files", "tags", `${art}.pdf`);
       const pdfBytes = await pdfDoc.save();
       console.log(new Date(), filepath);
       fs.writeFileSync(filepath, pdfBytes);
@@ -335,8 +335,8 @@ async function autoGenerateNewTags(campaign, brand) {
       const row = pivot[i]
       let size = '0';
       if (!row[0] || row[0] == '') continue;
-      if (row[0].includes('ФТБЛ')) size = row[0].split('_').slice(-1)[0]
-      xlsxss[row[0]] = {
+      if (row[0].includes('ФТБЛ')) size = row[5]
+      xlsxss[row[0] + (size != '0' ? ('_' + size) : '')] = {
         brand_art: row[0],
         color: row[3],
         object: row[2],
@@ -538,7 +538,7 @@ function generateTags() {
 function generateTagsRaspredelenniy() {
   return new Promise((resolve, reject) => {
     // const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
-    const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags_ozon");
+    const mainTagsDir = path.join(__dirname, "../qrGeneration/files/tags");
     const brands = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../prices/files/campaigns.json"))
     ).brands;
@@ -555,7 +555,7 @@ function generateTagsRaspredelenniy() {
       //     )
       //   )
       // );
-      const pivot = xlsx.parse(path.join(__dirname, 'SLUMBER+.xlsx'))[0][
+      const pivot = xlsx.parse(path.join(__dirname, 'Amaze wear.xlsx'))[0][
         "data"
       ];
       console.log(new Date(), pivot);
@@ -563,15 +563,17 @@ function generateTagsRaspredelenniy() {
       for (let i = 0; i < pivot.length; i++) {
         const row = pivot[i]
         if (!row[0] || row[0] == '') continue;
-        artsBarcodesFull[row[0]] = {
+        const size = row[5] ?? '0';
+        artsBarcodesFull[row[0] + (size != '0' ? ('_' + size) : '')] = {
           brand_art: row[0],
           color: row[3],
           object: row[2],
           brand: row[4],
-          size: "0",
+          size: size,
           barcode: row[1],
         }
       }
+      console.log(artsBarcodesFull);
       for (const [art, art_data] of Object.entries(artsBarcodesFull)) {
         const array = art.split("_");
         // if (!art.includes("ФТБЛ_ЖЕН_ОВЕР_Ф-10_Черный_МАЮ")) continue;
@@ -744,7 +746,7 @@ const getMaskFromVendorCode = (vendorCode, cut_namatr = true) => {
     if (code.includes("МАЮ")) code.splice(-2, 1);
     else if (code.includes("СС")) code.splice(-2, 1);
     else if (code.includes("TF")) code.splice(-2, 1);
-    if (isNaN(parseInt(code.slice(-1)))) code.splice(-1, 1);
+    if (isNaN(parseInt(code.slice(-1))) && !['XS', 'S', 'M', 'L', 'XL'].includes(code.slice(-1)[0])) code.splice(-1, 1);
     else code.splice(-2, 2);
   } else code.splice(2, 1);
 
@@ -774,4 +776,6 @@ module.exports = {
   autofillAndWriteToXlsx,
   generateTagsRaspredelenniy,
   autoGenerateNewTags,
+  getMaskFromVendorCode,
+  getGeneralMaskFromVendorCode,
 };

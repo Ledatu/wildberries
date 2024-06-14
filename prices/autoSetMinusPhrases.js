@@ -10,7 +10,10 @@ const autoSetMinusPhrases = async (uid, campaignName) => {
   let lastUpdate = undefined;
   // await new Promise((resolve) => setTimeout(resolve, 1 * 61 * 1000));
   while (true) {
-    await fetchAdvertsWordsAndWriteToJsonMM(uid, campaignName);
+    try {
+      await fetchAdvertsWordsAndWriteToJsonMM(uid, campaignName);
+    } catch (e) { console.log(new Date(), uid, campaignName, e); }
+
     if (
       lastUpdate &&
       (new Date().getTime() - lastUpdate.getTime()) / 1000 < 10 * 60

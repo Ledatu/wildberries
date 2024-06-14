@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { fetchBalanceWithRetry, readIfExists } = require("./main");
+const { fetchBalanceWithRetry, readIfExists, fetchNmDetailReportMonthAndWriteToJsonMM } = require("./main");
 
 const autoTest = async () => {
   return new Promise(async (resolve, reject) => {
@@ -12,6 +12,8 @@ const autoTest = async () => {
       const campaignsNames = customerData.campaignsNames;
       for (let i = 0; i < campaignsNames.length; i++) {
         const campaignName = campaignsNames[i];
+
+        fetchNmDetailReportMonthAndWriteToJsonMM(uid, campaignName)
 
         // const advertsAutoBidsRulesPath = path.join(__dirname, "marketMaster", uid, campaignName, 'advertsAutoBidsRules.json')
 
